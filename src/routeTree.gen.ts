@@ -9,38 +9,197 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppSalasRouteImport } from './routes/_app/salas'
+import { Route as AppRealocacaoRouteImport } from './routes/_app/realocacao'
+import { Route as AppProfissionaisRouteImport } from './routes/_app/profissionais'
+import { Route as AppPreferenciasRouteImport } from './routes/_app/preferencias'
+import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
+import { Route as AppContratosRouteImport } from './routes/_app/contratos'
+import { Route as AppConflitosRouteImport } from './routes/_app/conflitos'
+import { Route as AppCalendarioRouteImport } from './routes/_app/calendario'
+import { Route as AppAuditoriaRouteImport } from './routes/_app/auditoria'
+import { Route as AppAssinaturaRouteImport } from './routes/_app/assinatura'
 
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppRoute = AppRouteImport.update({
+  id: '/_app',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppSalasRoute = AppSalasRouteImport.update({
+  id: '/salas',
+  path: '/salas',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppRealocacaoRoute = AppRealocacaoRouteImport.update({
+  id: '/realocacao',
+  path: '/realocacao',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppProfissionaisRoute = AppProfissionaisRouteImport.update({
+  id: '/profissionais',
+  path: '/profissionais',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPreferenciasRoute = AppPreferenciasRouteImport.update({
+  id: '/preferencias',
+  path: '/preferencias',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppDashboardRoute = AppDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppContratosRoute = AppContratosRouteImport.update({
+  id: '/contratos',
+  path: '/contratos',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppConflitosRoute = AppConflitosRouteImport.update({
+  id: '/conflitos',
+  path: '/conflitos',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppCalendarioRoute = AppCalendarioRouteImport.update({
+  id: '/calendario',
+  path: '/calendario',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAuditoriaRoute = AppAuditoriaRouteImport.update({
+  id: '/auditoria',
+  path: '/auditoria',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAssinaturaRoute = AppAssinaturaRouteImport.update({
+  id: '/assinatura',
+  path: '/assinatura',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
+  '/assinatura': typeof AppAssinaturaRoute
+  '/auditoria': typeof AppAuditoriaRoute
+  '/calendario': typeof AppCalendarioRoute
+  '/conflitos': typeof AppConflitosRoute
+  '/contratos': typeof AppContratosRoute
+  '/dashboard': typeof AppDashboardRoute
+  '/preferencias': typeof AppPreferenciasRoute
+  '/profissionais': typeof AppProfissionaisRoute
+  '/realocacao': typeof AppRealocacaoRoute
+  '/salas': typeof AppSalasRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
+  '/assinatura': typeof AppAssinaturaRoute
+  '/auditoria': typeof AppAuditoriaRoute
+  '/calendario': typeof AppCalendarioRoute
+  '/conflitos': typeof AppConflitosRoute
+  '/contratos': typeof AppContratosRoute
+  '/dashboard': typeof AppDashboardRoute
+  '/preferencias': typeof AppPreferenciasRoute
+  '/profissionais': typeof AppProfissionaisRoute
+  '/realocacao': typeof AppRealocacaoRoute
+  '/salas': typeof AppSalasRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_app': typeof AppRouteWithChildren
+  '/login': typeof LoginRoute
+  '/_app/assinatura': typeof AppAssinaturaRoute
+  '/_app/auditoria': typeof AppAuditoriaRoute
+  '/_app/calendario': typeof AppCalendarioRoute
+  '/_app/conflitos': typeof AppConflitosRoute
+  '/_app/contratos': typeof AppContratosRoute
+  '/_app/dashboard': typeof AppDashboardRoute
+  '/_app/preferencias': typeof AppPreferenciasRoute
+  '/_app/profissionais': typeof AppProfissionaisRoute
+  '/_app/realocacao': typeof AppRealocacaoRoute
+  '/_app/salas': typeof AppSalasRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/assinatura'
+    | '/auditoria'
+    | '/calendario'
+    | '/conflitos'
+    | '/contratos'
+    | '/dashboard'
+    | '/preferencias'
+    | '/profissionais'
+    | '/realocacao'
+    | '/salas'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/login'
+    | '/assinatura'
+    | '/auditoria'
+    | '/calendario'
+    | '/conflitos'
+    | '/contratos'
+    | '/dashboard'
+    | '/preferencias'
+    | '/profissionais'
+    | '/realocacao'
+    | '/salas'
+  id:
+    | '__root__'
+    | '/'
+    | '/_app'
+    | '/login'
+    | '/_app/assinatura'
+    | '/_app/auditoria'
+    | '/_app/calendario'
+    | '/_app/conflitos'
+    | '/_app/contratos'
+    | '/_app/dashboard'
+    | '/_app/preferencias'
+    | '/_app/profissionais'
+    | '/_app/realocacao'
+    | '/_app/salas'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AppRoute: typeof AppRouteWithChildren
+  LoginRoute: typeof LoginRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_app': {
+      id: '/_app'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,22 +207,112 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/salas': {
+      id: '/_app/salas'
+      path: '/salas'
+      fullPath: '/salas'
+      preLoaderRoute: typeof AppSalasRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/realocacao': {
+      id: '/_app/realocacao'
+      path: '/realocacao'
+      fullPath: '/realocacao'
+      preLoaderRoute: typeof AppRealocacaoRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/profissionais': {
+      id: '/_app/profissionais'
+      path: '/profissionais'
+      fullPath: '/profissionais'
+      preLoaderRoute: typeof AppProfissionaisRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/preferencias': {
+      id: '/_app/preferencias'
+      path: '/preferencias'
+      fullPath: '/preferencias'
+      preLoaderRoute: typeof AppPreferenciasRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/dashboard': {
+      id: '/_app/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AppDashboardRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/contratos': {
+      id: '/_app/contratos'
+      path: '/contratos'
+      fullPath: '/contratos'
+      preLoaderRoute: typeof AppContratosRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/conflitos': {
+      id: '/_app/conflitos'
+      path: '/conflitos'
+      fullPath: '/conflitos'
+      preLoaderRoute: typeof AppConflitosRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/calendario': {
+      id: '/_app/calendario'
+      path: '/calendario'
+      fullPath: '/calendario'
+      preLoaderRoute: typeof AppCalendarioRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/auditoria': {
+      id: '/_app/auditoria'
+      path: '/auditoria'
+      fullPath: '/auditoria'
+      preLoaderRoute: typeof AppAuditoriaRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/assinatura': {
+      id: '/_app/assinatura'
+      path: '/assinatura'
+      fullPath: '/assinatura'
+      preLoaderRoute: typeof AppAssinaturaRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
+interface AppRouteChildren {
+  AppAssinaturaRoute: typeof AppAssinaturaRoute
+  AppAuditoriaRoute: typeof AppAuditoriaRoute
+  AppCalendarioRoute: typeof AppCalendarioRoute
+  AppConflitosRoute: typeof AppConflitosRoute
+  AppContratosRoute: typeof AppContratosRoute
+  AppDashboardRoute: typeof AppDashboardRoute
+  AppPreferenciasRoute: typeof AppPreferenciasRoute
+  AppProfissionaisRoute: typeof AppProfissionaisRoute
+  AppRealocacaoRoute: typeof AppRealocacaoRoute
+  AppSalasRoute: typeof AppSalasRoute
+}
+
+const AppRouteChildren: AppRouteChildren = {
+  AppAssinaturaRoute: AppAssinaturaRoute,
+  AppAuditoriaRoute: AppAuditoriaRoute,
+  AppCalendarioRoute: AppCalendarioRoute,
+  AppConflitosRoute: AppConflitosRoute,
+  AppContratosRoute: AppContratosRoute,
+  AppDashboardRoute: AppDashboardRoute,
+  AppPreferenciasRoute: AppPreferenciasRoute,
+  AppProfissionaisRoute: AppProfissionaisRoute,
+  AppRealocacaoRoute: AppRealocacaoRoute,
+  AppSalasRoute: AppSalasRoute,
+}
+
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AppRoute: AppRouteWithChildren,
+  LoginRoute: LoginRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
