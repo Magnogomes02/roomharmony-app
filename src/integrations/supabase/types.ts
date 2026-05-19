@@ -183,6 +183,42 @@ export type Database = {
           },
         ]
       }
+      contract_attachments: {
+        Row: {
+          contract_id: string | null
+          created_at: string
+          file_name: string
+          file_path: string
+          id: string
+          mime_type: string | null
+          professional_id: string
+          size_bytes: number | null
+          uploaded_by: string | null
+        }
+        Insert: {
+          contract_id?: string | null
+          created_at?: string
+          file_name: string
+          file_path: string
+          id?: string
+          mime_type?: string | null
+          professional_id: string
+          size_bytes?: number | null
+          uploaded_by?: string | null
+        }
+        Update: {
+          contract_id?: string | null
+          created_at?: string
+          file_name?: string
+          file_path?: string
+          id?: string
+          mime_type?: string | null
+          professional_id?: string
+          size_bytes?: number | null
+          uploaded_by?: string | null
+        }
+        Relationships: []
+      }
       contract_schedules: {
         Row: {
           contract_id: string
@@ -234,6 +270,7 @@ export type Database = {
           end_date: string | null
           extra_clauses: string | null
           id: string
+          locador_name: string | null
           monthly_value: number
           notes: string | null
           professional_id: string
@@ -250,6 +287,7 @@ export type Database = {
           end_date?: string | null
           extra_clauses?: string | null
           id?: string
+          locador_name?: string | null
           monthly_value?: number
           notes?: string | null
           professional_id: string
@@ -266,6 +304,7 @@ export type Database = {
           end_date?: string | null
           extra_clauses?: string | null
           id?: string
+          locador_name?: string | null
           monthly_value?: number
           notes?: string | null
           professional_id?: string
