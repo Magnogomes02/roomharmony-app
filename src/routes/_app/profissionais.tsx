@@ -125,7 +125,7 @@ function ProfissionaisPage() {
     if (!user) return;
     await supabase.from("audit_logs").insert({
       actor_id: user.id, action, entity_type: "professional",
-      entity_id: entityId ?? null, metadata: metadata ?? null,
+      entity_id: entityId ?? null, metadata: (metadata ?? null) as never,
     });
   }
 
