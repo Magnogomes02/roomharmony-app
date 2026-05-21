@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Pencil, FileText, Paperclip, Download, Trash2, Search } from "lucide-react";
+import { Plus, Pencil, FileText, Paperclip, Download, Trash2, Search, FileDown } from "lucide-react";
+import { generateContractPdf } from "@/lib/contractPdf";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -366,6 +367,38 @@ function ContratosPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          title="Baixar PDF"
+                          onClick={async () => {
+                            if (!c.professional || !c.room) {
+                              toast.error("Dados incompletos para gerar o PDF");
+                              return;
+                            }
+                            try {
+                              await generateContractPdf({
+                                professional: c.professional,
+                                room: { name: c.room.name },
+                                start_date: c.start_date,
+                                end_date: c.end_date,
+                                monthly_value: Number(c.monthly_value),
+                                extra_clauses: c.extra_clauses,
+                                notes: c.notes,
+                                locador_name: c.locador_name,
+                                signed_by_name: c.signed_by_name,
+                                signed_at: c.signed_at,
+                              });
+                              await logAudit("contract.pdf_download", c.id);
+                            } catch (err) {
+                              toast.error("Erro ao gerar PDF", {
+                                description: err instanceof Error ? err.message : undefined,
+                              });
+                            }
+                          }}
+                        >
+                          <FileDown className="h-4 w-4" />
+                        </Button>
                         <Button size="icon" variant="ghost" onClick={() => openAttachments(c)} title="Anexos">
                           <Paperclip className="h-4 w-4" />
                         </Button>

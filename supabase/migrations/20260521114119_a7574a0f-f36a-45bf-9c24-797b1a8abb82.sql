@@ -1,0 +1,1 @@
+drop policy if exists "clinic-assets public read" on storage.objects;
