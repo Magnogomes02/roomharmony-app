@@ -202,7 +202,7 @@ function CalendarioPage() {
   async function audit(action: string, entity_id: string | null, metadata: Record<string, unknown>) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-    await supabase.from("audit_logs").insert({ actor_id: user.id, action, entity_type: "booking", entity_id, metadata });
+    await supabase.from("audit_logs").insert({ actor_id: user.id, action, entity_type: "booking", entity_id, metadata: metadata as never });
   }
 
   function openNewAt(roomId: string, slotIdx: number) {
