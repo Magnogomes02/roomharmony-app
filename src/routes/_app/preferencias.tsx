@@ -78,6 +78,7 @@ function PreferenciasPage() {
     if (up.error) {
       setUploading(false);
       e.target.value = "";
+      console.error("[logo upload]", up.error);
       toast.error("Erro no upload", { description: up.error.message });
       return;
     }
