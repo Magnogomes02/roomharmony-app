@@ -16,6 +16,7 @@ import { Route as AppSalasRouteImport } from './routes/_app/salas'
 import { Route as AppRealocacaoRouteImport } from './routes/_app/realocacao'
 import { Route as AppProfissionaisRouteImport } from './routes/_app/profissionais'
 import { Route as AppPreferenciasRouteImport } from './routes/_app/preferencias'
+import { Route as AppFinanceiroRouteImport } from './routes/_app/financeiro'
 import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
 import { Route as AppContratosRouteImport } from './routes/_app/contratos'
 import { Route as AppConflitosRouteImport } from './routes/_app/conflitos'
@@ -56,6 +57,11 @@ const AppPreferenciasRoute = AppPreferenciasRouteImport.update({
   path: '/preferencias',
   getParentRoute: () => AppRoute,
 } as any)
+const AppFinanceiroRoute = AppFinanceiroRouteImport.update({
+  id: '/financeiro',
+  path: '/financeiro',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppDashboardRoute = AppDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -90,6 +96,7 @@ export interface FileRoutesByFullPath {
   '/conflitos': typeof AppConflitosRoute
   '/contratos': typeof AppContratosRoute
   '/dashboard': typeof AppDashboardRoute
+  '/financeiro': typeof AppFinanceiroRoute
   '/preferencias': typeof AppPreferenciasRoute
   '/profissionais': typeof AppProfissionaisRoute
   '/realocacao': typeof AppRealocacaoRoute
@@ -103,6 +110,7 @@ export interface FileRoutesByTo {
   '/conflitos': typeof AppConflitosRoute
   '/contratos': typeof AppContratosRoute
   '/dashboard': typeof AppDashboardRoute
+  '/financeiro': typeof AppFinanceiroRoute
   '/preferencias': typeof AppPreferenciasRoute
   '/profissionais': typeof AppProfissionaisRoute
   '/realocacao': typeof AppRealocacaoRoute
@@ -118,6 +126,7 @@ export interface FileRoutesById {
   '/_app/conflitos': typeof AppConflitosRoute
   '/_app/contratos': typeof AppContratosRoute
   '/_app/dashboard': typeof AppDashboardRoute
+  '/_app/financeiro': typeof AppFinanceiroRoute
   '/_app/preferencias': typeof AppPreferenciasRoute
   '/_app/profissionais': typeof AppProfissionaisRoute
   '/_app/realocacao': typeof AppRealocacaoRoute
@@ -133,6 +142,7 @@ export interface FileRouteTypes {
     | '/conflitos'
     | '/contratos'
     | '/dashboard'
+    | '/financeiro'
     | '/preferencias'
     | '/profissionais'
     | '/realocacao'
@@ -146,6 +156,7 @@ export interface FileRouteTypes {
     | '/conflitos'
     | '/contratos'
     | '/dashboard'
+    | '/financeiro'
     | '/preferencias'
     | '/profissionais'
     | '/realocacao'
@@ -160,6 +171,7 @@ export interface FileRouteTypes {
     | '/_app/conflitos'
     | '/_app/contratos'
     | '/_app/dashboard'
+    | '/_app/financeiro'
     | '/_app/preferencias'
     | '/_app/profissionais'
     | '/_app/realocacao'
@@ -223,6 +235,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppPreferenciasRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/financeiro': {
+      id: '/_app/financeiro'
+      path: '/financeiro'
+      fullPath: '/financeiro'
+      preLoaderRoute: typeof AppFinanceiroRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/dashboard': {
       id: '/_app/dashboard'
       path: '/dashboard'
@@ -267,6 +286,7 @@ interface AppRouteChildren {
   AppConflitosRoute: typeof AppConflitosRoute
   AppContratosRoute: typeof AppContratosRoute
   AppDashboardRoute: typeof AppDashboardRoute
+  AppFinanceiroRoute: typeof AppFinanceiroRoute
   AppPreferenciasRoute: typeof AppPreferenciasRoute
   AppProfissionaisRoute: typeof AppProfissionaisRoute
   AppRealocacaoRoute: typeof AppRealocacaoRoute
@@ -279,6 +299,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppConflitosRoute: AppConflitosRoute,
   AppContratosRoute: AppContratosRoute,
   AppDashboardRoute: AppDashboardRoute,
+  AppFinanceiroRoute: AppFinanceiroRoute,
   AppPreferenciasRoute: AppPreferenciasRoute,
   AppProfissionaisRoute: AppProfissionaisRoute,
   AppRealocacaoRoute: AppRealocacaoRoute,

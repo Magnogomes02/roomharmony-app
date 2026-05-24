@@ -49,6 +49,7 @@ interface Contract {
   start_date: string;
   end_date: string | null;
   monthly_value: number;
+  due_day: number;
   status: string;
   notes: string | null;
   extra_clauses: string | null;
@@ -78,6 +79,7 @@ const emptyForm = {
   start_date: new Date().toISOString().slice(0, 10),
   end_date: "",
   monthly_value: "",
+  due_day: "5",
   status: "rascunho",
   extra_clauses: "",
   notes: "",
@@ -155,6 +157,7 @@ function ContratosPage() {
       start_date: c.start_date,
       end_date: c.end_date ?? "",
       monthly_value: String(c.monthly_value ?? ""),
+      due_day: String(c.due_day ?? 5),
       status: c.status,
       extra_clauses: c.extra_clauses ?? "",
       notes: c.notes ?? "",
@@ -194,6 +197,7 @@ function ContratosPage() {
       start_date: form.start_date,
       end_date: form.end_date || null,
       monthly_value: form.monthly_value ? Number(form.monthly_value) : 0,
+      due_day: Math.min(28, Math.max(1, Number(form.due_day) || 5)),
       status: form.status,
       extra_clauses: form.extra_clauses.trim() || null,
       notes: form.notes.trim() || null,
@@ -502,6 +506,11 @@ function ContratosPage() {
                   <Input type="number" step="0.01" min="0" value={form.monthly_value}
                     onChange={(e) => setForm({ ...form, monthly_value: e.target.value })} />
                 </div>
+                <div className="space-y-2">
+                  <Label>Dia de vencimento (1-28)</Label>
+                  <Input type="number" min="1" max="28" value={form.due_day}
+                    onChange={(e) => setForm({ ...form, due_day: e.target.value })} />
+                </div>
                 <div className="space-y-2 sm:col-span-3">
                   <Label>Status</Label>
                   <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
@@ -513,6 +522,7 @@ function ContratosPage() {
                       <SelectItem value="cancelado">Cancelado</SelectItem>
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-muted-foreground">Ao salvar como "Ativo", o sistema gera automaticamente os recebíveis mensais no Financeiro.</p>
                 </div>
               </div>
             </section>
