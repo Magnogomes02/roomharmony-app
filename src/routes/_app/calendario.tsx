@@ -124,8 +124,8 @@ function CalendarioPage() {
 
   // dialogs
   const [newOpen, setNewOpen] = useState(false);
-  const [newForm, setNewForm] = useState<{ room_id: string; professional_id: string; start: string; end: string; notes: string }>({
-    room_id: "", professional_id: "", start: "08:00", end: "09:00", notes: "",
+  const [newForm, setNewForm] = useState<{ room_id: string; professional_id: string; start: string; end: string; notes: string; avulso_amount: string; avulso_paid: boolean }>({
+    room_id: "", professional_id: "", start: "08:00", end: "09:00", notes: "", avulso_amount: "", avulso_paid: false,
   });
   const [conflictWarn, setConflictWarn] = useState<{ open: boolean; onConfirm: () => void; message: string }>({ open: false, onConfirm: () => {}, message: "" });
   const [detailBooking, setDetailBooking] = useState<Booking | null>(null);
@@ -210,7 +210,7 @@ function CalendarioPage() {
     const startMin = HOUR_START * 60 + slotIdx * SLOT_MINUTES;
     const endMin = startMin + 60;
     const fmt = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
-    setNewForm({ room_id: roomId, professional_id: "", start: fmt(startMin), end: fmt(endMin), notes: "" });
+    setNewForm({ room_id: roomId, professional_id: "", start: fmt(startMin), end: fmt(endMin), notes: "", avulso_amount: "", avulso_paid: false });
     setNewOpen(true);
   }
 
@@ -235,6 +235,7 @@ function CalendarioPage() {
       }
     }
 
+    const amountNum = newForm.avulso_amount ? Number(newForm.avulso_amount) : null;
     const { data, error } = await supabase.from("bookings").insert({
       professional_id: newForm.professional_id,
       room_id: newForm.room_id,
@@ -242,9 +243,32 @@ function CalendarioPage() {
       end_at: end.toISOString(),
       status: "ativa",
       source: "avulsa",
+      avulso_amount: amountNum,
+      avulso_paid_at: newForm.avulso_paid && amountNum ? new Date().toISOString() : null,
     }).select("id").single();
     if (error) { toast.error("Erro ao criar reserva", { description: error.message }); return; }
-    await audit("booking.create", data?.id ?? null, { source: "avulsa", forced_conflict: force });
+
+    // gera recebível avulso se há valor
+    if (amountNum && amountNum > 0) {
+      const today = new Date().toISOString().slice(0, 10);
+      const monthRef = new Date(start.getFullYear(), start.getMonth(), 1).toISOString().slice(0, 10);
+      const recPayload = {
+        kind: "avulso" as const,
+        booking_id: data!.id,
+        professional_id: newForm.professional_id,
+        room_id: newForm.room_id,
+        reference_month: monthRef,
+        due_date: today,
+        amount_due: amountNum,
+        status: newForm.avulso_paid ? "recebido" : "a_receber",
+        amount_paid: newForm.avulso_paid ? amountNum : null,
+        paid_at: newForm.avulso_paid ? new Date().toISOString() : null,
+        payment_method: newForm.avulso_paid ? "PIX" : null,
+      };
+      await supabase.from("receivables").insert(recPayload);
+    }
+
+    await audit("booking.create", data?.id ?? null, { source: "avulsa", forced_conflict: force, amount: amountNum });
     toast.success("Reserva criada");
     setNewOpen(false);
     loadBookings();
@@ -622,6 +646,25 @@ function CalendarioPage() {
                 <Input type="time" value={newForm.end} onChange={(e) => setNewForm({ ...newForm, end: e.target.value })} />
               </div>
             </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-2">
+                <Label>Valor avulso (R$)</Label>
+                <Input type="number" step="0.01" min="0" placeholder="0,00"
+                  value={newForm.avulso_amount}
+                  onChange={(e) => setNewForm({ ...newForm, avulso_amount: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Pagamento</Label>
+                <label className="flex h-10 items-center gap-2 rounded-md border px-3 text-sm">
+                  <Checkbox checked={newForm.avulso_paid}
+                    onCheckedChange={(v) => setNewForm({ ...newForm, avulso_paid: !!v })} />
+                  Já pago no ato
+                </label>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Se informar valor, será criado um recebível avulso no Financeiro. Sem marcar "pago no ato", ele entra como "A receber".
+            </p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setNewOpen(false)}>Cancelar</Button>

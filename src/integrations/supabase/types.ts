@@ -104,6 +104,8 @@ export type Database = {
       }
       bookings: {
         Row: {
+          avulso_amount: number | null
+          avulso_paid_at: string | null
           contract_id: string | null
           created_at: string
           end_at: string
@@ -118,6 +120,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          avulso_amount?: number | null
+          avulso_paid_at?: string | null
           contract_id?: string | null
           created_at?: string
           end_at: string
@@ -132,6 +136,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          avulso_amount?: number | null
+          avulso_paid_at?: string | null
           contract_id?: string | null
           created_at?: string
           end_at?: string
@@ -267,6 +273,7 @@ export type Database = {
       contracts: {
         Row: {
           created_at: string
+          due_day: number
           end_date: string | null
           extra_clauses: string | null
           id: string
@@ -284,6 +291,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          due_day?: number
           end_date?: string | null
           extra_clauses?: string | null
           id?: string
@@ -301,6 +309,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          due_day?: number
           end_date?: string | null
           extra_clauses?: string | null
           id?: string
@@ -441,6 +450,95 @@ export type Database = {
         }
         Relationships: []
       }
+      receivables: {
+        Row: {
+          amount_due: number
+          amount_paid: number | null
+          attachment_path: string | null
+          booking_id: string | null
+          contract_id: string | null
+          created_at: string
+          due_date: string
+          id: string
+          kind: string
+          notes: string | null
+          paid_at: string | null
+          payment_method: string | null
+          professional_id: string
+          reference_month: string
+          room_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount_due?: number
+          amount_paid?: number | null
+          attachment_path?: string | null
+          booking_id?: string | null
+          contract_id?: string | null
+          created_at?: string
+          due_date: string
+          id?: string
+          kind: string
+          notes?: string | null
+          paid_at?: string | null
+          payment_method?: string | null
+          professional_id: string
+          reference_month: string
+          room_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount_due?: number
+          amount_paid?: number | null
+          attachment_path?: string | null
+          booking_id?: string | null
+          contract_id?: string | null
+          created_at?: string
+          due_date?: string
+          id?: string
+          kind?: string
+          notes?: string | null
+          paid_at?: string | null
+          payment_method?: string | null
+          professional_id?: string
+          reference_month?: string
+          room_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "receivables_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: true
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receivables_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receivables_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
+            referencedRelation: "professionals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receivables_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rooms: {
         Row: {
           active: boolean
@@ -521,12 +619,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      generate_contract_receivables: {
+        Args: { _contract_id: string }
+        Returns: number
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
         Returns: boolean
+      }
+      mark_overdue_receivables: { Args: never; Returns: number }
+      regenerate_contract_receivables: {
+        Args: { _contract_id: string }
+        Returns: number
       }
     }
     Enums: {

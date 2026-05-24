@@ -9,7 +9,7 @@ import {
   ArrowRightLeft,
   Settings,
   ScrollText,
-  PenLine,
+  DollarSign,
   LogOut,
   Sparkles,
 } from "lucide-react";
@@ -37,7 +37,7 @@ const navItems = [
   { title: "Calendário", url: "/calendario", icon: Calendar, roles: ["gestor", "profissional", "visualizador"] },
   { title: "Conflitos", url: "/conflitos", icon: AlertTriangle, roles: ["gestor"] },
   { title: "Realocação", url: "/realocacao", icon: ArrowRightLeft, roles: ["gestor"] },
-  { title: "Assinatura", url: "/assinatura", icon: PenLine, roles: ["gestor", "profissional"] },
+  { title: "Financeiro", url: "/financeiro", icon: DollarSign, roles: ["gestor", "visualizador"] },
   { title: "Preferências", url: "/preferencias", icon: Settings, roles: ["gestor"] },
   { title: "Auditoria", url: "/auditoria", icon: ScrollText, roles: ["gestor"] },
 ];

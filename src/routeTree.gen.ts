@@ -16,12 +16,12 @@ import { Route as AppSalasRouteImport } from './routes/_app/salas'
 import { Route as AppRealocacaoRouteImport } from './routes/_app/realocacao'
 import { Route as AppProfissionaisRouteImport } from './routes/_app/profissionais'
 import { Route as AppPreferenciasRouteImport } from './routes/_app/preferencias'
+import { Route as AppFinanceiroRouteImport } from './routes/_app/financeiro'
 import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
 import { Route as AppContratosRouteImport } from './routes/_app/contratos'
 import { Route as AppConflitosRouteImport } from './routes/_app/conflitos'
 import { Route as AppCalendarioRouteImport } from './routes/_app/calendario'
 import { Route as AppAuditoriaRouteImport } from './routes/_app/auditoria'
-import { Route as AppAssinaturaRouteImport } from './routes/_app/assinatura'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -57,6 +57,11 @@ const AppPreferenciasRoute = AppPreferenciasRouteImport.update({
   path: '/preferencias',
   getParentRoute: () => AppRoute,
 } as any)
+const AppFinanceiroRoute = AppFinanceiroRouteImport.update({
+  id: '/financeiro',
+  path: '/financeiro',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppDashboardRoute = AppDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -82,21 +87,16 @@ const AppAuditoriaRoute = AppAuditoriaRouteImport.update({
   path: '/auditoria',
   getParentRoute: () => AppRoute,
 } as any)
-const AppAssinaturaRoute = AppAssinaturaRouteImport.update({
-  id: '/assinatura',
-  path: '/assinatura',
-  getParentRoute: () => AppRoute,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/assinatura': typeof AppAssinaturaRoute
   '/auditoria': typeof AppAuditoriaRoute
   '/calendario': typeof AppCalendarioRoute
   '/conflitos': typeof AppConflitosRoute
   '/contratos': typeof AppContratosRoute
   '/dashboard': typeof AppDashboardRoute
+  '/financeiro': typeof AppFinanceiroRoute
   '/preferencias': typeof AppPreferenciasRoute
   '/profissionais': typeof AppProfissionaisRoute
   '/realocacao': typeof AppRealocacaoRoute
@@ -105,12 +105,12 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/assinatura': typeof AppAssinaturaRoute
   '/auditoria': typeof AppAuditoriaRoute
   '/calendario': typeof AppCalendarioRoute
   '/conflitos': typeof AppConflitosRoute
   '/contratos': typeof AppContratosRoute
   '/dashboard': typeof AppDashboardRoute
+  '/financeiro': typeof AppFinanceiroRoute
   '/preferencias': typeof AppPreferenciasRoute
   '/profissionais': typeof AppProfissionaisRoute
   '/realocacao': typeof AppRealocacaoRoute
@@ -121,12 +121,12 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
-  '/_app/assinatura': typeof AppAssinaturaRoute
   '/_app/auditoria': typeof AppAuditoriaRoute
   '/_app/calendario': typeof AppCalendarioRoute
   '/_app/conflitos': typeof AppConflitosRoute
   '/_app/contratos': typeof AppContratosRoute
   '/_app/dashboard': typeof AppDashboardRoute
+  '/_app/financeiro': typeof AppFinanceiroRoute
   '/_app/preferencias': typeof AppPreferenciasRoute
   '/_app/profissionais': typeof AppProfissionaisRoute
   '/_app/realocacao': typeof AppRealocacaoRoute
@@ -137,12 +137,12 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
-    | '/assinatura'
     | '/auditoria'
     | '/calendario'
     | '/conflitos'
     | '/contratos'
     | '/dashboard'
+    | '/financeiro'
     | '/preferencias'
     | '/profissionais'
     | '/realocacao'
@@ -151,12 +151,12 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
-    | '/assinatura'
     | '/auditoria'
     | '/calendario'
     | '/conflitos'
     | '/contratos'
     | '/dashboard'
+    | '/financeiro'
     | '/preferencias'
     | '/profissionais'
     | '/realocacao'
@@ -166,12 +166,12 @@ export interface FileRouteTypes {
     | '/'
     | '/_app'
     | '/login'
-    | '/_app/assinatura'
     | '/_app/auditoria'
     | '/_app/calendario'
     | '/_app/conflitos'
     | '/_app/contratos'
     | '/_app/dashboard'
+    | '/_app/financeiro'
     | '/_app/preferencias'
     | '/_app/profissionais'
     | '/_app/realocacao'
@@ -235,6 +235,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppPreferenciasRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/financeiro': {
+      id: '/_app/financeiro'
+      path: '/financeiro'
+      fullPath: '/financeiro'
+      preLoaderRoute: typeof AppFinanceiroRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/dashboard': {
       id: '/_app/dashboard'
       path: '/dashboard'
@@ -270,23 +277,16 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAuditoriaRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/assinatura': {
-      id: '/_app/assinatura'
-      path: '/assinatura'
-      fullPath: '/assinatura'
-      preLoaderRoute: typeof AppAssinaturaRouteImport
-      parentRoute: typeof AppRoute
-    }
   }
 }
 
 interface AppRouteChildren {
-  AppAssinaturaRoute: typeof AppAssinaturaRoute
   AppAuditoriaRoute: typeof AppAuditoriaRoute
   AppCalendarioRoute: typeof AppCalendarioRoute
   AppConflitosRoute: typeof AppConflitosRoute
   AppContratosRoute: typeof AppContratosRoute
   AppDashboardRoute: typeof AppDashboardRoute
+  AppFinanceiroRoute: typeof AppFinanceiroRoute
   AppPreferenciasRoute: typeof AppPreferenciasRoute
   AppProfissionaisRoute: typeof AppProfissionaisRoute
   AppRealocacaoRoute: typeof AppRealocacaoRoute
@@ -294,12 +294,12 @@ interface AppRouteChildren {
 }
 
 const AppRouteChildren: AppRouteChildren = {
-  AppAssinaturaRoute: AppAssinaturaRoute,
   AppAuditoriaRoute: AppAuditoriaRoute,
   AppCalendarioRoute: AppCalendarioRoute,
   AppConflitosRoute: AppConflitosRoute,
   AppContratosRoute: AppContratosRoute,
   AppDashboardRoute: AppDashboardRoute,
+  AppFinanceiroRoute: AppFinanceiroRoute,
   AppPreferenciasRoute: AppPreferenciasRoute,
   AppProfissionaisRoute: AppProfissionaisRoute,
   AppRealocacaoRoute: AppRealocacaoRoute,
@@ -316,13 +316,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
