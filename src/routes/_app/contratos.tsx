@@ -1001,6 +1001,44 @@ function ContratosPage() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Delete contract confirmation */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => { if (!o) { setDeleteTarget(null); setDeletePassword(""); } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-serif flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" /> Excluir contrato permanentemente
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação é <strong>irreversível</strong>. Serão removidos do banco de dados:
+              o contrato, sua grade de horários, reservas geradas, recebíveis e anexos vinculados.
+              Para confirmar, digite a senha de login do gestor.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="delete-pwd">Senha do gestor ({user?.email})</Label>
+            <Input
+              id="delete-pwd"
+              type="password"
+              autoComplete="current-password"
+              value={deletePassword}
+              onChange={(e) => setDeletePassword(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && !deleting) confirmDeleteContract(); }}
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleting || !deletePassword}
+              onClick={(e) => { e.preventDefault(); confirmDeleteContract(); }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? "Excluindo..." : "Excluir definitivamente"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+
       {/* Attachments dialog */}
       <Dialog open={attachOpen} onOpenChange={setAttachOpen}>
         <DialogContent className="max-w-2xl">
