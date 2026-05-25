@@ -79,6 +79,58 @@ const statusVariant: Record<string, "default" | "secondary" | "destructive" | "o
   rascunho: "secondary", ativo: "default", encerrado: "outline", cancelado: "destructive",
 };
 
+function ScheduleTimeline({
+  weekday, roomId, startMin, endMin, busy, otherRows, hasConflict,
+}: {
+  weekday: number; roomId: string;
+  startMin: number; endMin: number;
+  busy: BusySlot[];
+  otherRows: ScheduleRow[];
+  hasConflict: boolean;
+}) {
+  const range = TIMELINE_END_MIN - TIMELINE_START_MIN;
+  const pct = (n: number) => `${((n - TIMELINE_START_MIN) / range) * 100}%`;
+  const width = (a: number, b: number) => `${Math.max(0, ((b - a) / range) * 100)}%`;
+  const blocks = busy
+    .filter((b) => b.weekday === weekday && b.room_id === roomId)
+    .map((b) => ({ start: b.start_min, end: b.end_min, label: b.label, kind: b.kind as string }));
+  for (const o of otherRows) {
+    if (o.weekday === weekday && o.room_id === roomId && o.start_time && o.end_time) {
+      blocks.push({
+        start: tm(o.start_time), end: tm(o.end_time),
+        label: "Outra linha deste contrato", kind: "interno",
+      });
+    }
+  }
+  const ticks = [6, 9, 12, 15, 18, 21];
+  return (
+    <div className="mt-2 space-y-1">
+      <div className="relative h-6 w-full overflow-hidden rounded bg-muted/40">
+        {blocks.map((b, i) => (
+          <div
+            key={i}
+            className="absolute top-0 h-full bg-muted-foreground/40"
+            style={{ left: pct(Math.max(b.start, TIMELINE_START_MIN)), width: width(Math.max(b.start, TIMELINE_START_MIN), Math.min(b.end, TIMELINE_END_MIN)) }}
+            title={`${b.label} (${fromMin(b.start)}–${fromMin(b.end)})`}
+          />
+        ))}
+        <div
+          className={cn(
+            "absolute top-0 h-full border-2",
+            hasConflict ? "border-destructive bg-destructive/40" : "border-primary bg-primary/40",
+          )}
+          style={{ left: pct(Math.max(startMin, TIMELINE_START_MIN)), width: width(Math.max(startMin, TIMELINE_START_MIN), Math.min(endMin, TIMELINE_END_MIN)) }}
+        />
+      </div>
+      <div className="relative h-3 w-full text-[10px] text-muted-foreground">
+        {ticks.map((h) => (
+          <span key={h} className="absolute -translate-x-1/2" style={{ left: pct(h * 60) }}>{h}h</span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ContratosPage() {
   const { role } = useAuth();
   const canEdit = role === "gestor";
