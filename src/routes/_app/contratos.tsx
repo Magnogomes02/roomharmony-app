@@ -136,6 +136,25 @@ function ContratosPage() {
 
   useEffect(() => { load(); }, []);
 
+  // Reload busy slots whenever the dialog opens or the edited contract id changes
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setLoadingBusy(true);
+    loadBusySlots({ excludeContractId: editing?.id ?? null })
+      .then((b) => { if (!cancelled) setBusySlots(b); })
+      .catch(() => { /* silencioso: detecção é apenas um auxílio */ })
+      .finally(() => { if (!cancelled) setLoadingBusy(false); });
+    return () => { cancelled = true; };
+  }, [open, editing?.id]);
+
+  const conflictsByRow = useMemo(
+    () => schedules.map((s, i) => computeRowConflicts(s, i, schedules, busySlots)),
+    [schedules, busySlots],
+  );
+  const totalRowConflicts = conflictsByRow.reduce((acc, c) => acc + c.length, 0);
+  const rowsWithConflict = conflictsByRow.filter((c) => c.length > 0).length;
+
   const selectedProfessional = useMemo(
     () => professionals.find((p) => p.id === form.professional_id),
     [professionals, form.professional_id],
