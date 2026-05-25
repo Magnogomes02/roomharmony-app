@@ -107,6 +107,10 @@ function ContratosPage() {
     contractId: string | null;
   }>({ open: false, plan: null, contractId: null });
 
+  // Realtime conflict detection state for the grid
+  const [busySlots, setBusySlots] = useState<BusySlot[]>([]);
+  const [loadingBusy, setLoadingBusy] = useState(false);
+
   async function load() {
     setLoading(true);
     const [c, p, r, sch] = await Promise.all([
