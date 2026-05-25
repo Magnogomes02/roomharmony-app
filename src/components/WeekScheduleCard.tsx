@@ -18,13 +18,15 @@ interface BookingRow {
 }
 
 const ROOM_COLORS = [
-  "bg-primary/15 text-primary border-primary/30",
-  "bg-success/15 text-success border-success/30",
-  "bg-warning/15 text-warning border-warning/30",
-  "bg-destructive/15 text-destructive border-destructive/30",
+  "bg-primary/15 text-primary border-primary/40",
+  "bg-success/15 text-success border-success/40",
+  "bg-warning/15 text-warning border-warning/40",
+  "bg-destructive/15 text-destructive border-destructive/40",
   "bg-accent text-accent-foreground border-border",
   "bg-secondary text-secondary-foreground border-border",
 ];
+
+const ROW_PX = 40;
 
 export function WeekScheduleCard() {
   const [offset, setOffset] = useState(0);
@@ -50,9 +52,9 @@ export function WeekScheduleCard() {
       ]);
       return {
         bookings: (bk.data ?? []) as BookingRow[],
-        rooms: Object.fromEntries((rms.data ?? []).map((r: any) => [r.id, r.name])),
-        roomIds: (rms.data ?? []).map((r: any) => r.id),
-        pros: Object.fromEntries((pros.data ?? []).map((p: any) => [p.id, p.full_name])),
+        rooms: Object.fromEntries((rms.data ?? []).map((r: any) => [r.id, r.name])) as Record<string, string>,
+        roomIds: (rms.data ?? []).map((r: any) => r.id) as string[],
+        pros: Object.fromEntries((pros.data ?? []).map((p: any) => [p.id, p.full_name])) as Record<string, string>,
       };
     },
   });
@@ -74,7 +76,7 @@ export function WeekScheduleCard() {
   );
 
   const colorForRoom = (roomId: string) => {
-    const idx = (data?.roomIds.indexOf(roomId) ?? 0);
+    const idx = data?.roomIds.indexOf(roomId) ?? 0;
     return ROOM_COLORS[idx % ROOM_COLORS.length];
   };
 
@@ -86,6 +88,8 @@ export function WeekScheduleCard() {
     }
     return map;
   }, [data]);
+
+  const gridHeight = hours.length * ROW_PX;
 
   return (
     <Card className="border-border/60">
@@ -116,86 +120,99 @@ export function WeekScheduleCard() {
 
         <TooltipProvider delayDuration={150}>
           <div className="overflow-x-auto">
-            <div className="grid min-w-[700px]" style={{ gridTemplateColumns: "60px repeat(7, 1fr)" }}>
-              <div />
-              {days.map((d) => {
-                const isToday = format(d, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd");
-                return (
-                  <div
-                    key={d.toISOString()}
-                    className={`border-b border-border px-2 pb-2 text-center text-xs ${
-                      isToday ? "font-semibold text-primary" : "text-muted-foreground"
-                    }`}
-                  >
-                    <div className="uppercase">{format(d, "EEE", { locale: ptBR })}</div>
-                    <div className="text-sm">{format(d, "dd/MM")}</div>
-                  </div>
-                );
-              })}
+            <div className="min-w-[700px]">
+              {/* Header row */}
+              <div className="grid" style={{ gridTemplateColumns: "56px repeat(7, 1fr)" }}>
+                <div />
+                {days.map((d) => {
+                  const isToday = format(d, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd");
+                  return (
+                    <div
+                      key={d.toISOString()}
+                      className={`border-b border-border px-2 pb-2 text-center text-xs ${
+                        isToday ? "font-semibold text-primary" : "text-muted-foreground"
+                      }`}
+                    >
+                      <div className="uppercase">{format(d, "EEE", { locale: ptBR })}</div>
+                      <div className="text-sm">{format(d, "dd/MM")}</div>
+                    </div>
+                  );
+                })}
+              </div>
 
-              {hours.map((h) => (
-                <>
-                  <div key={`h-${h}`} className="border-t border-border/50 py-2 pr-2 text-right text-[10px] text-muted-foreground">
-                    {String(h).padStart(2, "0")}:00
-                  </div>
-                  {days.map((d) => (
-                    <div key={`${d.toISOString()}-${h}`} className="relative h-12 border-l border-t border-border/50" />
+              {/* Body */}
+              <div className="grid" style={{ gridTemplateColumns: "56px repeat(7, 1fr)" }}>
+                {/* Hour column */}
+                <div className="relative" style={{ height: gridHeight }}>
+                  {hours.map((h, i) => (
+                    <div
+                      key={h}
+                      className="absolute right-2 -translate-y-1/2 text-[10px] text-muted-foreground"
+                      style={{ top: i * ROW_PX }}
+                    >
+                      {String(h).padStart(2, "0")}:00
+                    </div>
                   ))}
-                </>
-              ))}
-            </div>
+                </div>
 
-            {/* Overlay bookings absolutely positioned per day column */}
-            <div className="relative -mt-[calc(48px*var(--rows)+0px)] grid min-w-[700px] pointer-events-none"
-              style={{
-                gridTemplateColumns: "60px repeat(7, 1fr)",
-                ["--rows" as any]: hours.length,
-              }}
-            >
-              <div />
-              {days.map((d) => {
-                const key = format(d, "yyyy-MM-dd");
-                const list = bookingsByDay[key] ?? [];
-                return (
-                  <div key={`col-${key}`} className="relative" style={{ height: `${hours.length * 48}px` }}>
-                    {list.map((b) => {
-                      const s = new Date(b.start_at);
-                      const e = new Date(b.end_at);
-                      const startMin = (s.getHours() - hourStart) * 60 + s.getMinutes();
-                      const durMin = Math.max(30, (e.getTime() - s.getTime()) / 60000);
-                      const top = (startMin / 60) * 48;
-                      const height = (durMin / 60) * 48 - 2;
-                      if (top < 0) return null;
-                      return (
-                        <Tooltip key={b.id}>
-                          <TooltipTrigger asChild>
-                            <Link
-                              to="/calendario"
-                              className={`pointer-events-auto absolute left-0.5 right-0.5 overflow-hidden rounded border px-1.5 py-0.5 text-[10px] leading-tight hover:opacity-90 ${colorForRoom(b.room_id)}`}
-                              style={{ top: `${top}px`, height: `${height}px` }}
-                            >
-                              <div className="truncate font-medium">
-                                {format(s, "HH:mm")}–{format(e, "HH:mm")}
+                {/* Day columns */}
+                {days.map((d) => {
+                  const key = format(d, "yyyy-MM-dd");
+                  const list = bookingsByDay[key] ?? [];
+                  return (
+                    <div
+                      key={key}
+                      className="relative border-l border-border/50"
+                      style={{ height: gridHeight }}
+                    >
+                      {/* hour grid lines */}
+                      {hours.map((_, i) => (
+                        <div
+                          key={i}
+                          className="absolute inset-x-0 border-t border-border/40"
+                          style={{ top: i * ROW_PX }}
+                        />
+                      ))}
+                      {/* bookings */}
+                      {list.map((b) => {
+                        const s = new Date(b.start_at);
+                        const e = new Date(b.end_at);
+                        const startMin = (s.getHours() - hourStart) * 60 + s.getMinutes();
+                        const durMin = Math.max(30, (e.getTime() - s.getTime()) / 60000);
+                        const top = (startMin / 60) * ROW_PX;
+                        const height = (durMin / 60) * ROW_PX - 2;
+                        if (top < 0 || top >= gridHeight) return null;
+                        return (
+                          <Tooltip key={b.id}>
+                            <TooltipTrigger asChild>
+                              <Link
+                                to="/calendario"
+                                className={`absolute left-0.5 right-0.5 overflow-hidden rounded border px-1.5 py-0.5 text-[10px] leading-tight hover:opacity-90 ${colorForRoom(b.room_id)}`}
+                                style={{ top, height }}
+                              >
+                                <div className="truncate font-medium">
+                                  {format(s, "HH:mm")}–{format(e, "HH:mm")}
+                                </div>
+                                <div className="truncate">{data?.pros[b.professional_id] ?? "—"}</div>
+                                <div className="truncate opacity-80">{data?.rooms[b.room_id] ?? "—"}</div>
+                              </Link>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <div className="text-xs">
+                                <div className="font-medium">{data?.pros[b.professional_id]}</div>
+                                <div>{data?.rooms[b.room_id]}</div>
+                                <div className="text-muted-foreground">
+                                  {format(s, "EEE dd/MM HH:mm", { locale: ptBR })} – {format(e, "HH:mm")}
+                                </div>
                               </div>
-                              <div className="truncate">{data?.pros[b.professional_id] ?? "—"}</div>
-                              <div className="truncate opacity-80">{data?.rooms[b.room_id] ?? "—"}</div>
-                            </Link>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <div className="text-xs">
-                              <div className="font-medium">{data?.pros[b.professional_id]}</div>
-                              <div>{data?.rooms[b.room_id]}</div>
-                              <div className="text-muted-foreground">
-                                {format(s, "EEE dd/MM HH:mm", { locale: ptBR })} – {format(e, "HH:mm")}
-                              </div>
-                            </div>
-                          </TooltipContent>
-                        </Tooltip>
-                      );
-                    })}
-                  </div>
-                );
-              })}
+                            </TooltipContent>
+                          </Tooltip>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </TooltipProvider>
