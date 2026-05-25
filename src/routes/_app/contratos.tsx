@@ -132,7 +132,7 @@ function ScheduleTimeline({
 }
 
 function ContratosPage() {
-  const { role } = useAuth();
+  const { role, user } = useAuth();
   const canEdit = role === "gestor";
 
   const [contracts, setContracts] = useState<Contract[]>([]);
@@ -146,6 +146,10 @@ function ContratosPage() {
   const [form, setForm] = useState(emptyForm);
   const [schedules, setSchedules] = useState<ScheduleRow[]>([]);
   const [saving, setSaving] = useState(false);
+
+  const [deleteTarget, setDeleteTarget] = useState<Contract | null>(null);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   const [attachOpen, setAttachOpen] = useState(false);
   const [attachContract, setAttachContract] = useState<Contract | null>(null);
@@ -255,6 +259,43 @@ function ContratosPage() {
       actor_id: user.id, action, entity_type: "contract",
       entity_id: entityId ?? null, metadata: (metadata ?? null) as never,
     });
+  }
+
+  async function confirmDeleteContract() {
+    if (!deleteTarget || !user?.email) return;
+    if (!deletePassword) { toast.error("Informe sua senha para confirmar."); return; }
+    setDeleting(true);
+    try {
+      const { error: authErr } = await supabase.auth.signInWithPassword({
+        email: user.email, password: deletePassword,
+      });
+      if (authErr) { toast.error("Senha incorreta."); setDeleting(false); return; }
+
+      const contractId = deleteTarget.id;
+      // coleta bookings do contrato para limpar conflitos
+      const { data: bks } = await supabase
+        .from("bookings").select("id").eq("contract_id", contractId);
+      const bookingIds = (bks ?? []).map((b) => b.id);
+      if (bookingIds.length > 0) {
+        await supabase.from("booking_conflicts").delete().or(
+          `booking_id_a.in.(${bookingIds.join(",")}),booking_id_b.in.(${bookingIds.join(",")})`,
+        );
+      }
+      await supabase.from("receivables").delete().eq("contract_id", contractId);
+      await supabase.from("bookings").delete().eq("contract_id", contractId);
+      await supabase.from("contract_schedules").delete().eq("contract_id", contractId);
+      await supabase.from("contract_attachments").delete().eq("contract_id", contractId);
+      const { error: delErr } = await supabase.from("contracts").delete().eq("id", contractId);
+      if (delErr) { toast.error("Erro ao excluir contrato", { description: delErr.message }); setDeleting(false); return; }
+
+      await logAudit("contract.delete", contractId, { professional_id: deleteTarget.professional_id });
+      toast.success("Contrato excluído permanentemente.");
+      setDeleteTarget(null);
+      setDeletePassword("");
+      await load();
+    } finally {
+      setDeleting(false);
+    }
   }
 
   function addSchedule() {
@@ -595,6 +636,16 @@ function ContratosPage() {
                         {canEdit && (
                           <Button size="icon" variant="ghost" onClick={() => openEdit(c)} title="Editar">
                             <Pencil className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {canEdit && (
+                          <Button
+                            size="icon" variant="ghost"
+                            onClick={() => { setDeleteTarget(c); setDeletePassword(""); }}
+                            title="Excluir contrato"
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         )}
                       </div>
@@ -949,6 +1000,44 @@ function ContratosPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Delete contract confirmation */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => { if (!o) { setDeleteTarget(null); setDeletePassword(""); } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-serif flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" /> Excluir contrato permanentemente
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação é <strong>irreversível</strong>. Serão removidos do banco de dados:
+              o contrato, sua grade de horários, reservas geradas, recebíveis e anexos vinculados.
+              Para confirmar, digite a senha de login do gestor.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="delete-pwd">Senha do gestor ({user?.email})</Label>
+            <Input
+              id="delete-pwd"
+              type="password"
+              autoComplete="current-password"
+              value={deletePassword}
+              onChange={(e) => setDeletePassword(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && !deleting) confirmDeleteContract(); }}
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleting || !deletePassword}
+              onClick={(e) => { e.preventDefault(); confirmDeleteContract(); }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? "Excluindo..." : "Excluir definitivamente"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
 
       {/* Attachments dialog */}
       <Dialog open={attachOpen} onOpenChange={setAttachOpen}>
