@@ -638,6 +638,16 @@ function ContratosPage() {
                             <Pencil className="h-4 w-4" />
                           </Button>
                         )}
+                        {canEdit && (
+                          <Button
+                            size="icon" variant="ghost"
+                            onClick={() => { setDeleteTarget(c); setDeletePassword(""); }}
+                            title="Excluir contrato"
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
