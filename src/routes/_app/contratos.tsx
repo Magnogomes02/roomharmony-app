@@ -261,6 +261,43 @@ function ContratosPage() {
     });
   }
 
+  async function confirmDeleteContract() {
+    if (!deleteTarget || !user?.email) return;
+    if (!deletePassword) { toast.error("Informe sua senha para confirmar."); return; }
+    setDeleting(true);
+    try {
+      const { error: authErr } = await supabase.auth.signInWithPassword({
+        email: user.email, password: deletePassword,
+      });
+      if (authErr) { toast.error("Senha incorreta."); setDeleting(false); return; }
+
+      const contractId = deleteTarget.id;
+      // coleta bookings do contrato para limpar conflitos
+      const { data: bks } = await supabase
+        .from("bookings").select("id").eq("contract_id", contractId);
+      const bookingIds = (bks ?? []).map((b) => b.id);
+      if (bookingIds.length > 0) {
+        await supabase.from("booking_conflicts").delete().or(
+          `booking_id_a.in.(${bookingIds.join(",")}),booking_id_b.in.(${bookingIds.join(",")})`,
+        );
+      }
+      await supabase.from("receivables").delete().eq("contract_id", contractId);
+      await supabase.from("bookings").delete().eq("contract_id", contractId);
+      await supabase.from("contract_schedules").delete().eq("contract_id", contractId);
+      await supabase.from("contract_attachments").delete().eq("contract_id", contractId);
+      const { error: delErr } = await supabase.from("contracts").delete().eq("id", contractId);
+      if (delErr) { toast.error("Erro ao excluir contrato", { description: delErr.message }); setDeleting(false); return; }
+
+      await logAudit("contract.delete", contractId, { professional_id: deleteTarget.professional_id });
+      toast.success("Contrato excluído permanentemente.");
+      setDeleteTarget(null);
+      setDeletePassword("");
+      await load();
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   function addSchedule() {
     setSchedules((s) => [...s, { weekday: 1, room_id: rooms[0]?.id ?? "", start_time: "08:00", end_time: "09:00" }]);
   }
