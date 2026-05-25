@@ -608,59 +608,160 @@ function ContratosPage() {
                   <Plus className="mr-2 h-4 w-4" /> Adicionar linha
                 </Button>
               </div>
+
+              {/* Resumo geral */}
+              {schedules.length > 0 && (
+                <div
+                  className={cn(
+                    "rounded-md border px-3 py-2 text-xs",
+                    totalRowConflicts > 0
+                      ? "border-destructive/40 bg-destructive/5 text-destructive"
+                      : "border-emerald-500/30 bg-emerald-500/5 text-emerald-700 dark:text-emerald-400",
+                  )}
+                >
+                  {loadingBusy
+                    ? "Verificando conflitos com outros contratos e avulsos..."
+                    : totalRowConflicts > 0
+                      ? `${totalRowConflicts} conflito(s) detectado(s) em ${rowsWithConflict} linha(s). É possível salvar mesmo assim — as ocorrências ficarão marcadas como conflito para ajuste em /conflitos.`
+                      : "Nenhum conflito detectado na grade (verificação nos próximos 90 dias)."}
+                </div>
+              )}
+
               {schedules.length === 0 ? (
                 <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
                   Nenhum horário adicionado. Clique em "Adicionar linha" para definir dia, sala e faixa de horário.
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {schedules.map((s, i) => (
-                    <div key={i} className="grid grid-cols-12 items-end gap-2 rounded-md border p-3">
-                      <div className="col-span-3 space-y-1">
-                        <Label className="text-xs">Dia da semana</Label>
-                        <Select
-                          value={String(s.weekday)}
-                          onValueChange={(v) => updateSchedule(i, { weekday: Number(v) })}
-                        >
-                          <SelectTrigger><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {WEEKDAY_LABELS.map((lbl, idx) => (
-                              <SelectItem key={idx} value={String(idx)}>{lbl}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                  {schedules.map((s, i) => {
+                    const rowConflicts = conflictsByRow[i] ?? [];
+                    const hasConflict = rowConflicts.length > 0;
+                    const suggestion = hasConflict
+                      ? suggestAlternatives(s, i, schedules, busySlots, rooms)
+                      : { alternativeRooms: [], alternativeStart: null };
+                    return (
+                      <div
+                        key={i}
+                        className={cn(
+                          "rounded-md border p-3",
+                          hasConflict ? "border-destructive bg-destructive/5" : "",
+                        )}
+                      >
+                        <div className="grid grid-cols-12 items-end gap-2">
+                          <div className="col-span-3 space-y-1">
+                            <Label className="text-xs">Dia da semana</Label>
+                            <Select
+                              value={String(s.weekday)}
+                              onValueChange={(v) => updateSchedule(i, { weekday: Number(v) })}
+                            >
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                {WEEKDAY_LABELS.map((lbl, idx) => (
+                                  <SelectItem key={idx} value={String(idx)}>{lbl}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="col-span-4 space-y-1">
+                            <Label className="text-xs">Sala</Label>
+                            <Select value={s.room_id} onValueChange={(v) => updateSchedule(i, { room_id: v })}>
+                              <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                              <SelectContent>
+                                {rooms.filter((r) => r.active).map((r) => (
+                                  <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="col-span-2 space-y-1">
+                            <Label className="text-xs">Início</Label>
+                            <Input type="time" value={s.start_time}
+                              onChange={(e) => updateSchedule(i, { start_time: e.target.value })} />
+                          </div>
+                          <div className="col-span-2 space-y-1">
+                            <Label className="text-xs">Fim</Label>
+                            <Input type="time" value={s.end_time}
+                              onChange={(e) => updateSchedule(i, { end_time: e.target.value })} />
+                          </div>
+                          <div className="col-span-1 flex justify-end">
+                            <Button type="button" variant="ghost" size="icon" onClick={() => removeSchedule(i)} title="Remover">
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Mini timeline do dia/sala */}
+                        {s.room_id && s.start_time && s.end_time && tm(s.end_time) > tm(s.start_time) && (
+                          <ScheduleTimeline
+                            weekday={s.weekday}
+                            roomId={s.room_id}
+                            startMin={tm(s.start_time)}
+                            endMin={tm(s.end_time)}
+                            busy={busySlots}
+                            otherRows={schedules.filter((_, idx) => idx !== i)}
+                            hasConflict={hasConflict}
+                          />
+                        )}
+
+                        {/* Badges com quem conflita + sugestões */}
+                        {hasConflict && (
+                          <div className="mt-2 space-y-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <AlertTriangle className="h-4 w-4 text-destructive" />
+                              <span className="text-xs font-medium text-destructive">Conflita com:</span>
+                              <TooltipProvider delayDuration={150}>
+                                {rowConflicts.map((c, idx) => (
+                                  <Tooltip key={idx}>
+                                    <TooltipTrigger asChild>
+                                      <Badge variant="destructive" className="cursor-help capitalize">
+                                        {c.label}
+                                      </Badge>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      {c.start_min !== undefined && c.end_min !== undefined
+                                        ? `${fromMin(c.start_min)}–${fromMin(c.end_min)} • ${c.kind}`
+                                        : c.kind}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                ))}
+                              </TooltipProvider>
+                            </div>
+                            {(suggestion.alternativeRooms.length > 0 || suggestion.alternativeStart) && (
+                              <div className="flex flex-wrap items-center gap-2 text-xs">
+                                <span className="text-muted-foreground">Sugestões:</span>
+                                {suggestion.alternativeRooms.map((r) => (
+                                  <Button
+                                    key={r.id} type="button" size="sm" variant="outline"
+                                    className="h-7 px-2 text-xs"
+                                    onClick={() => updateSchedule(i, { room_id: r.id })}
+                                  >
+                                    Trocar para {r.name}
+                                  </Button>
+                                ))}
+                                {suggestion.alternativeStart && (
+                                  <Button
+                                    type="button" size="sm" variant="outline" className="h-7 px-2 text-xs"
+                                    onClick={() => {
+                                      const dur = tm(s.end_time) - tm(s.start_time);
+                                      const newStart = suggestion.alternativeStart!;
+                                      const newEnd = fromMin(tm(newStart) + dur);
+                                      updateSchedule(i, { start_time: newStart, end_time: newEnd });
+                                    }}
+                                  >
+                                    Mover para {suggestion.alternativeStart}
+                                  </Button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
-                      <div className="col-span-4 space-y-1">
-                        <Label className="text-xs">Sala</Label>
-                        <Select value={s.room_id} onValueChange={(v) => updateSchedule(i, { room_id: v })}>
-                          <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                          <SelectContent>
-                            {rooms.filter((r) => r.active).map((r) => (
-                              <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="col-span-2 space-y-1">
-                        <Label className="text-xs">Início</Label>
-                        <Input type="time" value={s.start_time}
-                          onChange={(e) => updateSchedule(i, { start_time: e.target.value })} />
-                      </div>
-                      <div className="col-span-2 space-y-1">
-                        <Label className="text-xs">Fim</Label>
-                        <Input type="time" value={s.end_time}
-                          onChange={(e) => updateSchedule(i, { end_time: e.target.value })} />
-                      </div>
-                      <div className="col-span-1 flex justify-end">
-                        <Button type="button" variant="ghost" size="icon" onClick={() => removeSchedule(i)} title="Remover">
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </section>
+
 
             {/* Vigência */}
             <section className="space-y-4">
