@@ -132,7 +132,7 @@ function ScheduleTimeline({
 }
 
 function ContratosPage() {
-  const { role } = useAuth();
+  const { role, user } = useAuth();
   const canEdit = role === "gestor";
 
   const [contracts, setContracts] = useState<Contract[]>([]);
@@ -146,6 +146,10 @@ function ContratosPage() {
   const [form, setForm] = useState(emptyForm);
   const [schedules, setSchedules] = useState<ScheduleRow[]>([]);
   const [saving, setSaving] = useState(false);
+
+  const [deleteTarget, setDeleteTarget] = useState<Contract | null>(null);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   const [attachOpen, setAttachOpen] = useState(false);
   const [attachContract, setAttachContract] = useState<Contract | null>(null);
