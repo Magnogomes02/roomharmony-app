@@ -281,7 +281,7 @@ export type Database = {
           monthly_value: number
           notes: string | null
           professional_id: string
-          room_id: string
+          room_id: string | null
           signature_hash: string | null
           signed_at: string | null
           signed_by_name: string | null
@@ -299,7 +299,7 @@ export type Database = {
           monthly_value?: number
           notes?: string | null
           professional_id: string
-          room_id: string
+          room_id?: string | null
           signature_hash?: string | null
           signed_at?: string | null
           signed_by_name?: string | null
@@ -317,7 +317,7 @@ export type Database = {
           monthly_value?: number
           notes?: string | null
           professional_id?: string
-          room_id?: string
+          room_id?: string | null
           signature_hash?: string | null
           signed_at?: string | null
           signed_by_name?: string | null
