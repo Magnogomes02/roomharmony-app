@@ -123,6 +123,8 @@ function DashboardPage() {
         ))}
       </div>
 
+      <WeekScheduleCard />
+
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
