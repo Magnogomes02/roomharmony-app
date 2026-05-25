@@ -80,16 +80,51 @@ export function WeekScheduleCard() {
     return ROOM_COLORS[idx % ROOM_COLORS.length];
   };
 
-  const bookingsByDay = useMemo(() => {
-    const map: Record<string, BookingRow[]> = {};
+  type Laid = BookingRow & { _col: number; _cols: number };
+  const layoutByDay = useMemo(() => {
+    const map: Record<string, { items: Laid[]; maxCols: number }> = {};
+    const groups: Record<string, BookingRow[]> = {};
     for (const b of data?.bookings ?? []) {
       const k = format(new Date(b.start_at), "yyyy-MM-dd");
-      (map[k] ||= []).push(b);
+      (groups[k] ||= []).push(b);
+    }
+    for (const [k, list] of Object.entries(groups)) {
+      const sorted = [...list].sort(
+        (a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime()
+      );
+      const laid: Laid[] = [];
+      let cluster: Laid[] = [];
+      let clusterEnd = 0;
+      let dayMax = 1;
+      const flush = () => {
+        const cols = Math.max(...cluster.map((c) => c._col + 1), 1);
+        cluster.forEach((c) => (c._cols = cols));
+        dayMax = Math.max(dayMax, cols);
+        cluster = [];
+      };
+      for (const b of sorted) {
+        const s = new Date(b.start_at).getTime();
+        const e = new Date(b.end_at).getTime();
+        if (cluster.length && s >= clusterEnd) flush();
+        // find smallest free column index
+        const used = new Set(
+          cluster.filter((c) => new Date(c.end_at).getTime() > s).map((c) => c._col)
+        );
+        let col = 0;
+        while (used.has(col)) col++;
+        const item: Laid = { ...b, _col: col, _cols: 1 };
+        cluster.push(item);
+        laid.push(item);
+        clusterEnd = Math.max(clusterEnd, e);
+      }
+      if (cluster.length) flush();
+      map[k] = { items: laid, maxCols: dayMax };
     }
     return map;
   }, [data]);
 
   const gridHeight = hours.length * ROW_PX;
+  const MIN_COL_PX = 80;
 
   return (
     <Card className="border-border/60">
