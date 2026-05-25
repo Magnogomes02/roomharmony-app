@@ -80,16 +80,51 @@ export function WeekScheduleCard() {
     return ROOM_COLORS[idx % ROOM_COLORS.length];
   };
 
-  const bookingsByDay = useMemo(() => {
-    const map: Record<string, BookingRow[]> = {};
+  type Laid = BookingRow & { _col: number; _cols: number };
+  const layoutByDay = useMemo(() => {
+    const map: Record<string, { items: Laid[]; maxCols: number }> = {};
+    const groups: Record<string, BookingRow[]> = {};
     for (const b of data?.bookings ?? []) {
       const k = format(new Date(b.start_at), "yyyy-MM-dd");
-      (map[k] ||= []).push(b);
+      (groups[k] ||= []).push(b);
+    }
+    for (const [k, list] of Object.entries(groups)) {
+      const sorted = [...list].sort(
+        (a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime()
+      );
+      const laid: Laid[] = [];
+      let cluster: Laid[] = [];
+      let clusterEnd = 0;
+      let dayMax = 1;
+      const flush = () => {
+        const cols = Math.max(...cluster.map((c) => c._col + 1), 1);
+        cluster.forEach((c) => (c._cols = cols));
+        dayMax = Math.max(dayMax, cols);
+        cluster = [];
+      };
+      for (const b of sorted) {
+        const s = new Date(b.start_at).getTime();
+        const e = new Date(b.end_at).getTime();
+        if (cluster.length && s >= clusterEnd) flush();
+        // find smallest free column index
+        const used = new Set(
+          cluster.filter((c) => new Date(c.end_at).getTime() > s).map((c) => c._col)
+        );
+        let col = 0;
+        while (used.has(col)) col++;
+        const item: Laid = { ...b, _col: col, _cols: 1 };
+        cluster.push(item);
+        laid.push(item);
+        clusterEnd = Math.max(clusterEnd, e);
+      }
+      if (cluster.length) flush();
+      map[k] = { items: laid, maxCols: dayMax };
     }
     return map;
   }, [data]);
 
   const gridHeight = hours.length * ROW_PX;
+  const MIN_COL_PX = 80;
 
   return (
     <Card className="border-border/60">
@@ -120,100 +155,121 @@ export function WeekScheduleCard() {
 
         <TooltipProvider delayDuration={150}>
           <div className="overflow-x-auto">
-            <div className="min-w-[700px]">
-              {/* Header row */}
-              <div className="grid" style={{ gridTemplateColumns: "56px repeat(7, 1fr)" }}>
-                <div />
-                {days.map((d) => {
-                  const isToday = format(d, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd");
-                  return (
-                    <div
-                      key={d.toISOString()}
-                      className={`border-b border-border px-2 pb-2 text-center text-xs ${
-                        isToday ? "font-semibold text-primary" : "text-muted-foreground"
-                      }`}
-                    >
-                      <div className="uppercase">{format(d, "EEE", { locale: ptBR })}</div>
-                      <div className="text-sm">{format(d, "dd/MM")}</div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Body */}
-              <div className="grid" style={{ gridTemplateColumns: "56px repeat(7, 1fr)" }}>
-                {/* Hour column */}
-                <div className="relative" style={{ height: gridHeight }}>
-                  {hours.map((h, i) => (
-                    <div
-                      key={h}
-                      className="absolute right-2 -translate-y-1/2 text-[10px] text-muted-foreground"
-                      style={{ top: i * ROW_PX }}
-                    >
-                      {String(h).padStart(2, "0")}:00
-                    </div>
-                  ))}
-                </div>
-
-                {/* Day columns */}
-                {days.map((d) => {
-                  const key = format(d, "yyyy-MM-dd");
-                  const list = bookingsByDay[key] ?? [];
-                  return (
-                    <div
-                      key={key}
-                      className="relative border-l border-border/50"
-                      style={{ height: gridHeight }}
-                    >
-                      {/* hour grid lines */}
-                      {hours.map((_, i) => (
+            {(() => {
+              const colTemplate =
+                "56px " +
+                days
+                  .map((d) => {
+                    const k = format(d, "yyyy-MM-dd");
+                    const max = layoutByDay[k]?.maxCols ?? 1;
+                    return `minmax(${Math.max(MIN_COL_PX, max * MIN_COL_PX)}px, 1fr)`;
+                  })
+                  .join(" ");
+              return (
+                <div className="min-w-[700px]">
+                  <div className="grid" style={{ gridTemplateColumns: colTemplate }}>
+                    <div />
+                    {days.map((d) => {
+                      const isToday = format(d, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd");
+                      return (
                         <div
-                          key={i}
-                          className="absolute inset-x-0 border-t border-border/40"
+                          key={d.toISOString()}
+                          className={`border-b border-border px-2 pb-2 text-center text-xs ${
+                            isToday ? "font-semibold text-primary" : "text-muted-foreground"
+                          }`}
+                        >
+                          <div className="uppercase">{format(d, "EEE", { locale: ptBR })}</div>
+                          <div className="text-sm">{format(d, "dd/MM")}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="grid" style={{ gridTemplateColumns: colTemplate }}>
+                    <div className="relative" style={{ height: gridHeight }}>
+                      {hours.map((h, i) => (
+                        <div
+                          key={h}
+                          className="absolute right-2 -translate-y-1/2 text-[10px] text-muted-foreground"
                           style={{ top: i * ROW_PX }}
-                        />
+                        >
+                          {String(h).padStart(2, "0")}:00
+                        </div>
                       ))}
-                      {/* bookings */}
-                      {list.map((b) => {
-                        const s = new Date(b.start_at);
-                        const e = new Date(b.end_at);
-                        const startMin = (s.getHours() - hourStart) * 60 + s.getMinutes();
-                        const durMin = Math.max(30, (e.getTime() - s.getTime()) / 60000);
-                        const top = (startMin / 60) * ROW_PX;
-                        const height = (durMin / 60) * ROW_PX - 2;
-                        if (top < 0 || top >= gridHeight) return null;
-                        return (
-                          <Tooltip key={b.id}>
-                            <TooltipTrigger asChild>
-                              <Link
-                                to="/calendario"
-                                className={`absolute left-0.5 right-0.5 overflow-hidden rounded border px-1.5 py-0.5 text-[10px] leading-tight hover:opacity-90 ${colorForRoom(b.room_id)}`}
-                                style={{ top, height }}
-                              >
-                                <div className="truncate font-medium">
-                                  {format(s, "HH:mm")}–{format(e, "HH:mm")}
-                                </div>
-                                <div className="truncate">{data?.pros[b.professional_id] ?? "—"}</div>
-                                <div className="truncate opacity-80">{data?.rooms[b.room_id] ?? "—"}</div>
-                              </Link>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <div className="text-xs">
-                                <div className="font-medium">{data?.pros[b.professional_id]}</div>
-                                <div>{data?.rooms[b.room_id]}</div>
-                                <div className="text-muted-foreground">
-                                  {format(s, "EEE dd/MM HH:mm", { locale: ptBR })} – {format(e, "HH:mm")}
-                                </div>
-                              </div>
-                            </TooltipContent>
-                          </Tooltip>
-                        );
-                      })}
                     </div>
-                  );
-                })}
-              </div>
-            </div>
+
+                    {days.map((d) => {
+                      const key = format(d, "yyyy-MM-dd");
+                      const list = layoutByDay[key]?.items ?? [];
+                      return (
+                        <div
+                          key={key}
+                          className="relative border-l border-border/50"
+                          style={{ height: gridHeight }}
+                        >
+                          {hours.map((_, i) => (
+                            <div
+                              key={i}
+                              className="absolute inset-x-0 border-t border-border/40"
+                              style={{ top: i * ROW_PX }}
+                            />
+                          ))}
+                          {list.map((b) => {
+                            const s = new Date(b.start_at);
+                            const e = new Date(b.end_at);
+                            const startMin = (s.getHours() - hourStart) * 60 + s.getMinutes();
+                            const durMin = Math.max(30, (e.getTime() - s.getTime()) / 60000);
+                            const top = (startMin / 60) * ROW_PX;
+                            const height = (durMin / 60) * ROW_PX - 2;
+                            if (top < 0 || top >= gridHeight) return null;
+                            const widthPct = 100 / b._cols;
+                            const leftPct = b._col * widthPct;
+                            const narrow = b._cols > 1;
+                            return (
+                              <Tooltip key={b.id}>
+                                <TooltipTrigger asChild>
+                                  <Link
+                                    to="/calendario"
+                                    className={`absolute overflow-hidden rounded border px-1 py-0.5 text-[10px] leading-tight hover:opacity-90 ${colorForRoom(b.room_id)}`}
+                                    style={{
+                                      top,
+                                      height,
+                                      left: `calc(${leftPct}% + 2px)`,
+                                      width: `calc(${widthPct}% - 4px)`,
+                                    }}
+                                  >
+                                    <div className="truncate font-medium">
+                                      {format(s, "HH:mm")}–{format(e, "HH:mm")}
+                                    </div>
+                                    {!narrow ? (
+                                      <>
+                                        <div className="truncate">{data?.pros[b.professional_id] ?? "—"}</div>
+                                        <div className="truncate opacity-80">{data?.rooms[b.room_id] ?? "—"}</div>
+                                      </>
+                                    ) : (
+                                      <div className="truncate opacity-80">{data?.rooms[b.room_id] ?? "—"}</div>
+                                    )}
+                                  </Link>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <div className="text-xs">
+                                    <div className="font-medium">{data?.pros[b.professional_id]}</div>
+                                    <div>{data?.rooms[b.room_id]}</div>
+                                    <div className="text-muted-foreground">
+                                      {format(s, "EEE dd/MM HH:mm", { locale: ptBR })} – {format(e, "HH:mm")}
+                                    </div>
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </TooltipProvider>
 
