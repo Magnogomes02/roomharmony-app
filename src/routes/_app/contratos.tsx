@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Pencil, FileText, Paperclip, Download, Trash2, Search, FileDown, X } from "lucide-react";
+import { Plus, Pencil, FileText, Paperclip, Download, Trash2, Search, FileDown, X, AlertTriangle } from "lucide-react";
 import { generateContractPdf } from "@/lib/contractPdf";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -23,11 +23,18 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import {
   planContractBookings, commitGenerationPlan, WEEKDAY_LABELS,
   type ScheduleRow, type GenerationPlan,
 } from "@/lib/contractBookings";
+import {
+  loadBusySlots, computeRowConflicts, suggestAlternatives,
+  TIMELINE_START_MIN, TIMELINE_END_MIN, tm, fromMin,
+  type BusySlot,
+} from "@/lib/scheduleConflicts";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_app/contratos")({
   component: ContratosPage,
