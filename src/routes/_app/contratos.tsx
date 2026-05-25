@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Pencil, FileText, Paperclip, Download, Trash2, Search, FileDown } from "lucide-react";
+import { Plus, Pencil, FileText, Paperclip, Download, Trash2, Search, FileDown, X } from "lucide-react";
 import { generateContractPdf } from "@/lib/contractPdf";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -14,68 +14,48 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
+import {
+  planContractBookings, commitGenerationPlan, WEEKDAY_LABELS,
+  type ScheduleRow, type GenerationPlan,
+} from "@/lib/contractBookings";
 
 export const Route = createFileRoute("/_app/contratos")({
   component: ContratosPage,
 });
 
 interface Professional {
-  id: string;
-  full_name: string;
-  cpf: string | null;
-  registry: string | null;
-  specialty: string | null;
-  email: string | null;
-  phone: string | null;
-  address: string | null;
+  id: string; full_name: string; cpf: string | null; registry: string | null;
+  specialty: string | null; email: string | null; phone: string | null; address: string | null;
 }
-
-interface Room {
-  id: string;
-  name: string;
-  active: boolean;
-}
-
+interface Room { id: string; name: string; active: boolean }
 interface Contract {
-  id: string;
-  professional_id: string;
-  room_id: string;
-  start_date: string;
-  end_date: string | null;
-  monthly_value: number;
-  due_day: number;
-  status: string;
-  notes: string | null;
-  extra_clauses: string | null;
-  signed_at: string | null;
-  signed_by_name: string | null;
-  signature_hash: string | null;
-  locador_name: string | null;
-  created_at: string;
+  id: string; professional_id: string; room_id: string | null;
+  start_date: string; end_date: string | null;
+  monthly_value: number; due_day: number; status: string;
+  notes: string | null; extra_clauses: string | null;
+  signed_at: string | null; signed_by_name: string | null; signature_hash: string | null;
+  locador_name: string | null; created_at: string;
   professional?: Professional;
-  room?: Room;
+  schedules?: ScheduleRow[];
 }
-
 interface Attachment {
-  id: string;
-  professional_id: string;
-  contract_id: string | null;
-  file_name: string;
-  file_path: string;
-  mime_type: string | null;
-  size_bytes: number | null;
-  created_at: string;
+  id: string; professional_id: string; contract_id: string | null;
+  file_name: string; file_path: string; mime_type: string | null;
+  size_bytes: number | null; created_at: string;
 }
 
 const emptyForm = {
   professional_id: "",
-  room_id: "",
   start_date: new Date().toISOString().slice(0, 10),
   end_date: "",
   monthly_value: "",
@@ -89,10 +69,7 @@ const emptyForm = {
 };
 
 const statusVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-  rascunho: "secondary",
-  ativo: "default",
-  encerrado: "outline",
-  cancelado: "destructive",
+  rascunho: "secondary", ativo: "default", encerrado: "outline", cancelado: "destructive",
 };
 
 function ContratosPage() {
@@ -108,6 +85,7 @@ function ContratosPage() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Contract | null>(null);
   const [form, setForm] = useState(emptyForm);
+  const [schedules, setSchedules] = useState<ScheduleRow[]>([]);
   const [saving, setSaving] = useState(false);
 
   const [attachOpen, setAttachOpen] = useState(false);
@@ -115,20 +93,29 @@ function ContratosPage() {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [uploading, setUploading] = useState(false);
 
+  // Conflict preview dialog state for generation
+  const [genPreview, setGenPreview] = useState<{
+    open: boolean;
+    plan: GenerationPlan | null;
+    contractId: string | null;
+  }>({ open: false, plan: null, contractId: null });
+
   async function load() {
     setLoading(true);
-    const [c, p, r] = await Promise.all([
+    const [c, p, r, sch] = await Promise.all([
       supabase.from("contracts").select("*").order("created_at", { ascending: false }),
       supabase.from("professionals").select("id,full_name,cpf,registry,specialty,email,phone,address").eq("active", true).order("full_name"),
       supabase.from("rooms").select("id,name,active").order("name"),
+      supabase.from("contract_schedules").select("id,contract_id,room_id,weekday,start_time,end_time"),
     ]);
     if (c.error) toast.error("Erro ao carregar contratos", { description: c.error.message });
     const profs = (p.data as Professional[]) ?? [];
     const rms = (r.data as Room[]) ?? [];
+    const schedList = (sch.data as Array<ScheduleRow & { contract_id: string }>) ?? [];
     const enriched = ((c.data as Contract[]) ?? []).map((ct) => ({
       ...ct,
       professional: profs.find((pp) => pp.id === ct.professional_id),
-      room: rms.find((rr) => rr.id === ct.room_id),
+      schedules: schedList.filter((s) => s.contract_id === ct.id),
     }));
     setContracts(enriched);
     setProfessionals(profs);
@@ -142,10 +129,12 @@ function ContratosPage() {
     () => professionals.find((p) => p.id === form.professional_id),
     [professionals, form.professional_id],
   );
+  const roomMap = useMemo(() => new Map(rooms.map((r) => [r.id, r])), [rooms]);
 
   function openNew() {
     setEditing(null);
     setForm(emptyForm);
+    setSchedules([]);
     setOpen(true);
   }
 
@@ -153,7 +142,6 @@ function ContratosPage() {
     setEditing(c);
     setForm({
       professional_id: c.professional_id,
-      room_id: c.room_id,
       start_date: c.start_date,
       end_date: c.end_date ?? "",
       monthly_value: String(c.monthly_value ?? ""),
@@ -165,10 +153,13 @@ function ContratosPage() {
       signed_by_name: c.signed_by_name ?? "",
       signed_at: c.signed_at ? c.signed_at.slice(0, 10) : "",
     });
+    setSchedules((c.schedules ?? []).map((s) => ({
+      id: s.id, weekday: s.weekday, room_id: s.room_id,
+      start_time: s.start_time.slice(0, 5), end_time: s.end_time.slice(0, 5),
+    })));
     setOpen(true);
   }
 
-  // auto-fill locatário (signed_by_name) quando seleciona profissional num novo contrato
   useEffect(() => {
     if (!editing && selectedProfessional && !form.signed_by_name) {
       setForm((f) => ({ ...f, signed_by_name: selectedProfessional.full_name }));
@@ -184,16 +175,67 @@ function ContratosPage() {
     });
   }
 
+  function addSchedule() {
+    setSchedules((s) => [...s, { weekday: 1, room_id: rooms[0]?.id ?? "", start_time: "08:00", end_time: "09:00" }]);
+  }
+  function updateSchedule(idx: number, patch: Partial<ScheduleRow>) {
+    setSchedules((s) => s.map((row, i) => (i === idx ? { ...row, ...patch } : row)));
+  }
+  function removeSchedule(idx: number) {
+    setSchedules((s) => s.filter((_, i) => i !== idx));
+  }
+
+  function validateSchedules(): string | null {
+    for (const s of schedules) {
+      if (!s.room_id) return "Selecione a sala em todas as linhas da grade.";
+      if (!s.start_time || !s.end_time) return "Preencha início e fim em todas as linhas.";
+      if (s.end_time <= s.start_time) return "Em cada linha, o horário final deve ser após o inicial.";
+    }
+    // overlap entre linhas no mesmo dia/sala
+    for (let i = 0; i < schedules.length; i++) {
+      for (let j = i + 1; j < schedules.length; j++) {
+        const a = schedules[i], b = schedules[j];
+        if (a.weekday === b.weekday && a.room_id === b.room_id) {
+          if (!(a.end_time <= b.start_time || b.end_time <= a.start_time)) {
+            return "Há sobreposição de horários no mesmo dia/sala dentro deste contrato.";
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  async function persistSchedules(contractId: string) {
+    await supabase.from("contract_schedules").delete().eq("contract_id", contractId);
+    if (schedules.length === 0) return;
+    const rows = schedules.map((s) => ({
+      contract_id: contractId,
+      room_id: s.room_id,
+      weekday: s.weekday,
+      start_time: s.start_time,
+      end_time: s.end_time,
+    }));
+    const { error } = await supabase.from("contract_schedules").insert(rows);
+    if (error) throw error;
+  }
+
   async function save(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.professional_id || !form.room_id || !form.start_date) {
-      toast.error("Profissional, sala e data de início são obrigatórios");
+    if (!form.professional_id || !form.start_date) {
+      toast.error("Profissional e data de início são obrigatórios");
       return;
     }
+    if (schedules.length === 0) {
+      toast.error("Inclua ao menos um horário na grade (dia, sala, início, fim).");
+      return;
+    }
+    const schedErr = validateSchedules();
+    if (schedErr) { toast.error(schedErr); return; }
+
     setSaving(true);
     const payload = {
       professional_id: form.professional_id,
-      room_id: form.room_id,
+      room_id: null,
       start_date: form.start_date,
       end_date: form.end_date || null,
       monthly_value: form.monthly_value ? Number(form.monthly_value) : 0,
@@ -205,41 +247,104 @@ function ContratosPage() {
       signed_by_name: form.signed_by_name.trim() || null,
       signed_at: form.signed_at ? new Date(form.signed_at).toISOString() : null,
     };
-    const res = editing
-      ? await supabase.from("contracts").update(payload).eq("id", editing.id)
-      : await supabase.from("contracts").insert(payload);
-    setSaving(false);
-    if (res.error) {
-      toast.error("Erro ao salvar", { description: res.error.message });
+
+    try {
+      let contractId: string;
+      if (editing) {
+        const { error } = await supabase.from("contracts").update(payload).eq("id", editing.id);
+        if (error) throw error;
+        contractId = editing.id;
+      } else {
+        const { data, error } = await supabase.from("contracts").insert(payload).select("id").single();
+        if (error) throw error;
+        contractId = data!.id;
+      }
+      await persistSchedules(contractId);
+
+      // Se ativo, prepara geração de bookings com prévia de conflitos
+      if (form.status === "ativo") {
+        const plan = await planContractBookings({
+          contract_id: contractId,
+          professional_id: form.professional_id,
+          start_date: form.start_date,
+          end_date: form.end_date || null,
+          schedules,
+        });
+
+        if (plan.toCreate.length === 0) {
+          toast.success(editing ? "Contrato atualizado" : "Contrato criado", {
+            description: "Nenhuma reserva nova a gerar.",
+          });
+          await logAudit(editing ? "contract.update" : "contract.create", contractId);
+          setOpen(false);
+          load();
+        } else if (plan.conflicts.length > 0) {
+          // pedir confirmação
+          setGenPreview({ open: true, plan, contractId });
+          await logAudit(editing ? "contract.update" : "contract.create", contractId);
+        } else {
+          const res = await commitGenerationPlan(plan);
+          toast.success(editing ? "Contrato atualizado" : "Contrato criado", {
+            description: `${res.created} reserva(s) geradas no calendário.`,
+          });
+          await logAudit(editing ? "contract.update" : "contract.create", contractId, { generated: res.created });
+          setOpen(false);
+          load();
+        }
+      } else {
+        toast.success(editing ? "Contrato atualizado" : "Contrato criado");
+        await logAudit(editing ? "contract.update" : "contract.create", contractId);
+        setOpen(false);
+        load();
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error("Erro ao salvar", { description: msg });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function confirmGeneration(force: boolean) {
+    if (!genPreview.plan) return;
+    if (!force) {
+      setGenPreview({ open: false, plan: null, contractId: null });
+      setOpen(false);
+      load();
       return;
     }
-    toast.success(editing ? "Contrato atualizado" : "Contrato criado");
-    setOpen(false);
-    await logAudit(editing ? "contract.update" : "contract.create", editing?.id);
-    load();
+    try {
+      const res = await commitGenerationPlan(genPreview.plan);
+      toast.success("Reservas geradas", {
+        description: `${res.created} criadas • ${res.conflictsRegistered} conflitos registrados para resolução em /conflitos.`,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error("Erro ao gerar reservas", { description: msg });
+    } finally {
+      setGenPreview({ open: false, plan: null, contractId: null });
+      setOpen(false);
+      load();
+    }
   }
 
   async function openAttachments(c: Contract) {
     setAttachContract(c);
     setAttachOpen(true);
     const { data, error } = await supabase
-      .from("contract_attachments")
-      .select("*")
+      .from("contract_attachments").select("*")
       .eq("professional_id", c.professional_id)
       .order("created_at", { ascending: false });
     if (error) toast.error("Erro ao carregar anexos", { description: error.message });
     setAttachments((data as Attachment[]) ?? []);
   }
-
   async function refreshAttachments(professionalId: string) {
     const { data } = await supabase
-      .from("contract_attachments")
-      .select("*")
+      .from("contract_attachments").select("*")
       .eq("professional_id", professionalId)
       .order("created_at", { ascending: false });
     setAttachments((data as Attachment[]) ?? []);
   }
-
   async function uploadFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file || !attachContract) return;
@@ -255,34 +360,23 @@ function ContratosPage() {
     const ins = await supabase.from("contract_attachments").insert({
       professional_id: attachContract.professional_id,
       contract_id: attachContract.id,
-      file_name: file.name,
-      file_path: path,
-      mime_type: file.type,
-      size_bytes: file.size,
+      file_name: file.name, file_path: path,
+      mime_type: file.type, size_bytes: file.size,
       uploaded_by: user?.id ?? null,
     });
     setUploading(false);
     e.target.value = "";
-    if (ins.error) {
-      toast.error("Erro ao registrar anexo", { description: ins.error.message });
-      return;
-    }
+    if (ins.error) { toast.error("Erro ao registrar anexo", { description: ins.error.message }); return; }
     toast.success("Anexo enviado");
     await logAudit("contract.attachment_upload", attachContract.id, { file: file.name });
     refreshAttachments(attachContract.professional_id);
   }
-
   async function downloadAttachment(a: Attachment) {
     const { data, error } = await supabase.storage
-      .from("contract-attachments")
-      .createSignedUrl(a.file_path, 60);
-    if (error || !data) {
-      toast.error("Erro ao gerar link", { description: error?.message });
-      return;
-    }
+      .from("contract-attachments").createSignedUrl(a.file_path, 60);
+    if (error || !data) { toast.error("Erro ao gerar link", { description: error?.message }); return; }
     window.open(data.signedUrl, "_blank");
   }
-
   async function deleteAttachment(a: Attachment) {
     if (!confirm(`Remover "${a.file_name}"?`)) return;
     const s = await supabase.storage.from("contract-attachments").remove([a.file_path]);
@@ -296,11 +390,28 @@ function ContratosPage() {
 
   const filtered = contracts.filter((c) => {
     const q = search.toLowerCase();
-    return !q
-      || (c.professional?.full_name ?? "").toLowerCase().includes(q)
-      || (c.room?.name ?? "").toLowerCase().includes(q)
-      || c.status.toLowerCase().includes(q);
+    if (!q) return true;
+    if ((c.professional?.full_name ?? "").toLowerCase().includes(q)) return true;
+    if (c.status.toLowerCase().includes(q)) return true;
+    if ((c.schedules ?? []).some((s) => (roomMap.get(s.room_id)?.name ?? "").toLowerCase().includes(q))) return true;
+    return false;
   });
+
+  function summarizeSchedules(list: ScheduleRow[] | undefined) {
+    if (!list || list.length === 0) return "—";
+    const byRoom = new Map<string, ScheduleRow[]>();
+    for (const s of list) {
+      const arr = byRoom.get(s.room_id) ?? [];
+      arr.push(s); byRoom.set(s.room_id, arr);
+    }
+    const parts: string[] = [];
+    for (const [roomId, rows] of byRoom) {
+      const room = roomMap.get(roomId)?.name ?? "Sala";
+      const days = rows.map((r) => WEEKDAY_LABELS[r.weekday]).join("/");
+      parts.push(`${room} (${days})`);
+    }
+    return parts.join(" • ");
+  }
 
   return (
     <div className="space-y-6">
@@ -308,7 +419,7 @@ function ContratosPage() {
         <div>
           <h1 className="font-serif text-3xl">Contratos</h1>
           <p className="text-muted-foreground">
-            Contratos de locação com dados do profissional, cláusulas editáveis e anexos.
+            Contratos com grade multi-sala, geração automática de reservas e detecção de conflitos.
           </p>
         </div>
         {canEdit && (
@@ -330,8 +441,7 @@ function ContratosPage() {
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Buscar por profissional, sala ou status..."
-              className="pl-9"
-              value={search}
+              className="pl-9" value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
@@ -341,7 +451,7 @@ function ContratosPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Profissional</TableHead>
-                  <TableHead>Sala</TableHead>
+                  <TableHead>Salas / dias</TableHead>
                   <TableHead>Vigência</TableHead>
                   <TableHead>Valor mensal</TableHead>
                   <TableHead>Status</TableHead>
@@ -356,15 +466,13 @@ function ContratosPage() {
                 ) : filtered.map((c) => (
                   <TableRow key={c.id}>
                     <TableCell className="font-medium">{c.professional?.full_name ?? "—"}</TableCell>
-                    <TableCell>{c.room?.name ?? "—"}</TableCell>
+                    <TableCell className="text-sm">{summarizeSchedules(c.schedules)}</TableCell>
                     <TableCell className="text-sm">
                       {new Date(c.start_date).toLocaleDateString("pt-BR")}
                       {c.end_date && <> – {new Date(c.end_date).toLocaleDateString("pt-BR")}</>}
                     </TableCell>
                     <TableCell>
-                      {Number(c.monthly_value).toLocaleString("pt-BR", {
-                        style: "currency", currency: "BRL",
-                      })}
+                      {Number(c.monthly_value).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
                     </TableCell>
                     <TableCell>
                       <Badge variant={statusVariant[c.status] ?? "secondary"}>{c.status}</Badge>
@@ -372,25 +480,21 @@ function ContratosPage() {
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
                         <Button
-                          size="icon"
-                          variant="ghost"
-                          title="Baixar PDF"
+                          size="icon" variant="ghost" title="Baixar PDF"
                           onClick={async () => {
-                            if (!c.professional || !c.room) {
-                              toast.error("Dados incompletos para gerar o PDF");
-                              return;
-                            }
+                            if (!c.professional) { toast.error("Dados incompletos para gerar o PDF"); return; }
+                            const firstRoomId = c.schedules?.[0]?.room_id;
+                            const roomName = firstRoomId
+                              ? (roomMap.get(firstRoomId)?.name ?? "—")
+                              : "—";
                             try {
                               await generateContractPdf({
                                 professional: c.professional,
-                                room: { name: c.room.name },
-                                start_date: c.start_date,
-                                end_date: c.end_date,
+                                room: { name: summarizeSchedules(c.schedules) !== "—" ? summarizeSchedules(c.schedules) : roomName },
+                                start_date: c.start_date, end_date: c.end_date,
                                 monthly_value: Number(c.monthly_value),
-                                extra_clauses: c.extra_clauses,
-                                notes: c.notes,
-                                locador_name: c.locador_name,
-                                signed_by_name: c.signed_by_name,
+                                extra_clauses: c.extra_clauses, notes: c.notes,
+                                locador_name: c.locador_name, signed_by_name: c.signed_by_name,
                                 signed_at: c.signed_at,
                               });
                               await logAudit("contract.pdf_download", c.id);
@@ -423,50 +527,35 @@ function ContratosPage() {
 
       {/* Form dialog */}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-serif text-2xl">
               {editing ? "Editar contrato" : "Novo contrato"}
             </DialogTitle>
             <DialogDescription>
-              Os dados do locatário são preenchidos automaticamente a partir do profissional selecionado.
+              Defina a grade de horários (cada linha = dia da semana + sala + faixa de horário).
+              Ao salvar como "Ativo", as reservas até a data fim do contrato são geradas no calendário.
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={save} className="space-y-6">
             {/* Partes */}
             <section className="space-y-4">
-              <h3 className="font-serif text-lg">Partes</h3>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>Profissional (locatário) *</Label>
-                  <Select
-                    value={form.professional_id}
-                    onValueChange={(v) => setForm({ ...form, professional_id: v })}
-                    disabled={!!editing}
-                  >
-                    <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                    <SelectContent>
-                      {professionals.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Sala *</Label>
-                  <Select
-                    value={form.room_id}
-                    onValueChange={(v) => setForm({ ...form, room_id: v })}
-                  >
-                    <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                    <SelectContent>
-                      {rooms.filter((r) => r.active).map((r) => (
-                        <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+              <h3 className="font-serif text-lg">Profissional</h3>
+              <div className="space-y-2">
+                <Label>Profissional (locatário) *</Label>
+                <Select
+                  value={form.professional_id}
+                  onValueChange={(v) => setForm({ ...form, professional_id: v })}
+                  disabled={!!editing}
+                >
+                  <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                  <SelectContent>
+                    {professionals.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               {selectedProfessional && (
@@ -477,12 +566,68 @@ function ContratosPage() {
                     {selectedProfessional.registry && <> • {selectedProfessional.registry}</>}
                     {selectedProfessional.cpf && <> • CPF {selectedProfessional.cpf}</>}
                   </div>
-                  <div className="text-muted-foreground">
-                    {selectedProfessional.email ?? ""} {selectedProfessional.phone ? `• ${selectedProfessional.phone}` : ""}
-                  </div>
-                  {selectedProfessional.address && (
-                    <div className="text-muted-foreground">{selectedProfessional.address}</div>
-                  )}
+                </div>
+              )}
+            </section>
+
+            {/* Grade de horários */}
+            <section className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="font-serif text-lg">Grade de horários *</h3>
+                <Button type="button" variant="outline" size="sm" onClick={addSchedule} disabled={rooms.length === 0}>
+                  <Plus className="mr-2 h-4 w-4" /> Adicionar linha
+                </Button>
+              </div>
+              {schedules.length === 0 ? (
+                <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+                  Nenhum horário adicionado. Clique em "Adicionar linha" para definir dia, sala e faixa de horário.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {schedules.map((s, i) => (
+                    <div key={i} className="grid grid-cols-12 items-end gap-2 rounded-md border p-3">
+                      <div className="col-span-3 space-y-1">
+                        <Label className="text-xs">Dia da semana</Label>
+                        <Select
+                          value={String(s.weekday)}
+                          onValueChange={(v) => updateSchedule(i, { weekday: Number(v) })}
+                        >
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {WEEKDAY_LABELS.map((lbl, idx) => (
+                              <SelectItem key={idx} value={String(idx)}>{lbl}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="col-span-4 space-y-1">
+                        <Label className="text-xs">Sala</Label>
+                        <Select value={s.room_id} onValueChange={(v) => updateSchedule(i, { room_id: v })}>
+                          <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                          <SelectContent>
+                            {rooms.filter((r) => r.active).map((r) => (
+                              <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="col-span-2 space-y-1">
+                        <Label className="text-xs">Início</Label>
+                        <Input type="time" value={s.start_time}
+                          onChange={(e) => updateSchedule(i, { start_time: e.target.value })} />
+                      </div>
+                      <div className="col-span-2 space-y-1">
+                        <Label className="text-xs">Fim</Label>
+                        <Input type="time" value={s.end_time}
+                          onChange={(e) => updateSchedule(i, { end_time: e.target.value })} />
+                      </div>
+                      <div className="col-span-1 flex justify-end">
+                        <Button type="button" variant="ghost" size="icon" onClick={() => removeSchedule(i)} title="Remover">
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </section>
@@ -522,7 +667,11 @@ function ContratosPage() {
                       <SelectItem value="cancelado">Cancelado</SelectItem>
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-muted-foreground">Ao salvar como "Ativo", o sistema gera automaticamente os recebíveis mensais no Financeiro.</p>
+                  <p className="text-xs text-muted-foreground">
+                    Ao salvar como "Ativo": gera recebíveis mensais no Financeiro e materializa as reservas
+                    da grade no Calendário até a data de término (ou 12 meses se em aberto). Conflitos serão
+                    notificados antes de prosseguir.
+                  </p>
                 </div>
               </div>
             </section>
@@ -533,7 +682,6 @@ function ContratosPage() {
               <div className="space-y-2">
                 <Label>Cláusulas adicionais</Label>
                 <Textarea rows={6} maxLength={5000}
-                  placeholder="Inclua aqui cláusulas específicas deste contrato..."
                   value={form.extra_clauses}
                   onChange={(e) => setForm({ ...form, extra_clauses: e.target.value })} />
               </div>
@@ -551,14 +699,12 @@ function ContratosPage() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Locador (assinante)</Label>
-                  <Input maxLength={150} placeholder="Nome de quem assina pela clínica"
-                    value={form.locador_name}
+                  <Input maxLength={150} value={form.locador_name}
                     onChange={(e) => setForm({ ...form, locador_name: e.target.value })} />
                 </div>
                 <div className="space-y-2">
                   <Label>Locatário (editável)</Label>
-                  <Input maxLength={150}
-                    value={form.signed_by_name}
+                  <Input maxLength={150} value={form.signed_by_name}
                     onChange={(e) => setForm({ ...form, signed_by_name: e.target.value })} />
                 </div>
                 <div className="space-y-2">
@@ -577,6 +723,50 @@ function ContratosPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Conflict preview dialog */}
+      <AlertDialog open={genPreview.open} onOpenChange={(o) => !o && setGenPreview({ open: false, plan: null, contractId: null })}>
+        <AlertDialogContent className="max-w-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-serif">Conflitos detectados na geração</AlertDialogTitle>
+            <AlertDialogDescription>
+              Foram encontrados {genPreview.plan?.conflicts.length ?? 0} conflito(s) ao tentar materializar{" "}
+              {genPreview.plan?.toCreate.length ?? 0} reserva(s).
+              Você pode gerar mesmo assim — as reservas conflitantes ficarão marcadas como{" "}
+              <strong>conflito</strong> e listadas em <strong>/conflitos</strong> para ajuste.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="max-h-64 overflow-auto rounded-md border text-sm">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Data</TableHead>
+                  <TableHead>Sala</TableHead>
+                  <TableHead>Horário</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(genPreview.plan?.conflicts ?? []).slice(0, 50).map((c, i) => (
+                  <TableRow key={i}>
+                    <TableCell>{c.date.toLocaleDateString("pt-BR")} ({WEEKDAY_LABELS[c.schedule.weekday]})</TableCell>
+                    <TableCell>{roomMap.get(c.schedule.room_id)?.name ?? "—"}</TableCell>
+                    <TableCell>{c.schedule.start_time}–{c.schedule.end_time}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            {(genPreview.plan?.conflicts.length ?? 0) > 50 && (
+              <div className="p-2 text-center text-xs text-muted-foreground">
+                Mostrando os primeiros 50 conflitos.
+              </div>
+            )}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => confirmGeneration(false)}>Cancelar geração</AlertDialogCancel>
+            <AlertDialogAction onClick={() => confirmGeneration(true)}>Gerar mesmo assim</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Attachments dialog */}
       <Dialog open={attachOpen} onOpenChange={setAttachOpen}>
         <DialogContent className="max-w-2xl">
@@ -585,7 +775,7 @@ function ContratosPage() {
               <FileText className="h-5 w-5" /> Anexos do contrato
             </DialogTitle>
             <DialogDescription>
-              Contratos assinados externamente, vinculados ao profissional{" "}
+              Vinculados ao profissional{" "}
               <span className="font-medium">{attachContract?.professional?.full_name}</span>.
             </DialogDescription>
           </DialogHeader>
@@ -593,12 +783,8 @@ function ContratosPage() {
           {canEdit && (
             <div className="flex items-center gap-3 rounded-md border border-dashed p-4">
               <Paperclip className="h-4 w-4 text-muted-foreground" />
-              <Input
-                type="file"
-                accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
-                disabled={uploading}
-                onChange={uploadFile}
-              />
+              <Input type="file" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
+                disabled={uploading} onChange={uploadFile} />
               {uploading && <span className="text-sm text-muted-foreground">Enviando...</span>}
             </div>
           )}
