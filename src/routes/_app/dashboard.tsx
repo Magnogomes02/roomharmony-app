@@ -7,6 +7,7 @@ import {
   Users, DoorOpen, FileText, Calendar, AlertTriangle, DollarSign, ScrollText,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { WeekScheduleCard } from "@/components/WeekScheduleCard";
 import { startOfMonth, endOfMonth } from "date-fns";
 
 export const Route = createFileRoute("/_app/dashboard")({
