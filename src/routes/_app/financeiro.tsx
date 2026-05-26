@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { format, parseISO, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Check, Pencil, Trash2, RefreshCw, Undo2, Search, Paperclip, Download } from "lucide-react";
+import { Check, Pencil, Trash2, RefreshCw, Undo2, Search, Paperclip, Download, FileText, Ban } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,16 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
+import {
+  createReceiptForReceivable,
+  cancelReceiptForReceivable,
+  cancelReceiptById,
+  downloadReceipt,
+  getReceiptsByReceivableIds,
+  type ReceiptRow,
+} from "@/lib/receiptService";
 
 export const Route = createFileRoute("/_app/financeiro")({
   component: FinanceiroPage,
@@ -87,6 +96,8 @@ function FinanceiroPage() {
   });
   const [payFile, setPayFile] = useState<File | null>(null);
   const [paying, setPaying] = useState(false);
+  const [generateReceiptAfterPay, setGenerateReceiptAfterPay] = useState(true);
+  const [receipts, setReceipts] = useState<Map<string, ReceiptRow>>(new Map());
 
   const [editOpen, setEditOpen] = useState(false);
   const [editRow, setEditRow] = useState<Receivable | null>(null);
@@ -107,9 +118,12 @@ function FinanceiroPage() {
       supabase.from("rooms").select("id,name"),
     ]);
     if (error) toast.error("Erro ao carregar", { description: error.message });
-    setRows((rec as Receivable[]) ?? []);
+    const list = (rec as Receivable[]) ?? [];
+    setRows(list);
     setProfs(new Map((p.data ?? []).map((x: { id: string; full_name: string }) => [x.id, x.full_name])));
     setRooms(new Map((r.data ?? []).map((x: { id: string; name: string }) => [x.id, x.name])));
+    const recIds = list.filter((x) => x.status === "recebido").map((x) => x.id);
+    setReceipts(await getReceiptsByReceivableIds(recIds));
     setLoading(false);
   }, [monthRef]);
 
@@ -147,6 +161,7 @@ function FinanceiroPage() {
   }
 
   function openPay(r: Receivable) {
+    setGenerateReceiptAfterPay(true);
     setPayRow(r);
     setPayForm({
       amount_paid: String(r.amount_due),
@@ -186,13 +201,30 @@ function FinanceiroPage() {
     setPaying(false);
     if (error) return toast.error("Erro ao baixar", { description: error.message });
     await audit("receivable.pay", payRow.id, { amount: payForm.amount_paid, method: payForm.payment_method });
-    toast.success("Baixa registrada");
+
+    if (generateReceiptAfterPay) {
+      try {
+        await createReceiptForReceivable(payRow.id);
+        toast.success("Baixa registrada e recibo gerado");
+      } catch (e) {
+        toast.warning("Baixa registrada, mas não foi possível gerar o recibo", {
+          description: e instanceof Error ? e.message : String(e),
+        });
+      }
+    } else {
+      toast.success("Baixa registrada");
+    }
     setPayOpen(false);
     load();
   }
 
   async function revertPay(r: Receivable) {
-    if (!confirm("Estornar este pagamento? O recebível voltará para 'A receber'.")) return;
+    if (!confirm("Estornar este pagamento? O recebível voltará para 'A receber' e o recibo emitido (se houver) será cancelado.")) return;
+    try {
+      await cancelReceiptForReceivable(r.id, "Pagamento estornado");
+    } catch (e) {
+      console.warn("[revertPay] cancel receipt", e);
+    }
     const { error } = await supabase
       .from("receivables")
       .update({ status: "a_receber", amount_paid: null, paid_at: null, payment_method: null })
@@ -204,6 +236,9 @@ function FinanceiroPage() {
   }
 
   function openEdit(r: Receivable) {
+    if (receipts.has(r.id)) {
+      alert("Este recebível possui recibo emitido. Alterar valor/vencimento não altera o recibo já emitido.");
+    }
     setEditRow(r);
     setEditForm({
       amount_due: String(r.amount_due),
@@ -231,6 +266,10 @@ function FinanceiroPage() {
   }
 
   async function removeRow(r: Receivable) {
+    if (receipts.has(r.id)) {
+      toast.error("Este recebível possui recibo emitido. Cancele o recibo ou estorne o pagamento antes de excluir.");
+      return;
+    }
     if (!confirm("Excluir esta parcela? Esta ação não pode ser desfeita.")) return;
     const { error } = await supabase.from("receivables").delete().eq("id", r.id);
     if (error) return toast.error("Erro", { description: error.message });
@@ -238,6 +277,39 @@ function FinanceiroPage() {
     toast.success("Parcela excluída");
     load();
   }
+
+  async function handleGenerateReceipt(r: Receivable) {
+    try {
+      await createReceiptForReceivable(r.id);
+      toast.success("Recibo gerado");
+      load();
+    } catch (e) {
+      toast.error("Erro ao gerar recibo", { description: e instanceof Error ? e.message : String(e) });
+    }
+  }
+
+  async function handleDownloadReceipt(r: Receivable) {
+    const rc = receipts.get(r.id);
+    if (!rc) return;
+    try { await downloadReceipt(rc); } catch (e) {
+      toast.error("Erro ao baixar recibo", { description: e instanceof Error ? e.message : String(e) });
+    }
+  }
+
+  async function handleCancelReceipt(r: Receivable) {
+    const rc = receipts.get(r.id);
+    if (!rc) return;
+    const reason = prompt("Motivo do cancelamento do recibo:");
+    if (!reason || !reason.trim()) return;
+    try {
+      await cancelReceiptById(rc.id, reason.trim());
+      toast.success("Recibo cancelado");
+      load();
+    } catch (e) {
+      toast.error("Erro ao cancelar recibo", { description: e instanceof Error ? e.message : String(e) });
+    }
+  }
+
 
   async function regenerateContract(contractId: string) {
     const { data, error } = await supabase.rpc("regenerate_contract_receivables", { _contract_id: contractId });
@@ -363,6 +435,21 @@ function FinanceiroPage() {
                                 <Undo2 className="h-4 w-4" />
                               </Button>
                             )}
+                            {canEdit && r.status === "recebido" && !receipts.has(r.id) && (
+                              <Button size="icon" variant="ghost" title="Gerar recibo" onClick={() => handleGenerateReceipt(r)}>
+                                <FileText className="h-4 w-4 text-primary" />
+                              </Button>
+                            )}
+                            {r.status === "recebido" && receipts.has(r.id) && (
+                              <Button size="icon" variant="ghost" title="Baixar recibo" onClick={() => handleDownloadReceipt(r)}>
+                                <FileText className="h-4 w-4 text-success" />
+                              </Button>
+                            )}
+                            {canEdit && r.status === "recebido" && receipts.has(r.id) && (
+                              <Button size="icon" variant="ghost" title="Cancelar recibo" onClick={() => handleCancelReceipt(r)}>
+                                <Ban className="h-4 w-4 text-destructive" />
+                              </Button>
+                            )}
                             {canEdit && (
                               <Button size="icon" variant="ghost" title="Editar" onClick={() => openEdit(r)}>
                                 <Pencil className="h-4 w-4" />
@@ -432,6 +519,16 @@ function FinanceiroPage() {
             <div className="space-y-2">
               <Label className="flex items-center gap-2"><Paperclip className="h-4 w-4" /> Comprovante (opcional)</Label>
               <Input type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={(e) => setPayFile(e.target.files?.[0] ?? null)} />
+            </div>
+            <div className="flex items-center gap-2 rounded-md border bg-muted/30 p-3">
+              <Checkbox
+                id="gen-receipt"
+                checked={generateReceiptAfterPay}
+                onCheckedChange={(v) => setGenerateReceiptAfterPay(v === true)}
+              />
+              <Label htmlFor="gen-receipt" className="cursor-pointer text-sm font-normal">
+                Gerar recibo automaticamente após a baixa
+              </Label>
             </div>
           </div>
           <DialogFooter>

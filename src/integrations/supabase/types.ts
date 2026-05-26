@@ -506,6 +506,125 @@ export type Database = {
         }
         Relationships: []
       }
+      receivable_receipts: {
+        Row: {
+          amount_due: number
+          amount_paid: number
+          authentication_code: string | null
+          cancel_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
+          clinic_address: string | null
+          clinic_cnpj: string | null
+          clinic_name: string | null
+          created_at: string
+          due_date: string
+          id: string
+          issued_at: string
+          issued_by: string | null
+          kind: string
+          metadata: Json | null
+          paid_at: string
+          payment_method: string | null
+          professional_document: string | null
+          professional_email: string | null
+          professional_id: string
+          professional_name: string
+          professional_phone: string | null
+          receipt_body: string | null
+          receipt_footer: string | null
+          receipt_number: string
+          receipt_path: string | null
+          receipt_title: string | null
+          receivable_id: string
+          reference_month: string
+          room_id: string | null
+          room_name: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount_due: number
+          amount_paid: number
+          authentication_code?: string | null
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          clinic_address?: string | null
+          clinic_cnpj?: string | null
+          clinic_name?: string | null
+          created_at?: string
+          due_date: string
+          id?: string
+          issued_at?: string
+          issued_by?: string | null
+          kind: string
+          metadata?: Json | null
+          paid_at: string
+          payment_method?: string | null
+          professional_document?: string | null
+          professional_email?: string | null
+          professional_id: string
+          professional_name: string
+          professional_phone?: string | null
+          receipt_body?: string | null
+          receipt_footer?: string | null
+          receipt_number: string
+          receipt_path?: string | null
+          receipt_title?: string | null
+          receivable_id: string
+          reference_month: string
+          room_id?: string | null
+          room_name?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount_due?: number
+          amount_paid?: number
+          authentication_code?: string | null
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          clinic_address?: string | null
+          clinic_cnpj?: string | null
+          clinic_name?: string | null
+          created_at?: string
+          due_date?: string
+          id?: string
+          issued_at?: string
+          issued_by?: string | null
+          kind?: string
+          metadata?: Json | null
+          paid_at?: string
+          payment_method?: string | null
+          professional_document?: string | null
+          professional_email?: string | null
+          professional_id?: string
+          professional_name?: string
+          professional_phone?: string | null
+          receipt_body?: string | null
+          receipt_footer?: string | null
+          receipt_number?: string
+          receipt_path?: string | null
+          receipt_title?: string | null
+          receivable_id?: string
+          reference_month?: string
+          room_id?: string | null
+          room_name?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "receivable_receipts_receivable_id_fkey"
+            columns: ["receivable_id"]
+            isOneToOne: false
+            referencedRelation: "receivables"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       receivables: {
         Row: {
           amount_due: number
