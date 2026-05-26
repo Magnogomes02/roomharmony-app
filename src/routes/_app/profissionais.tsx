@@ -316,6 +316,7 @@ function ProfissionaisPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-12">Cor</TableHead>
                   <TableHead>Nome</TableHead>
                   <TableHead>Especialidade</TableHead>
                   <TableHead>Registro</TableHead>
@@ -326,11 +327,18 @@ function ProfissionaisPage() {
               </TableHeader>
               <TableBody>
                 {loading ? (
-                  <TableRow><TableCell colSpan={6} className="py-8 text-center text-muted-foreground">Carregando...</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="py-8 text-center text-muted-foreground">Carregando...</TableCell></TableRow>
                 ) : filtered.length === 0 ? (
-                  <TableRow><TableCell colSpan={6} className="py-8 text-center text-muted-foreground">Nenhum profissional encontrado.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="py-8 text-center text-muted-foreground">Nenhum profissional encontrado.</TableCell></TableRow>
                 ) : filtered.map((p) => (
                   <TableRow key={p.id}>
+                    <TableCell>
+                      <span
+                        className="inline-block h-4 w-4 rounded-full border border-border"
+                        style={{ backgroundColor: entityColor(p.color_hex, p.id) }}
+                        aria-hidden
+                      />
+                    </TableCell>
                     <TableCell className="font-medium">{p.full_name}</TableCell>
                     <TableCell>{p.specialty ?? "—"}</TableCell>
                     <TableCell>{p.registry ?? "—"}</TableCell>
