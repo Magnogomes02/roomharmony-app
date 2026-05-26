@@ -24,11 +24,16 @@ import {
 } from "@/lib/shifts";
 import {
   CONTRACT_TEMPLATE_VARIABLES,
-  loadContractTemplates,
-  saveContractTemplates,
+  loadContractTemplatesSettings,
+  saveContractTemplatesSettings,
   getInitialContractTemplate,
+  renderContractTemplate,
+  stripHtmlToText,
+  DEFAULT_SIGNATURE_SETTINGS,
   type ContractTemplate,
+  type SignatureSettings,
 } from "@/lib/contractTemplates";
+import { RichContractEditor } from "@/components/RichContractEditor";
 
 export const Route = createFileRoute("/_app/preferencias")({
   component: PreferenciasPage,
@@ -54,22 +59,26 @@ function PreferenciasPage() {
   const [uploading, setUploading] = useState(false);
 
   const [templates, setTemplates] = useState<ContractTemplate[]>([]);
+  const [sigSettings, setSigSettings] = useState<SignatureSettings>(DEFAULT_SIGNATURE_SETTINGS);
+  const [savingSig, setSavingSig] = useState(false);
   const [tplOpen, setTplOpen] = useState(false);
   const [tplEditing, setTplEditing] = useState<ContractTemplate | null>(null);
   const [tplForm, setTplForm] = useState<ContractTemplate>(() => emptyTemplate());
   const [tplSaving, setTplSaving] = useState(false);
   const [tplDeleteTarget, setTplDeleteTarget] = useState<ContractTemplate | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   async function load() {
     setLoading(true);
-    const [{ data }, sd, tpls] = await Promise.all([
+    const [{ data }, sd, tplSettings] = await Promise.all([
       supabase.from("settings").select("value").eq("key", "clinic_branding").maybeSingle(),
       loadShiftDefaults(),
-      loadContractTemplates(),
+      loadContractTemplatesSettings(),
     ]);
     setBranding(((data?.value as ClinicBranding) ?? {}) as ClinicBranding);
     setShifts(sd);
-    setTemplates(tpls);
+    setTemplates(tplSettings.templates);
+    setSigSettings(tplSettings.signature_settings ?? DEFAULT_SIGNATURE_SETTINGS);
     setLoading(false);
   }
 
@@ -154,7 +163,8 @@ function PreferenciasPage() {
       active: true,
       is_default: false,
       title: "",
-      body: "",
+      body_html: "",
+      body_text: "",
     };
   }
 
@@ -174,20 +184,33 @@ function PreferenciasPage() {
 
   function fillInitialTemplate() {
     const init = getInitialContractTemplate();
-    setTplForm((f) => ({ ...f, title: init.title, body: init.body, name: f.name || "Sublocação padrão" }));
+    setTplForm((f) => ({ ...f, title: init.title, body_html: init.body_html, body_text: stripHtmlToText(init.body_html), name: f.name || "Sublocação padrão" }));
   }
 
   async function persistTemplates(next: ContractTemplate[]) {
-    await saveContractTemplates(next);
-    const reloaded = await loadContractTemplates();
-    setTemplates(reloaded);
+    await saveContractTemplatesSettings({ templates: next, signature_settings: sigSettings });
+    const reloaded = await loadContractTemplatesSettings();
+    setTemplates(reloaded.templates);
+    setSigSettings(reloaded.signature_settings ?? DEFAULT_SIGNATURE_SETTINGS);
+  }
+
+  async function saveSigSettings() {
+    setSavingSig(true);
+    try {
+      await saveContractTemplatesSettings({ templates, signature_settings: sigSettings });
+      toast.success("Configuração de assinatura salva");
+    } catch (err) {
+      toast.error("Erro", { description: err instanceof Error ? err.message : String(err) });
+    } finally {
+      setSavingSig(false);
+    }
   }
 
   async function submitTemplate(e: React.FormEvent) {
     e.preventDefault();
     if (!tplForm.name.trim()) { toast.error("Informe o nome do modelo."); return; }
     if (!tplForm.title.trim()) { toast.error("Informe o título do contrato."); return; }
-    if (!tplForm.body.trim()) { toast.error("Informe o corpo do contrato."); return; }
+    if (!tplForm.body_html.trim()) { toast.error("Informe o corpo do contrato."); return; }
     setTplSaving(true);
     try {
       let next = [...templates];
@@ -197,7 +220,8 @@ function PreferenciasPage() {
         name: tplForm.name.trim(),
         description: tplForm.description?.trim() || "",
         title: tplForm.title,
-        body: tplForm.body,
+        body_html: tplForm.body_html,
+        body_text: stripHtmlToText(tplForm.body_html),
       };
       if (idx >= 0) next[idx] = incoming;
       else next.push(incoming);
@@ -537,14 +561,13 @@ function PreferenciasPage() {
 
               <div className="space-y-2">
                 <Label>Corpo completo do contrato *</Label>
-                <Textarea
-                  rows={22} value={tplForm.body}
-                  placeholder="Cole aqui o contrato completo, usando os placeholders ao lado."
-                  onChange={(e) => setTplForm({ ...tplForm, body: e.target.value })}
-                  className="font-mono text-xs"
+                <RichContractEditor
+                  value={tplForm.body_html}
+                  onChange={(html) => setTplForm({ ...tplForm, body_html: html })}
+                  onPreview={() => setPreviewOpen(true)}
                 />
                 <p className="text-xs text-muted-foreground">
-                  As quebras de linha são preservadas. Linhas em branco viram parágrafos no PDF.
+                  Use a barra de ferramentas para formatar. Insira variáveis e o bloco de assinaturas pelos botões da toolbar.
                 </p>
               </div>
             </div>
@@ -618,6 +641,7 @@ function emptyTemplate(): ContractTemplate {
     active: true,
     is_default: false,
     title: "",
-    body: "",
+    body_html: "",
+    body_text: "",
   };
 }
