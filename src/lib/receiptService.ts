@@ -110,6 +110,26 @@ export async function getReceiptsByReceivableIds(ids: string[]): Promise<Map<str
   return out;
 }
 
+async function resolveReceivableRoom(rec: { room_id: string | null; contract_id: string | null }): Promise<{ room_id: string | null; room_name: string | null }> {
+  if (rec.room_id) {
+    const { data } = await supabase.from("rooms").select("id,name").eq("id", rec.room_id).maybeSingle();
+    return { room_id: rec.room_id, room_name: data?.name ?? null };
+  }
+  if (rec.contract_id) {
+    const { data: schedules } = await supabase
+      .from("contract_schedules").select("room_id").eq("contract_id", rec.contract_id);
+    const uniqueIds = Array.from(new Set((schedules ?? []).map((s) => s.room_id).filter(Boolean) as string[]));
+    if (uniqueIds.length === 0) return { room_id: null, room_name: null };
+    const { data: rooms } = await supabase.from("rooms").select("id,name").in("id", uniqueIds);
+    const names = (rooms ?? []).map((r) => r.name).filter(Boolean);
+    if (uniqueIds.length === 1) {
+      return { room_id: uniqueIds[0], room_name: names[0] ?? null };
+    }
+    return { room_id: null, room_name: names.length ? names.join(", ") : null };
+  }
+  return { room_id: null, room_name: null };
+}
+
 export async function createReceiptForReceivable(receivableId: string): Promise<ReceiptRow> {
   // 1. receivable
   const { data: rec, error: recErr } = await supabase
@@ -124,9 +144,9 @@ export async function createReceiptForReceivable(receivableId: string): Promise<
   if (existing) throw new Error("Já existe um recibo emitido para este recebível.");
 
   // 2. related
-  const [{ data: prof }, roomQ, branding, settings, userQ] = await Promise.all([
+  const [{ data: prof }, resolvedRoom, branding, settings, userQ] = await Promise.all([
     supabase.from("professionals").select("*").eq("id", rec.professional_id).single(),
-    rec.room_id ? supabase.from("rooms").select("id,name").eq("id", rec.room_id).maybeSingle() : Promise.resolve({ data: null } as { data: { id: string; name: string } | null }),
+    resolveReceivableRoom({ room_id: rec.room_id, contract_id: rec.contract_id }),
     getClinicBranding(),
     loadReceiptSettings(),
     supabase.auth.getUser(),
@@ -149,8 +169,8 @@ export async function createReceiptForReceivable(receivableId: string): Promise<
     professional_document: prof.cpf,
     professional_email: prof.email,
     professional_phone: prof.phone,
-    room_id: rec.room_id,
-    room_name: roomQ.data?.name ?? null,
+    room_id: resolvedRoom.room_id,
+    room_name: resolvedRoom.room_name,
     kind: rec.kind,
     reference_month: rec.reference_month,
     due_date: rec.due_date,
