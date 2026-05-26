@@ -1,5 +1,6 @@
 // Helpers para cores cadastradas em rooms.color_hex e professionals.color_hex.
 // Mantém fallback determinístico quando não houver cor configurada.
+import type { CSSProperties } from "react";
 
 const FALLBACK_PALETTE = [
   "#E8BF2F", // dourado
