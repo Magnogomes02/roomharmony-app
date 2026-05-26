@@ -218,6 +218,17 @@ function ContratosPage() {
 
   useEffect(() => { load(); }, []);
 
+  // Load contract templates whenever the dialog opens
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    loadContractTemplates()
+      .then((t) => { if (!cancelled) setContractTemplates(t); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [open]);
+
+
   // Reload busy slots whenever the dialog opens or the edited contract id changes
   useEffect(() => {
     if (!open) return;
