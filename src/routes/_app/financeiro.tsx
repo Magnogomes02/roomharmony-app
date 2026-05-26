@@ -435,6 +435,21 @@ function FinanceiroPage() {
                                 <Undo2 className="h-4 w-4" />
                               </Button>
                             )}
+                            {canEdit && r.status === "recebido" && !receipts.has(r.id) && (
+                              <Button size="icon" variant="ghost" title="Gerar recibo" onClick={() => handleGenerateReceipt(r)}>
+                                <FileText className="h-4 w-4 text-primary" />
+                              </Button>
+                            )}
+                            {r.status === "recebido" && receipts.has(r.id) && (
+                              <Button size="icon" variant="ghost" title="Baixar recibo" onClick={() => handleDownloadReceipt(r)}>
+                                <FileText className="h-4 w-4 text-success" />
+                              </Button>
+                            )}
+                            {canEdit && r.status === "recebido" && receipts.has(r.id) && (
+                              <Button size="icon" variant="ghost" title="Cancelar recibo" onClick={() => handleCancelReceipt(r)}>
+                                <Ban className="h-4 w-4 text-destructive" />
+                              </Button>
+                            )}
                             {canEdit && (
                               <Button size="icon" variant="ghost" title="Editar" onClick={() => openEdit(r)}>
                                 <Pencil className="h-4 w-4" />
