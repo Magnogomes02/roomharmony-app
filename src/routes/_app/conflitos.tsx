@@ -159,7 +159,7 @@ function ConflitosPage() {
       const { data: candidates } = await supabase
         .from("bookings").select("id")
         .eq("room_id", room_id)
-        .neq("status", "cancelada")
+        .in("status", ["ativa", "conflito"])
         .neq("id", target.id)
         .lt("start_at", newEnd.toISOString())
         .gt("end_at", newStart.toISOString());

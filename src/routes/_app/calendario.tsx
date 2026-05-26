@@ -26,13 +26,13 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { entityColor, isValidHex } from "@/lib/entityColors";
+import { entityColor, isValidHex, sortRooms } from "@/lib/entityColors";
 
 export const Route = createFileRoute("/_app/calendario")({
   component: CalendarioPage,
 });
 
-interface Room { id: string; name: string; active: boolean; color_hex: string | null }
+interface Room { id: string; name: string; active: boolean; color_hex: string | null; sort_order: number | null }
 interface Professional { id: string; full_name: string; active: boolean; color_hex: string | null }
 interface Booking {
   id: string;
@@ -141,10 +141,10 @@ function CalendarioPage() {
 
   const loadStatic = useCallback(async () => {
     const [r, p] = await Promise.all([
-      supabase.from("rooms").select("id,name,active,color_hex").eq("active", true).order("name"),
+      supabase.from("rooms").select("id,name,active,color_hex,sort_order").eq("active", true),
       supabase.from("professionals").select("id,full_name,active,color_hex").eq("active", true).order("full_name"),
     ]);
-    setRooms((r.data as Room[]) ?? []);
+    setRooms(sortRooms((r.data as Room[]) ?? []));
     setProfessionals((p.data as Professional[]) ?? []);
   }, []);
 
@@ -194,7 +194,7 @@ function CalendarioPage() {
       .from("bookings")
       .select("id,professional_id,room_id,start_at,end_at,status,source,contract_id,reallocated_from,reallocated_to")
       .eq("room_id", roomId)
-      .neq("status", "cancelada")
+      .in("status", ["ativa", "conflito"])
       .lt("start_at", end.toISOString())
       .gt("end_at", start.toISOString());
     return ((data as Booking[]) ?? []).filter((b) => b.id !== ignoreId);

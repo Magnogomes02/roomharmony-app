@@ -1,5 +1,6 @@
 // Helpers para cores cadastradas em rooms.color_hex e professionals.color_hex.
 // Mantém fallback determinístico quando não houver cor configurada.
+import type { CSSProperties } from "react";
 
 const FALLBACK_PALETTE = [
   "#E8BF2F", // dourado
@@ -27,7 +28,7 @@ export function entityColor(hex: string | null | undefined, id: string): string 
 }
 
 // Estilo inline pronto para "badge"/bloco: borda forte + fundo translúcido.
-export function colorBlockStyle(hex: string): React.CSSProperties {
+export function colorBlockStyle(hex: string): CSSProperties {
   return {
     borderColor: hex,
     backgroundColor: `${hex}22`,
