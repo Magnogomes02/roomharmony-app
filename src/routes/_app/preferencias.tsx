@@ -680,6 +680,42 @@ function PreferenciasPage() {
         </DialogContent>
       </Dialog>
 
+      {/* A4 Preview dialog */}
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="max-w-[900px] max-h-[92vh] overflow-y-auto bg-muted/40">
+          <DialogHeader>
+            <DialogTitle className="font-serif">Pré-visualização A4</DialogTitle>
+            <DialogDescription>
+              Renderização aproximada do conteúdo. As variáveis aparecem como {"{{NOME}}"} —
+              no PDF final elas serão substituídas pelos dados do contrato.
+            </DialogDescription>
+          </DialogHeader>
+          <div
+            className="mx-auto bg-white text-black shadow-md"
+            style={{ width: "210mm", minHeight: "297mm", padding: "25mm 20mm", boxSizing: "border-box" }}
+          >
+            {tplForm.title && (
+              <h1 className="mb-6 text-center text-xl font-bold uppercase">{tplForm.title}</h1>
+            )}
+            <div
+              className="prose prose-sm max-w-none [&_p]:my-2 [&_h1]:text-2xl [&_h2]:text-xl [&_h3]:text-lg [&_h1]:font-bold [&_h2]:font-bold [&_h3]:font-bold [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-6 [&_ol]:pl-6"
+              style={{ textAlign: "justify" }}
+              dangerouslySetInnerHTML={{ __html: tplForm.body_html || "<p><em>(modelo vazio)</em></p>" }}
+            />
+            <div
+              className="mt-10 border-t border-dashed border-gray-400 pt-3 text-center text-[10px] text-gray-500"
+              style={{ minHeight: `${sigSettings.reserved_height_mm}mm` }}
+            >
+              Espaço reservado para o bloco de assinaturas ({sigSettings.layout === "side_by_side" ? "lado a lado" : "empilhado"} · {sigSettings.reserved_height_mm}mm)
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPreviewOpen(false)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+
       <AlertDialog open={!!tplDeleteTarget} onOpenChange={(o) => !o && setTplDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
