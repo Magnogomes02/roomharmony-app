@@ -21,7 +21,16 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
+import {
+  createReceiptForReceivable,
+  cancelReceiptForReceivable,
+  cancelReceiptById,
+  downloadReceipt,
+  getReceiptsByReceivableIds,
+  type ReceiptRow,
+} from "@/lib/receiptService";
 
 export const Route = createFileRoute("/_app/financeiro")({
   component: FinanceiroPage,
