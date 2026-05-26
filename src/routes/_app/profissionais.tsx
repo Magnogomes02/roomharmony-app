@@ -17,6 +17,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
+import { entityColor } from "@/lib/entityColors";
 
 export const Route = createFileRoute("/_app/profissionais")({
   component: ProfissionaisPage,
@@ -34,6 +35,7 @@ interface Professional {
   notes: string | null;
   active: boolean;
   created_at: string;
+  color_hex: string | null;
 }
 
 interface Attachment {
@@ -57,7 +59,7 @@ interface PendingAttachment {
 
 const empty = {
   full_name: "", cpf: "", registry: "", specialty: "",
-  phone: "", email: "", address: "", notes: "",
+  phone: "", email: "", address: "", notes: "", color_hex: "",
 };
 
 const MAX_SIZE = 10 * 1024 * 1024; // 10 MB
@@ -129,7 +131,7 @@ function ProfissionaisPage() {
     setForm({
       full_name: p.full_name ?? "", cpf: p.cpf ?? "", registry: p.registry ?? "",
       specialty: p.specialty ?? "", phone: p.phone ?? "", email: p.email ?? "",
-      address: p.address ?? "", notes: p.notes ?? "",
+      address: p.address ?? "", notes: p.notes ?? "", color_hex: p.color_hex ?? "",
     });
     resetAttachments();
     loadAttachments(p.id);
@@ -211,6 +213,11 @@ function ProfissionaisPage() {
       toast.error("Nome é obrigatório");
       return;
     }
+    const colorHex = form.color_hex.trim();
+    if (colorHex && !/^#[0-9A-Fa-f]{6}$/.test(colorHex)) {
+      toast.error("Cor inválida", { description: "Use formato #RRGGBB." });
+      return;
+    }
     setSaving(true);
     const payload = {
       full_name: form.full_name.trim(),
@@ -221,6 +228,7 @@ function ProfissionaisPage() {
       email: form.email.trim() || null,
       address: form.address.trim() || null,
       notes: form.notes.trim() || null,
+      color_hex: colorHex || null,
     };
 
     let profId: string | null = editing?.id ?? null;
@@ -308,6 +316,7 @@ function ProfissionaisPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-12">Cor</TableHead>
                   <TableHead>Nome</TableHead>
                   <TableHead>Especialidade</TableHead>
                   <TableHead>Registro</TableHead>
@@ -318,11 +327,18 @@ function ProfissionaisPage() {
               </TableHeader>
               <TableBody>
                 {loading ? (
-                  <TableRow><TableCell colSpan={6} className="py-8 text-center text-muted-foreground">Carregando...</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="py-8 text-center text-muted-foreground">Carregando...</TableCell></TableRow>
                 ) : filtered.length === 0 ? (
-                  <TableRow><TableCell colSpan={6} className="py-8 text-center text-muted-foreground">Nenhum profissional encontrado.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="py-8 text-center text-muted-foreground">Nenhum profissional encontrado.</TableCell></TableRow>
                 ) : filtered.map((p) => (
                   <TableRow key={p.id}>
+                    <TableCell>
+                      <span
+                        className="inline-block h-4 w-4 rounded-full border border-border"
+                        style={{ backgroundColor: entityColor(p.color_hex, p.id) }}
+                        aria-hidden
+                      />
+                    </TableCell>
                     <TableCell className="font-medium">{p.full_name}</TableCell>
                     <TableCell>{p.specialty ?? "—"}</TableCell>
                     <TableCell>{p.registry ?? "—"}</TableCell>
@@ -413,6 +429,33 @@ function ProfissionaisPage() {
                 <Textarea id="notes" rows={3} maxLength={1000}
                   value={form.notes}
                   onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="color_hex">Cor do profissional</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="color_hex"
+                    type="color"
+                    className="h-10 w-14 cursor-pointer p-1"
+                    value={form.color_hex || "#6F8F72"}
+                    onChange={(e) => setForm({ ...form, color_hex: e.target.value })}
+                  />
+                  <Input
+                    placeholder="#RRGGBB"
+                    maxLength={7}
+                    value={form.color_hex}
+                    onChange={(e) => setForm({ ...form, color_hex: e.target.value })}
+                  />
+                  {form.color_hex && (
+                    <Button type="button" variant="ghost" size="sm"
+                      onClick={() => setForm({ ...form, color_hex: "" })}>
+                      Limpar
+                    </Button>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Usada para destacar as reservas do profissional no Dashboard e no Calendário.
+                </p>
               </div>
             </div>
 

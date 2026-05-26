@@ -432,6 +432,7 @@ export type Database = {
         Row: {
           active: boolean
           address: string | null
+          color_hex: string | null
           cpf: string | null
           created_at: string
           email: string | null
@@ -446,6 +447,7 @@ export type Database = {
         Insert: {
           active?: boolean
           address?: string | null
+          color_hex?: string | null
           cpf?: string | null
           created_at?: string
           email?: string | null
@@ -460,6 +462,7 @@ export type Database = {
         Update: {
           active?: boolean
           address?: string | null
+          color_hex?: string | null
           cpf?: string | null
           created_at?: string
           email?: string | null
@@ -593,28 +596,34 @@ export type Database = {
         Row: {
           active: boolean
           capacity: number
+          color_hex: string | null
           created_at: string
           description: string | null
           id: string
           name: string
+          sort_order: number | null
           updated_at: string
         }
         Insert: {
           active?: boolean
           capacity?: number
+          color_hex?: string | null
           created_at?: string
           description?: string | null
           id?: string
           name: string
+          sort_order?: number | null
           updated_at?: string
         }
         Update: {
           active?: boolean
           capacity?: number
+          color_hex?: string | null
           created_at?: string
           description?: string | null
           id?: string
           name?: string
+          sort_order?: number | null
           updated_at?: string
         }
         Relationships: []

@@ -26,13 +26,14 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { entityColor, isValidHex } from "@/lib/entityColors";
 
 export const Route = createFileRoute("/_app/calendario")({
   component: CalendarioPage,
 });
 
-interface Room { id: string; name: string; active: boolean }
-interface Professional { id: string; full_name: string; active: boolean }
+interface Room { id: string; name: string; active: boolean; color_hex: string | null }
+interface Professional { id: string; full_name: string; active: boolean; color_hex: string | null }
 interface Booking {
   id: string;
   professional_id: string;
@@ -140,8 +141,8 @@ function CalendarioPage() {
 
   const loadStatic = useCallback(async () => {
     const [r, p] = await Promise.all([
-      supabase.from("rooms").select("id,name,active").eq("active", true).order("name"),
-      supabase.from("professionals").select("id,full_name,active").eq("active", true).order("full_name"),
+      supabase.from("rooms").select("id,name,active,color_hex").eq("active", true).order("name"),
+      supabase.from("professionals").select("id,full_name,active,color_hex").eq("active", true).order("full_name"),
     ]);
     setRooms((r.data as Room[]) ?? []);
     setProfessionals((p.data as Professional[]) ?? []);
@@ -575,15 +576,28 @@ function CalendarioPage() {
                           {/* reservas */}
                           {roomBookings.map((b) => {
                             const { top, height } = bookingStyle(b);
-                            const colorId = colorMode === "sala" ? b.room_id : b.professional_id;
-                            const colorClass = colorFromId(colorId, colorMode, b.status);
+                            const colorClass = colorFromId(b.room_id, colorMode, b.status);
                             const prof = profMap.get(b.professional_id);
+                            // cor cadastrada (style inline) sobrepõe paleta determinística quando aplicável
+                            let inlineStyle: React.CSSProperties = { top, height, left: 2, right: 2 };
+                            if (colorMode === "sala") {
+                              const r = roomMap.get(b.room_id);
+                              if (isValidHex(r?.color_hex)) {
+                                const c = entityColor(r!.color_hex, b.room_id);
+                                inlineStyle = { ...inlineStyle, borderLeftColor: c, backgroundColor: `${c}22` };
+                              }
+                            } else if (colorMode === "profissional") {
+                              if (isValidHex(prof?.color_hex)) {
+                                const c = entityColor(prof!.color_hex, b.professional_id);
+                                inlineStyle = { ...inlineStyle, borderLeftColor: c, backgroundColor: `${c}22` };
+                              }
+                            }
                             return (
                               <button
                                 key={b.id}
                                 type="button"
                                 onClick={() => setDetailBooking(b)}
-                                style={{ top, height, left: 2, right: 2 }}
+                                style={inlineStyle}
                                 className={cn(
                                   "absolute overflow-hidden rounded-md border-l-4 px-2 py-1 text-left text-xs shadow-sm transition hover:shadow-md",
                                   colorClass,

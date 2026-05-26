@@ -7,8 +7,8 @@ import {
   Users, DoorOpen, FileText, Calendar, AlertTriangle, DollarSign, ScrollText,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { WeekScheduleCard } from "@/components/WeekScheduleCard";
-import { startOfMonth, endOfMonth } from "date-fns";
+import { WeekScheduleByRoomCard } from "@/components/WeekScheduleByRoomCard";
+import { startOfMonth, endOfMonth, startOfWeek, addDays } from "date-fns";
 
 export const Route = createFileRoute("/_app/dashboard")({
   component: DashboardPage,
@@ -25,8 +25,9 @@ function DashboardPage() {
     queryKey: ["dashboard-stats"],
     queryFn: async () => {
       const now = new Date();
-      const start = new Date(now); start.setDate(now.getDate() - now.getDay()); start.setHours(0, 0, 0, 0);
-      const end = new Date(start); end.setDate(start.getDate() + 7);
+      const weekStart = startOfWeek(now, { weekStartsOn: 1 });
+      weekStart.setHours(0, 0, 0, 0);
+      const weekEnd = addDays(weekStart, 7);
       const monthStart = startOfMonth(now).toISOString().slice(0, 10);
       const monthEnd = endOfMonth(now).toISOString().slice(0, 10);
 
@@ -34,8 +35,10 @@ function DashboardPage() {
         supabase.from("professionals").select("id", { count: "exact", head: true }).eq("active", true),
         supabase.from("rooms").select("id", { count: "exact", head: true }).eq("active", true),
         supabase.from("contracts").select("id", { count: "exact", head: true }).eq("status", "ativo"),
-        supabase.from("bookings").select("id", { count: "exact", head: true })
-          .gte("start_at", start.toISOString()).lt("start_at", end.toISOString()),
+        supabase.from("bookings").select("id,status")
+          .lt("start_at", weekEnd.toISOString())
+          .gt("end_at", weekStart.toISOString())
+          .in("status", ["ativa", "conflito"]),
         supabase.from("booking_conflicts").select("id", { count: "exact", head: true }).eq("status", "pendente"),
         supabase.from("receivables").select("kind,status,amount_due,amount_paid")
           .gte("due_date", monthStart).lte("due_date", monthEnd),
@@ -56,11 +59,17 @@ function DashboardPage() {
         else if (r.status === "recebido") fin[`recebido${k}` as keyof typeof fin] += vPago;
       }
 
+      const weekRows = (weekBookings.data ?? []) as { status: string }[];
+      const weekActive = weekRows.filter((b) => b.status === "ativa").length;
+      const weekConflict = weekRows.filter((b) => b.status === "conflito").length;
+
       return {
         professionals: profs.count ?? 0,
         rooms: rooms.count ?? 0,
         contracts: contracts.count ?? 0,
-        weekBookings: weekBookings.count ?? 0,
+        weekBookings: weekRows.length,
+        weekActive,
+        weekConflict,
         conflicts: conflicts.count ?? 0,
         fin,
         audits: audits.data ?? [],
@@ -72,7 +81,15 @@ function DashboardPage() {
     { label: "Profissionais ativos", value: stats?.professionals, icon: Users, color: "text-primary" },
     { label: "Salas ativas", value: stats?.rooms, icon: DoorOpen, color: "text-success" },
     { label: "Contratos ativos", value: stats?.contracts, icon: FileText, color: "text-primary" },
-    { label: "Reservas da semana", value: stats?.weekBookings, icon: Calendar, color: "text-success" },
+    {
+      label: "Reservas da semana",
+      value: stats?.weekBookings,
+      icon: Calendar,
+      color: "text-success",
+      hint: stats
+        ? `Ativas: ${stats.weekActive} · Conflitos: ${stats.weekConflict}`
+        : undefined,
+    },
     { label: "Conflitos pendentes", value: stats?.conflicts, icon: AlertTriangle, color: "text-destructive" },
   ];
 
@@ -118,12 +135,15 @@ function DashboardPage() {
               <div className="font-serif text-4xl">
                 {isLoading ? <span className="text-muted-foreground/40">—</span> : c.value ?? 0}
               </div>
+              {"hint" in c && c.hint && !isLoading && (
+                <p className="mt-1 text-xs text-muted-foreground">{c.hint}</p>
+              )}
             </CardContent>
           </Card>
         ))}
       </div>
 
-      <WeekScheduleCard />
+      <WeekScheduleByRoomCard />
 
       <Card>
         <CardHeader>

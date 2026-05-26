@@ -16,6 +16,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
+import { entityColor, sortRooms } from "@/lib/entityColors";
 
 export const Route = createFileRoute("/_app/salas")({
   component: SalasPage,
@@ -28,9 +29,11 @@ interface Room {
   capacity: number;
   active: boolean;
   created_at: string;
+  color_hex: string | null;
+  sort_order: number | null;
 }
 
-const empty = { name: "", description: "", capacity: 1 };
+const empty = { name: "", description: "", capacity: 1, color_hex: "", sort_order: "" as string };
 
 function SalasPage() {
   const { role } = useAuth();
@@ -45,9 +48,9 @@ function SalasPage() {
 
   async function load() {
     setLoading(true);
-    const { data, error } = await supabase.from("rooms").select("*").order("name");
+    const { data, error } = await supabase.from("rooms").select("*");
     if (error) toast.error("Erro ao carregar", { description: error.message });
-    setItems((data as Room[]) ?? []);
+    setItems(sortRooms((data as Room[]) ?? []));
     setLoading(false);
   }
 
@@ -61,7 +64,13 @@ function SalasPage() {
 
   function openEdit(r: Room) {
     setEditing(r);
-    setForm({ name: r.name, description: r.description ?? "", capacity: r.capacity });
+    setForm({
+      name: r.name,
+      description: r.description ?? "",
+      capacity: r.capacity,
+      color_hex: r.color_hex ?? "",
+      sort_order: r.sort_order != null ? String(r.sort_order) : "",
+    });
     setOpen(true);
   }
 
@@ -69,11 +78,17 @@ function SalasPage() {
     e.preventDefault();
     if (!form.name.trim()) return toast.error("Nome é obrigatório");
     if (form.capacity < 1) return toast.error("Capacidade deve ser ao menos 1");
+    const colorHex = form.color_hex.trim();
+    if (colorHex && !/^#[0-9A-Fa-f]{6}$/.test(colorHex)) {
+      return toast.error("Cor inválida", { description: "Use formato #RRGGBB." });
+    }
     setSaving(true);
     const payload = {
       name: form.name.trim(),
       description: form.description.trim() || null,
       capacity: form.capacity,
+      color_hex: colorHex || null,
+      sort_order: form.sort_order.trim() === "" ? null : parseInt(form.sort_order, 10),
     };
     const res = editing
       ? await supabase.from("rooms").update(payload).eq("id", editing.id)
@@ -138,23 +153,33 @@ function SalasPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-12">Cor</TableHead>
                   <TableHead>Nome</TableHead>
                   <TableHead>Descrição</TableHead>
                   <TableHead>Capacidade</TableHead>
+                  <TableHead>Ordem</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
-                  <TableRow><TableCell colSpan={5} className="py-8 text-center text-muted-foreground">Carregando...</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="py-8 text-center text-muted-foreground">Carregando...</TableCell></TableRow>
                 ) : filtered.length === 0 ? (
-                  <TableRow><TableCell colSpan={5} className="py-8 text-center text-muted-foreground">Nenhuma sala encontrada.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="py-8 text-center text-muted-foreground">Nenhuma sala encontrada.</TableCell></TableRow>
                 ) : filtered.map((r) => (
                   <TableRow key={r.id}>
+                    <TableCell>
+                      <span
+                        className="inline-block h-4 w-4 rounded-full border border-border"
+                        style={{ backgroundColor: entityColor(r.color_hex, r.id) }}
+                        aria-hidden
+                      />
+                    </TableCell>
                     <TableCell className="font-medium">{r.name}</TableCell>
                     <TableCell className="max-w-md text-sm text-muted-foreground">{r.description ?? "—"}</TableCell>
                     <TableCell>{r.capacity}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{r.sort_order ?? "—"}</TableCell>
                     <TableCell>
                       <Badge variant={r.active ? "default" : "secondary"}>
                         {r.active ? "Ativa" : "Inativa"}
@@ -206,6 +231,38 @@ function SalasPage() {
               <Textarea id="description" rows={3} maxLength={500}
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })} />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="sort_order">Ordem de exibição</Label>
+                <Input id="sort_order" type="number" min={0} max={9999} placeholder="ex: 1"
+                  value={form.sort_order}
+                  onChange={(e) => setForm({ ...form, sort_order: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="color_hex">Cor da sala</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="color_hex"
+                    type="color"
+                    className="h-10 w-14 cursor-pointer p-1"
+                    value={form.color_hex || "#E8BF2F"}
+                    onChange={(e) => setForm({ ...form, color_hex: e.target.value })}
+                  />
+                  <Input
+                    placeholder="#RRGGBB"
+                    maxLength={7}
+                    value={form.color_hex}
+                    onChange={(e) => setForm({ ...form, color_hex: e.target.value })}
+                  />
+                  {form.color_hex && (
+                    <Button type="button" variant="ghost" size="sm"
+                      onClick={() => setForm({ ...form, color_hex: "" })}>
+                      Limpar
+                    </Button>
+                  )}
+                </div>
+              </div>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
