@@ -28,7 +28,7 @@ export function entityColor(hex: string | null | undefined, id: string): string 
 }
 
 // Estilo inline pronto para "badge"/bloco: borda forte + fundo translúcido.
-export function colorBlockStyle(hex: string): React.CSSProperties {
+export function colorBlockStyle(hex: string): CSSProperties {
   return {
     borderColor: hex,
     backgroundColor: `${hex}22`,
