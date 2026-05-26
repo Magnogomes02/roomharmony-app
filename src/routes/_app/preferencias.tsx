@@ -8,6 +8,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { toast } from "sonner";
+import {
+  DEFAULT_SHIFTS, SHIFT_LABELS, loadShiftDefaults, saveShiftDefaults,
+  type ShiftDefaults, type ShiftKey,
+} from "@/lib/shifts";
+
+
 
 export const Route = createFileRoute("/_app/preferencias")({
   component: PreferenciasPage,
