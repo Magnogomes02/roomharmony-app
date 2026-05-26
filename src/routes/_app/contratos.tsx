@@ -457,7 +457,9 @@ function ContratosPage() {
       locador_name: form.locador_name.trim() || null,
       signed_by_name: form.signed_by_name.trim() || null,
       signed_at: form.signed_at ? new Date(form.signed_at).toISOString() : null,
+      template_id: form.template_id || null,
     };
+
 
     try {
       let contractId: string;
