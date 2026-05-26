@@ -124,9 +124,9 @@ export async function createReceiptForReceivable(receivableId: string): Promise<
   if (existing) throw new Error("Já existe um recibo emitido para este recebível.");
 
   // 2. related
-  const [{ data: prof }, roomQ, branding, settings, userQ] = await Promise.all([
+  const [{ data: prof }, resolvedRoom, branding, settings, userQ] = await Promise.all([
     supabase.from("professionals").select("*").eq("id", rec.professional_id).single(),
-    rec.room_id ? supabase.from("rooms").select("id,name").eq("id", rec.room_id).maybeSingle() : Promise.resolve({ data: null } as { data: { id: string; name: string } | null }),
+    resolveReceivableRoom({ room_id: rec.room_id, contract_id: rec.contract_id }),
     getClinicBranding(),
     loadReceiptSettings(),
     supabase.auth.getUser(),
@@ -149,8 +149,8 @@ export async function createReceiptForReceivable(receivableId: string): Promise<
     professional_document: prof.cpf,
     professional_email: prof.email,
     professional_phone: prof.phone,
-    room_id: rec.room_id,
-    room_name: roomQ.data?.name ?? null,
+    room_id: resolvedRoom.room_id,
+    room_name: resolvedRoom.room_name,
     kind: rec.kind,
     reference_month: rec.reference_month,
     due_date: rec.due_date,
