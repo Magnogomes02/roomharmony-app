@@ -208,6 +208,49 @@ function PreferenciasPage() {
           )}
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-serif">Turnos padrão</CardTitle>
+          <CardDescription>
+            Horários usados quando, na grade de horários de um contrato, o gestor escolher
+            "Turno" em vez de definir início e fim manualmente.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {(["manha", "tarde", "noite"] as ShiftKey[]).map((k) => (
+            <div key={k} className="grid grid-cols-12 items-end gap-3">
+              <div className="col-span-4">
+                <Label>{SHIFT_LABELS[k]}</Label>
+              </div>
+              <div className="col-span-4 space-y-1">
+                <Label className="text-xs">Início</Label>
+                <Input
+                  type="time"
+                  value={shifts[k].start}
+                  disabled={!canEdit}
+                  onChange={(e) => setShifts({ ...shifts, [k]: { ...shifts[k], start: e.target.value } })}
+                />
+              </div>
+              <div className="col-span-4 space-y-1">
+                <Label className="text-xs">Fim</Label>
+                <Input
+                  type="time"
+                  value={shifts[k].end}
+                  disabled={!canEdit}
+                  onChange={(e) => setShifts({ ...shifts, [k]: { ...shifts[k], end: e.target.value } })}
+                />
+              </div>
+            </div>
+          ))}
+          {canEdit && (
+            <Button onClick={saveShifts} disabled={savingShifts}>
+              {savingShifts ? "Salvando..." : "Salvar turnos"}
+            </Button>
+          )}
+        </CardContent>
+      </Card>
     </div>
+
   );
 }
