@@ -1,5 +1,12 @@
 import { jsPDF } from "jspdf";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  loadContractTemplates,
+  getDefaultContractTemplate,
+  getTemplateById,
+  renderContractTemplate,
+  type ContractTemplateRenderData,
+} from "@/lib/contractTemplates";
 
 export interface ContractPdfData {
   professional: {
@@ -20,6 +27,10 @@ export interface ContractPdfData {
   locador_name?: string | null;
   signed_by_name?: string | null;
   signed_at?: string | null;
+  template_id?: string | null;
+  due_day?: number | null;
+  schedules_summary?: string | null;
+  schedules_detail?: string | null;
 }
 
 export interface ClinicBranding {
@@ -58,7 +69,7 @@ export async function getClinicBranding(): Promise<ClinicBranding> {
 }
 
 function fmtDate(d?: string | null) {
-  if (!d) return "____/____/______";
+  if (!d) return "";
   return new Date(d).toLocaleDateString("pt-BR");
 }
 
@@ -68,13 +79,53 @@ function fmtBRL(v: number) {
 
 export async function generateContractPdf(contract: ContractPdfData) {
   const branding = await getClinicBranding();
+  const templates = await loadContractTemplates();
+  const selected =
+    getTemplateById(templates, contract.template_id) ??
+    getDefaultContractTemplate(templates);
+
+  if (!selected) {
+    throw new Error(
+      "Nenhum modelo de contrato cadastrado. Cadastre um modelo em Preferências antes de gerar o PDF.",
+    );
+  }
+
+  const p = contract.professional;
+  const data: ContractTemplateRenderData = {
+    LOCADOR_NOME: branding.clinic_name ?? "",
+    LOCADOR_CNPJ: branding.cnpj ?? "",
+    LOCADOR_ENDERECO: branding.address ?? "",
+    LOCADOR_ASSINANTE: contract.locador_name ?? "",
+    LOCATARIO_NOME: p.full_name,
+    LOCATARIO_CPF: p.cpf ?? "",
+    LOCATARIO_REGISTRO: p.registry ?? "",
+    LOCATARIO_ESPECIALIDADE: p.specialty ?? "",
+    LOCATARIO_ENDERECO: p.address ?? "",
+    LOCATARIO_EMAIL: p.email ?? "",
+    LOCATARIO_TELEFONE: p.phone ?? "",
+    LOCATARIO_ASSINANTE: contract.signed_by_name || p.full_name,
+    SALA_RESUMO: contract.schedules_summary || contract.room.name,
+    GRADE_HORARIOS: contract.schedules_detail || contract.room.name,
+    DATA_INICIO: fmtDate(contract.start_date),
+    DATA_TERMINO: contract.end_date ? fmtDate(contract.end_date) : "prazo indeterminado",
+    VALOR_MENSAL: fmtBRL(contract.monthly_value),
+    DIA_VENCIMENTO: contract.due_day != null ? String(contract.due_day) : "",
+    DATA_ASSINATURA: contract.signed_at ? fmtDate(contract.signed_at) : fmtDate(new Date().toISOString()),
+    DATA_ATUAL: fmtDate(new Date().toISOString()),
+    CLAUSULAS_ADICIONAIS: contract.extra_clauses?.trim() || "",
+    OBSERVACOES_INTERNAS: contract.notes?.trim() || "",
+  };
+
+  const renderedTitle = renderContractTemplate(selected.title, data).trim();
+  const renderedBody = renderContractTemplate(selected.body, data);
+
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
   const margin = 56;
   let y = margin;
 
-  // Header com logo
+  // Header com logo + branding (não-jurídico, identidade visual)
   if (branding.logo_url) {
     const img = await loadImageAsDataUrl(branding.logo_url);
     if (img) {
@@ -92,7 +143,9 @@ export async function generateContractPdf(contract: ContractPdfData) {
   }
   doc.setFont("helvetica", "bold");
   doc.setFontSize(14);
-  doc.text(branding.clinic_name ?? "Clínica", pageW - margin, y + 18, { align: "right" });
+  if (branding.clinic_name) {
+    doc.text(branding.clinic_name, pageW - margin, y + 18, { align: "right" });
+  }
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   if (branding.cnpj) doc.text(`CNPJ: ${branding.cnpj}`, pageW - margin, y + 34, { align: "right" });
@@ -103,122 +156,30 @@ export async function generateContractPdf(contract: ContractPdfData) {
   doc.line(margin, y, pageW - margin, y);
   y += 24;
 
-  // Título
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(16);
-  doc.text("CONTRATO DE SUBLOCAÇÃO DE IMÓVEL", pageW / 2, y, { align: "center" });
-  y += 30;
+  // Título — vindo do modelo
+  if (renderedTitle) {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    const titleLines = doc.splitTextToSize(renderedTitle, pageW - margin * 2);
+    for (const line of titleLines) {
+      doc.text(line, pageW / 2, y, { align: "center" });
+      y += 20;
+    }
+    y += 10;
+  }
 
-  // Partes
+  // Corpo — vindo do modelo, preservando quebras de linha
+  doc.setFont("helvetica", "normal");
   doc.setFontSize(11);
-  doc.setFont("helvetica", "bold");
-  doc.text("LOCADOR:", margin, y);
-  y += 14;
-  doc.setFont("helvetica", "normal");
-  const locadorText = `${branding.clinic_name ?? "____________________"}${
-    branding.cnpj ? `, CNPJ ${branding.cnpj}` : ""
-  }${branding.address ? `, ${branding.address}` : ""}, neste ato representado(a) por ${contract.locador_name ?? "____________________"}.`;
-  y = writeWrapped(doc, locadorText, margin, y, pageW - margin * 2, 14);
-
-  y += 8;
-  doc.setFont("helvetica", "bold");
-  doc.text("LOCATÁRIO:", margin, y);
-  y += 14;
-  doc.setFont("helvetica", "normal");
-  const p = contract.professional;
-  const locatarioText = `${p.full_name}${p.cpf ? `, CPF ${p.cpf}` : ""}${
-    p.registry ? `, ${p.registry}` : ""
-  }${p.specialty ? `, ${p.specialty}` : ""}${p.address ? `, residente em ${p.address}` : ""}${
-    p.email || p.phone ? `, contato: ${[p.email, p.phone].filter(Boolean).join(" / ")}` : ""
-  }.`;
-  y = writeWrapped(doc, locatarioText, margin, y, pageW - margin * 2, 14);
-
-  y += 16;
-
-  // Cláusulas padrão
-  doc.setFont("helvetica", "bold");
-  doc.text("CLÁUSULA 1ª — OBJETO", margin, y);
-  y += 14;
-  doc.setFont("helvetica", "normal");
-  y = writeWrapped(
-    doc,
-    `O LOCADOR cede ao LOCATÁRIO, em regime de locação, o uso da sala denominada "${contract.room.name}" para a prestação de serviços profissionais na área de saúde.`,
-    margin,
-    y,
-    pageW - margin * 2,
-    14,
-  );
-
-  y += 10;
-  doc.setFont("helvetica", "bold");
-  doc.text("CLÁUSULA 2ª — VIGÊNCIA", margin, y);
-  y += 14;
-  doc.setFont("helvetica", "normal");
-  const vig = contract.end_date
-    ? `O presente contrato vigora de ${fmtDate(contract.start_date)} a ${fmtDate(contract.end_date)}.`
-    : `O presente contrato vigora a partir de ${fmtDate(contract.start_date)} por prazo indeterminado.`;
-  y = writeWrapped(doc, vig, margin, y, pageW - margin * 2, 14);
-
-  y += 10;
-  doc.setFont("helvetica", "bold");
-  doc.text("CLÁUSULA 3ª — VALOR", margin, y);
-  y += 14;
-  doc.setFont("helvetica", "normal");
-  y = writeWrapped(
-    doc,
-    `O valor mensal da locação é de ${fmtBRL(contract.monthly_value)}, a ser pago conforme acordado entre as partes.`,
-    margin,
-    y,
-    pageW - margin * 2,
-    14,
-  );
-
-  // Cláusulas adicionais
-  if (contract.extra_clauses && contract.extra_clauses.trim()) {
-    y += 10;
-    y = ensureSpace(doc, y, pageH, margin, 40);
-    doc.setFont("helvetica", "bold");
-    doc.text("CLÁUSULAS ADICIONAIS", margin, y);
-    y += 14;
-    doc.setFont("helvetica", "normal");
-    y = writeWrapped(doc, contract.extra_clauses, margin, y, pageW - margin * 2, 14);
+  const paragraphs = renderedBody.split(/\n/);
+  for (const para of paragraphs) {
+    if (para.trim() === "") {
+      y += 8;
+      if (y > pageH - margin) { doc.addPage(); y = margin; }
+      continue;
+    }
+    y = writeWrapped(doc, para, margin, y, pageW - margin * 2, 14);
   }
-
-  if (contract.notes && contract.notes.trim()) {
-    y += 10;
-    y = ensureSpace(doc, y, pageH, margin, 40);
-    doc.setFont("helvetica", "bold");
-    doc.text("OBSERVAÇÕES", margin, y);
-    y += 14;
-    doc.setFont("helvetica", "normal");
-    y = writeWrapped(doc, contract.notes, margin, y, pageW - margin * 2, 14);
-  }
-
-  // Assinaturas
-  y += 30;
-  y = ensureSpace(doc, y, pageH, margin, 140);
-  doc.setFont("helvetica", "normal");
-  doc.text(
-    `Local e data: ____________________, ${
-      contract.signed_at ? fmtDate(contract.signed_at) : fmtDate(new Date().toISOString())
-    }.`,
-    margin,
-    y,
-  );
-
-  y += 60;
-  const colW = (pageW - margin * 2 - 40) / 2;
-  doc.line(margin, y, margin + colW, y);
-  doc.line(margin + colW + 40, y, pageW - margin, y);
-  y += 14;
-  doc.setFontSize(10);
-  doc.text("LOCADOR", margin + colW / 2, y, { align: "center" });
-  doc.text("LOCATÁRIO", margin + colW + 40 + colW / 2, y, { align: "center" });
-  y += 12;
-  doc.text(contract.locador_name ?? "—", margin + colW / 2, y, { align: "center" });
-  doc.text(contract.signed_by_name ?? contract.professional.full_name, margin + colW + 40 + colW / 2, y, {
-    align: "center",
-  });
 
   // Footer com paginação
   const total = doc.getNumberOfPages();
@@ -226,7 +187,7 @@ export async function generateContractPdf(contract: ContractPdfData) {
     doc.setPage(i);
     doc.setFontSize(8);
     doc.setTextColor(120);
-    doc.text(`Página ${i} de ${total}`, pageW - margin, pageH - 20, { align: "right" });
+    doc.text(`${i} / ${total}`, pageW - margin, pageH - 20, { align: "right" });
     doc.setTextColor(0);
   }
 
@@ -244,14 +205,6 @@ function writeWrapped(doc: jsPDF, text: string, x: number, y: number, maxWidth: 
     }
     doc.text(line, x, y);
     y += lineH;
-  }
-  return y;
-}
-
-function ensureSpace(doc: jsPDF, y: number, pageH: number, margin: number, need: number): number {
-  if (y + need > pageH - margin) {
-    doc.addPage();
-    return margin;
   }
   return y;
 }
