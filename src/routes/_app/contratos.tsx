@@ -39,6 +39,10 @@ import {
   DEFAULT_SHIFTS, SHIFT_LABELS, loadShiftDefaults, detectShift,
   type ShiftDefaults, type ShiftKey,
 } from "@/lib/shifts";
+import {
+  loadContractTemplates, type ContractTemplate,
+} from "@/lib/contractTemplates";
+
 
 type LocalSchedule = ScheduleRow & { _mode?: "horario" | "turno"; _shift?: ShiftKey };
 
