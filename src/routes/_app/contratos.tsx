@@ -217,7 +217,17 @@ function ContratosPage() {
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
-    loadShiftDefaults().then((d) => { if (!cancelled) setShiftDefs(d); }).catch(() => {});
+    loadShiftDefaults().then((d) => {
+      if (cancelled) return;
+      setShiftDefs(d);
+      // Refresh times of any rows already in "turno" mode using new defaults
+      setSchedules((rows) => rows.map((row) => {
+        if (row._mode !== "turno" || !row._shift) return row;
+        const r = d[row._shift];
+        return { ...row, start_time: r.start, end_time: r.end };
+      }));
+    }).catch(() => {});
+
     return () => { cancelled = true; };
   }, [open]);
 
