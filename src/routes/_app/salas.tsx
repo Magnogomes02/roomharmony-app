@@ -16,6 +16,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
+import { entityColor, sortRooms } from "@/lib/entityColors";
 
 export const Route = createFileRoute("/_app/salas")({
   component: SalasPage,
@@ -28,9 +29,11 @@ interface Room {
   capacity: number;
   active: boolean;
   created_at: string;
+  color_hex: string | null;
+  sort_order: number | null;
 }
 
-const empty = { name: "", description: "", capacity: 1 };
+const empty = { name: "", description: "", capacity: 1, color_hex: "", sort_order: "" as string };
 
 function SalasPage() {
   const { role } = useAuth();
