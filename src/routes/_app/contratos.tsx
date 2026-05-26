@@ -733,7 +733,12 @@ function ContratosPage() {
                                 extra_clauses: c.extra_clauses, notes: c.notes,
                                 locador_name: c.locador_name, signed_by_name: c.signed_by_name,
                                 signed_at: c.signed_at,
+                                template_id: c.template_id,
+                                due_day: c.due_day,
+                                schedules_summary: summarizeSchedules(c.schedules),
+                                schedules_detail: detailSchedules(c.schedules),
                               });
+
 
                               await logAudit("contract.pdf_download", c.id);
                             } catch (err) {
