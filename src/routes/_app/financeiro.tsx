@@ -96,6 +96,8 @@ function FinanceiroPage() {
   });
   const [payFile, setPayFile] = useState<File | null>(null);
   const [paying, setPaying] = useState(false);
+  const [generateReceiptAfterPay, setGenerateReceiptAfterPay] = useState(true);
+  const [receipts, setReceipts] = useState<Map<string, ReceiptRow>>(new Map());
 
   const [editOpen, setEditOpen] = useState(false);
   const [editRow, setEditRow] = useState<Receivable | null>(null);
@@ -116,9 +118,12 @@ function FinanceiroPage() {
       supabase.from("rooms").select("id,name"),
     ]);
     if (error) toast.error("Erro ao carregar", { description: error.message });
-    setRows((rec as Receivable[]) ?? []);
+    const list = (rec as Receivable[]) ?? [];
+    setRows(list);
     setProfs(new Map((p.data ?? []).map((x: { id: string; full_name: string }) => [x.id, x.full_name])));
     setRooms(new Map((r.data ?? []).map((x: { id: string; name: string }) => [x.id, x.name])));
+    const recIds = list.filter((x) => x.status === "recebido").map((x) => x.id);
+    setReceipts(await getReceiptsByReceivableIds(recIds));
     setLoading(false);
   }, [monthRef]);
 
@@ -156,6 +161,7 @@ function FinanceiroPage() {
   }
 
   function openPay(r: Receivable) {
+    setGenerateReceiptAfterPay(true);
     setPayRow(r);
     setPayForm({
       amount_paid: String(r.amount_due),
