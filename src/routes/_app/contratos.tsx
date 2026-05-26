@@ -39,6 +39,10 @@ import {
   DEFAULT_SHIFTS, SHIFT_LABELS, loadShiftDefaults, detectShift,
   type ShiftDefaults, type ShiftKey,
 } from "@/lib/shifts";
+import {
+  loadContractTemplates, type ContractTemplate,
+} from "@/lib/contractTemplates";
+
 
 type LocalSchedule = ScheduleRow & { _mode?: "horario" | "turno"; _shift?: ShiftKey };
 
@@ -59,9 +63,11 @@ interface Contract {
   notes: string | null; extra_clauses: string | null;
   signed_at: string | null; signed_by_name: string | null; signature_hash: string | null;
   locador_name: string | null; created_at: string;
+  template_id?: string | null;
   professional?: Professional;
   schedules?: ScheduleRow[];
 }
+
 interface Attachment {
   id: string; professional_id: string; contract_id: string | null;
   file_name: string; file_path: string; mime_type: string | null;
@@ -80,7 +86,9 @@ const emptyForm = {
   locador_name: "",
   signed_by_name: "",
   signed_at: "",
+  template_id: "",
 };
+
 
 const statusVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
   rascunho: "secondary", ativo: "default", encerrado: "outline", cancelado: "destructive",
@@ -153,6 +161,8 @@ function ContratosPage() {
   const [form, setForm] = useState(emptyForm);
   const [schedules, setSchedules] = useState<LocalSchedule[]>([]);
   const [shiftDefs, setShiftDefs] = useState<ShiftDefaults>(DEFAULT_SHIFTS);
+  const [templates, setTemplates] = useState<ContractTemplate[]>([]);
+
 
   const [saving, setSaving] = useState(false);
 
@@ -231,6 +241,24 @@ function ContratosPage() {
     return () => { cancelled = true; };
   }, [open]);
 
+  // Load contract templates whenever the dialog opens
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    loadContractTemplates().then((list) => {
+      if (cancelled) return;
+      setTemplates(list);
+      // auto-select default in new contract
+      if (!editing) {
+        const def = list.find((t) => t.is_default && t.active) ?? list.find((t) => t.active);
+        if (def) setForm((f) => (f.template_id ? f : { ...f, template_id: def.id }));
+      }
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [open, editing]);
+
+
+
 
   const conflictsByRow = useMemo(
     () => schedules.map((s, i) => computeRowConflicts(s, i, schedules, busySlots)),
@@ -266,7 +294,9 @@ function ContratosPage() {
       locador_name: c.locador_name ?? "",
       signed_by_name: c.signed_by_name ?? "",
       signed_at: c.signed_at ? c.signed_at.slice(0, 10) : "",
+      template_id: c.template_id ?? "",
     });
+
     setSchedules((c.schedules ?? []).map((s) => {
       const start = s.start_time.slice(0, 5);
       const end = s.end_time.slice(0, 5);
@@ -427,7 +457,9 @@ function ContratosPage() {
       locador_name: form.locador_name.trim() || null,
       signed_by_name: form.signed_by_name.trim() || null,
       signed_at: form.signed_at ? new Date(form.signed_at).toISOString() : null,
+      template_id: form.template_id || null,
     };
+
 
     try {
       let contractId: string;
@@ -594,6 +626,16 @@ function ContratosPage() {
     return parts.join(" • ");
   }
 
+  function detailSchedules(list: ScheduleRow[] | undefined) {
+    if (!list || list.length === 0) return "—";
+    return list.map((s) => {
+      const room = roomMap.get(s.room_id)?.name ?? "Sala";
+      const day = WEEKDAY_LABELS[s.weekday];
+      return `${day} - ${s.start_time.slice(0, 5)} às ${s.end_time.slice(0, 5)} - ${room}`;
+    }).join("\n");
+  }
+
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -677,7 +719,12 @@ function ContratosPage() {
                                 extra_clauses: c.extra_clauses, notes: c.notes,
                                 locador_name: c.locador_name, signed_by_name: c.signed_by_name,
                                 signed_at: c.signed_at,
+                                template_id: c.template_id ?? null,
+                                due_day: c.due_day,
+                                schedules_summary: summarizeSchedules(c.schedules),
+                                schedules_detail: detailSchedules(c.schedules),
                               });
+
                               await logAudit("contract.pdf_download", c.id);
                             } catch (err) {
                               toast.error("Erro ao gerar PDF", {
@@ -1007,6 +1054,42 @@ function ContratosPage() {
             <section className="space-y-4">
               <h3 className="font-serif text-lg">Cláusulas e observações</h3>
               <div className="space-y-2">
+                <Label>Modelo de contrato</Label>
+                {(() => {
+                  const activeTemplates = templates.filter((t) => t.active);
+                  const currentInactive = form.template_id
+                    && templates.find((t) => t.id === form.template_id && !t.active);
+                  const visible = currentInactive
+                    ? [...activeTemplates, currentInactive as ContractTemplate]
+                    : activeTemplates;
+                  if (templates.length === 0) {
+                    return (
+                      <p className="text-xs text-muted-foreground">
+                        Nenhum modelo cadastrado. O PDF usará o modelo padrão interno do sistema.
+                        Cadastre modelos em <strong>Preferências → Modelos de contrato</strong>.
+                      </p>
+                    );
+                  }
+                  return (
+                    <Select
+                      value={form.template_id || "__none__"}
+                      onValueChange={(v) => setForm({ ...form, template_id: v === "__none__" ? "" : v })}
+                    >
+                      <SelectTrigger><SelectValue placeholder="Selecione o modelo" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Usar modelo padrão</SelectItem>
+                        {visible.map((t) => (
+                          <SelectItem key={t.id} value={t.id}>
+                            {t.name}{t.is_default ? " (padrão)" : ""}{!t.active ? " — inativo" : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  );
+                })()}
+              </div>
+              <div className="space-y-2">
+
                 <Label>Cláusulas adicionais</Label>
                 <Textarea rows={6} maxLength={5000}
                   value={form.extra_clauses}

@@ -1,5 +1,13 @@
 import { jsPDF } from "jspdf";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  loadContractTemplates,
+  getDefaultContractTemplate,
+  getTemplateById,
+  renderContractTemplate,
+  getFallbackContractTemplateBody,
+  type ContractTemplateRenderData,
+} from "@/lib/contractTemplates";
 
 export interface ContractPdfData {
   professional: {
@@ -20,6 +28,10 @@ export interface ContractPdfData {
   locador_name?: string | null;
   signed_by_name?: string | null;
   signed_at?: string | null;
+  template_id?: string | null;
+  due_day?: number | null;
+  schedules_summary?: string | null;
+  schedules_detail?: string | null;
 }
 
 export interface ClinicBranding {
@@ -71,7 +83,40 @@ function fmtBRL(v: number) {
 }
 
 export async function generateContractPdf(contract: ContractPdfData) {
-  const branding = await getClinicBranding();
+  const [branding, templates] = await Promise.all([
+    getClinicBranding(),
+    loadContractTemplates().catch(() => []),
+  ]);
+
+  const selectedTemplate =
+    getTemplateById(templates, contract.template_id ?? null)
+    ?? getDefaultContractTemplate(templates);
+  const bodyTemplate = selectedTemplate?.body || getFallbackContractTemplateBody();
+
+  const renderData: ContractTemplateRenderData = {
+    LOCADOR_NOME: branding.clinic_name ?? null,
+    LOCADOR_CNPJ: branding.cnpj ?? null,
+    LOCADOR_ENDERECO: branding.address ?? null,
+    LOCATARIO_NOME: contract.professional.full_name,
+    LOCATARIO_CPF: contract.professional.cpf ?? null,
+    LOCATARIO_REGISTRO: contract.professional.registry ?? null,
+    LOCATARIO_ESPECIALIDADE: contract.professional.specialty ?? null,
+    LOCATARIO_ENDERECO: contract.professional.address ?? null,
+    LOCATARIO_EMAIL: contract.professional.email ?? null,
+    LOCATARIO_TELEFONE: contract.professional.phone ?? null,
+    SALA_RESUMO: contract.schedules_summary || contract.room.name || null,
+    GRADE_HORARIOS: contract.schedules_detail || contract.schedules_summary || contract.room.name || null,
+    DATA_INICIO: fmtDate(contract.start_date),
+    DATA_TERMINO: contract.end_date ? fmtDate(contract.end_date) : "prazo indeterminado",
+    VALOR_MENSAL: fmtBRL(contract.monthly_value),
+    DIA_VENCIMENTO: contract.due_day != null ? String(contract.due_day) : null,
+    DATA_ASSINATURA: contract.signed_at ? fmtDate(contract.signed_at) : fmtDate(new Date().toISOString()),
+    LOCADOR_ASSINANTE: contract.locador_name ?? null,
+    LOCATARIO_ASSINANTE: contract.signed_by_name ?? contract.professional.full_name,
+  };
+
+  const renderedBody = renderContractTemplate(bodyTemplate, renderData);
+
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
@@ -137,34 +182,18 @@ export async function generateContractPdf(contract: ContractPdfData) {
 
   y += 16;
 
-  // Cláusulas padrão
-  doc.setFont("helvetica", "bold");
-  doc.text("CLÁUSULA 1ª — OBJETO", margin, y); y += 14;
-  doc.setFont("helvetica", "normal");
-  y = writeWrapped(
-    doc,
-    `O LOCADOR cede ao LOCATÁRIO, em regime de locação, o uso da sala denominada "${contract.room.name}" para a prestação de serviços profissionais na área de saúde.`,
-    margin, y, pageW - margin * 2, 14,
-  );
-
-  y += 10;
-  doc.setFont("helvetica", "bold");
-  doc.text("CLÁUSULA 2ª — VIGÊNCIA", margin, y); y += 14;
-  doc.setFont("helvetica", "normal");
-  const vig = contract.end_date
-    ? `O presente contrato vigora de ${fmtDate(contract.start_date)} a ${fmtDate(contract.end_date)}.`
-    : `O presente contrato vigora a partir de ${fmtDate(contract.start_date)} por prazo indeterminado.`;
-  y = writeWrapped(doc, vig, margin, y, pageW - margin * 2, 14);
-
-  y += 10;
-  doc.setFont("helvetica", "bold");
-  doc.text("CLÁUSULA 3ª — VALOR", margin, y); y += 14;
-  doc.setFont("helvetica", "normal");
-  y = writeWrapped(
-    doc,
-    `O valor mensal da locação é de ${fmtBRL(contract.monthly_value)}, a ser pago conforme acordado entre as partes.`,
-    margin, y, pageW - margin * 2, 14,
-  );
+  // Corpo do contrato (modelo)
+  // Renderiza preservando quebras de linha e parágrafos
+  const paragraphs = renderedBody.split(/\n/);
+  for (const para of paragraphs) {
+    if (para.trim() === "") {
+      y += 8;
+      y = ensureSpace(doc, y, pageH, margin, 20);
+      continue;
+    }
+    y = ensureSpace(doc, y, pageH, margin, 28);
+    y = writeWrapped(doc, para, margin, y, pageW - margin * 2, 14);
+  }
 
   // Cláusulas adicionais
   if (contract.extra_clauses && contract.extra_clauses.trim()) {
