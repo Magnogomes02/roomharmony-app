@@ -232,7 +232,38 @@ function SalasPage() {
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })} />
             </div>
-            <DialogFooter>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="sort_order">Ordem de exibição</Label>
+                <Input id="sort_order" type="number" min={0} max={9999} placeholder="ex: 1"
+                  value={form.sort_order}
+                  onChange={(e) => setForm({ ...form, sort_order: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="color_hex">Cor da sala</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="color_hex"
+                    type="color"
+                    className="h-10 w-14 cursor-pointer p-1"
+                    value={form.color_hex || "#E8BF2F"}
+                    onChange={(e) => setForm({ ...form, color_hex: e.target.value })}
+                  />
+                  <Input
+                    placeholder="#RRGGBB"
+                    maxLength={7}
+                    value={form.color_hex}
+                    onChange={(e) => setForm({ ...form, color_hex: e.target.value })}
+                  />
+                  {form.color_hex && (
+                    <Button type="button" variant="ghost" size="sm"
+                      onClick={() => setForm({ ...form, color_hex: "" })}>
+                      Limpar
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
               <Button type="submit" disabled={saving}>{saving ? "Salvando..." : "Salvar"}</Button>
             </DialogFooter>
