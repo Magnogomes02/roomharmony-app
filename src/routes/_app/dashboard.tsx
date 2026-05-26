@@ -81,7 +81,15 @@ function DashboardPage() {
     { label: "Profissionais ativos", value: stats?.professionals, icon: Users, color: "text-primary" },
     { label: "Salas ativas", value: stats?.rooms, icon: DoorOpen, color: "text-success" },
     { label: "Contratos ativos", value: stats?.contracts, icon: FileText, color: "text-primary" },
-    { label: "Reservas da semana", value: stats?.weekBookings, icon: Calendar, color: "text-success" },
+    {
+      label: "Reservas da semana",
+      value: stats?.weekBookings,
+      icon: Calendar,
+      color: "text-success",
+      hint: stats
+        ? `Ativas: ${stats.weekActive} · Conflitos: ${stats.weekConflict}`
+        : undefined,
+    },
     { label: "Conflitos pendentes", value: stats?.conflicts, icon: AlertTriangle, color: "text-destructive" },
   ];
 
@@ -127,12 +135,15 @@ function DashboardPage() {
               <div className="font-serif text-4xl">
                 {isLoading ? <span className="text-muted-foreground/40">—</span> : c.value ?? 0}
               </div>
+              {"hint" in c && c.hint && !isLoading && (
+                <p className="mt-1 text-xs text-muted-foreground">{c.hint}</p>
+              )}
             </CardContent>
           </Card>
         ))}
       </div>
 
-      <WeekScheduleCard />
+      <WeekScheduleByRoomCard />
 
       <Card>
         <CardHeader>
