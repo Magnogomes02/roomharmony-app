@@ -220,6 +220,18 @@ function PreferenciasPage() {
     }
   }
 
+  async function saveReceipt() {
+    setSavingReceipt(true);
+    try {
+      await saveReceiptSettings(receipt);
+      toast.success("Modelo de recibo salvo");
+    } catch (err) {
+      toast.error("Erro", { description: err instanceof Error ? err.message : String(err) });
+    } finally {
+      setSavingReceipt(false);
+    }
+  }
+
   async function submitTemplate(e: React.FormEvent) {
     e.preventDefault();
     if (!tplForm.name.trim()) { toast.error("Informe o nome do modelo."); return; }
