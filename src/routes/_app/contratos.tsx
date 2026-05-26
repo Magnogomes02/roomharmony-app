@@ -626,6 +626,16 @@ function ContratosPage() {
     return parts.join(" • ");
   }
 
+  function detailSchedules(list: ScheduleRow[] | undefined) {
+    if (!list || list.length === 0) return "—";
+    return list.map((s) => {
+      const room = roomMap.get(s.room_id)?.name ?? "Sala";
+      const day = WEEKDAY_LABELS[s.weekday];
+      return `${day} - ${s.start_time.slice(0, 5)} às ${s.end_time.slice(0, 5)} - ${room}`;
+    }).join("\n");
+  }
+
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
