@@ -161,6 +161,8 @@ function ContratosPage() {
   const [form, setForm] = useState(emptyForm);
   const [schedules, setSchedules] = useState<LocalSchedule[]>([]);
   const [shiftDefs, setShiftDefs] = useState<ShiftDefaults>(DEFAULT_SHIFTS);
+  const [templates, setTemplates] = useState<ContractTemplate[]>([]);
+
 
   const [saving, setSaving] = useState(false);
 
