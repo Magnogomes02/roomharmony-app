@@ -241,6 +241,24 @@ function ContratosPage() {
     return () => { cancelled = true; };
   }, [open]);
 
+  // Load contract templates whenever the dialog opens
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    loadContractTemplates().then((list) => {
+      if (cancelled) return;
+      setTemplates(list);
+      // auto-select default in new contract
+      if (!editing) {
+        const def = list.find((t) => t.is_default && t.active) ?? list.find((t) => t.active);
+        if (def) setForm((f) => (f.template_id ? f : { ...f, template_id: def.id }));
+      }
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [open, editing]);
+
+
+
 
   const conflictsByRow = useMemo(
     () => schedules.map((s, i) => computeRowConflicts(s, i, schedules, busySlots)),
