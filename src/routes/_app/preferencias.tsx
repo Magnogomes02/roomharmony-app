@@ -32,22 +32,44 @@ function PreferenciasPage() {
   const canEdit = role === "gestor";
 
   const [branding, setBranding] = useState<ClinicBranding>({});
+  const [shifts, setShifts] = useState<ShiftDefaults>(DEFAULT_SHIFTS);
+  const [savingShifts, setSavingShifts] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
 
   async function load() {
     setLoading(true);
-    const { data } = await supabase
-      .from("settings")
-      .select("value")
-      .eq("key", "clinic_branding")
-      .maybeSingle();
+    const [{ data }, sd] = await Promise.all([
+      supabase.from("settings").select("value").eq("key", "clinic_branding").maybeSingle(),
+      loadShiftDefaults(),
+    ]);
     setBranding(((data?.value as ClinicBranding) ?? {}) as ClinicBranding);
+    setShifts(sd);
     setLoading(false);
   }
 
   useEffect(() => { load(); }, []);
+
+  async function saveShifts() {
+    setSavingShifts(true);
+    try {
+      for (const k of ["manha", "tarde", "noite"] as ShiftKey[]) {
+        if (shifts[k].end <= shifts[k].start) {
+          toast.error(`${SHIFT_LABELS[k]}: o fim deve ser após o início.`);
+          return;
+        }
+      }
+      await saveShiftDefaults(shifts);
+      toast.success("Turnos salvos");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Erro ao salvar turnos";
+      toast.error(msg);
+    } finally {
+      setSavingShifts(false);
+    }
+  }
+
 
   async function save(next: ClinicBranding) {
     setSaving(true);
