@@ -1068,13 +1068,55 @@ function ContratosPage() {
             {/* Cláusulas */}
             <section className="space-y-4">
               <h3 className="font-serif text-lg">Cláusulas e observações</h3>
-              <div className="space-y-2">
 
+              <div className="space-y-2">
+                <Label>Modelo de contrato</Label>
+                {(() => {
+                  const activeTpls = contractTemplates.filter((t) => t.active);
+                  const currentTpl = contractTemplates.find((t) => t.id === form.template_id);
+                  const showInactive = currentTpl && !currentTpl.active;
+                  if (contractTemplates.length === 0) {
+                    return (
+                      <p className="text-xs text-destructive">
+                        Nenhum modelo cadastrado. Cadastre um modelo em Preferências para gerar o PDF.
+                      </p>
+                    );
+                  }
+                  return (
+                    <>
+                      <Select
+                        value={form.template_id || ""}
+                        onValueChange={(v) => setForm({ ...form, template_id: v })}
+                      >
+                        <SelectTrigger><SelectValue placeholder="Selecione um modelo" /></SelectTrigger>
+                        <SelectContent>
+                          {activeTpls.map((t) => (
+                            <SelectItem key={t.id} value={t.id}>
+                              {t.name}{t.is_default ? " (padrão)" : ""}
+                            </SelectItem>
+                          ))}
+                          {showInactive && currentTpl && (
+                            <SelectItem key={currentTpl.id} value={currentTpl.id}>
+                              {currentTpl.name} (inativo)
+                            </SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        Define o título e o corpo do contrato gerado em PDF. Gerencie modelos em Preferências.
+                      </p>
+                    </>
+                  );
+                })()}
+              </div>
+
+              <div className="space-y-2">
                 <Label>Cláusulas adicionais</Label>
                 <Textarea rows={6} maxLength={5000}
                   value={form.extra_clauses}
                   onChange={(e) => setForm({ ...form, extra_clauses: e.target.value })} />
               </div>
+
               <div className="space-y-2">
                 <Label>Observações internas</Label>
                 <Textarea rows={3} maxLength={2000}
