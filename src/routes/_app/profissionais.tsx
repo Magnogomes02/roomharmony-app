@@ -430,6 +430,33 @@ function ProfissionaisPage() {
                   value={form.notes}
                   onChange={(e) => setForm({ ...form, notes: e.target.value })} />
               </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="color_hex">Cor do profissional</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="color_hex"
+                    type="color"
+                    className="h-10 w-14 cursor-pointer p-1"
+                    value={form.color_hex || "#6F8F72"}
+                    onChange={(e) => setForm({ ...form, color_hex: e.target.value })}
+                  />
+                  <Input
+                    placeholder="#RRGGBB"
+                    maxLength={7}
+                    value={form.color_hex}
+                    onChange={(e) => setForm({ ...form, color_hex: e.target.value })}
+                  />
+                  {form.color_hex && (
+                    <Button type="button" variant="ghost" size="sm"
+                      onClick={() => setForm({ ...form, color_hex: "" })}>
+                      Limpar
+                    </Button>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Usada para destacar as reservas do profissional no Dashboard e no Calendário.
+                </p>
+              </div>
             </div>
 
             {/* Attachments section */}
