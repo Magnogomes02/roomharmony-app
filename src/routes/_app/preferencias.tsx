@@ -738,6 +738,98 @@ function PreferenciasPage() {
         </DialogContent>
       </Dialog>
 
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-serif">Modelo de recibo</CardTitle>
+          <CardDescription>
+            Configure o conteúdo padrão usado nos recibos de pagamento gerados pelo Financeiro.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-3">
+          <div className="space-y-4 md:col-span-2">
+            <div className="space-y-2">
+              <Label>Título do recibo</Label>
+              <Input
+                value={receipt.title} maxLength={120} disabled={!canEdit}
+                onChange={(e) => setReceipt({ ...receipt, title: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Texto declarativo</Label>
+              <Textarea
+                rows={5} value={receipt.body} disabled={!canEdit}
+                onChange={(e) => setReceipt({ ...receipt, body: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Rodapé</Label>
+              <Textarea
+                rows={2} value={receipt.footer} disabled={!canEdit}
+                onChange={(e) => setReceipt({ ...receipt, footer: e.target.value })}
+              />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={receipt.show_logo} disabled={!canEdit}
+                  onCheckedChange={(v) => setReceipt({ ...receipt, show_logo: v })}
+                />
+                <Label>Mostrar logomarca</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={receipt.show_clinic_data} disabled={!canEdit}
+                  onCheckedChange={(v) => setReceipt({ ...receipt, show_clinic_data: v })}
+                />
+                <Label>Mostrar dados da clínica</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={receipt.show_authentication_code} disabled={!canEdit}
+                  onCheckedChange={(v) => setReceipt({ ...receipt, show_authentication_code: v })}
+                />
+                <Label>Mostrar código de autenticação</Label>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Cor de destaque</Label>
+                <Input
+                  type="color" value={receipt.accent_color} disabled={!canEdit}
+                  onChange={(e) => setReceipt({ ...receipt, accent_color: e.target.value })}
+                />
+              </div>
+            </div>
+            {canEdit && (
+              <Button size="sm" onClick={saveReceipt} disabled={savingReceipt}>
+                {savingReceipt ? "Salvando..." : "Salvar modelo de recibo"}
+              </Button>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label>Variáveis disponíveis</Label>
+            <div className="max-h-[60vh] overflow-y-auto rounded-md border p-2 text-xs">
+              <ul className="space-y-1">
+                {RECEIPT_TEMPLATE_VARIABLES.map((v) => (
+                  <li key={v.key} className="flex items-start justify-between gap-2 rounded p-1 hover:bg-muted">
+                    <div className="min-w-0">
+                      <code className="font-mono">{`{{${v.key}}}`}</code>
+                      <div className="text-[10px] text-muted-foreground">{v.description}</div>
+                    </div>
+                    <Button
+                      type="button" size="icon" variant="ghost" className="h-6 w-6 shrink-0" title="Copiar"
+                      onClick={() => { navigator.clipboard.writeText(`{{${v.key}}}`); toast.success("Copiado"); }}
+                    >
+                      <CopyIcon className="h-3 w-3" />
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+
+
 
       <AlertDialog open={!!tplDeleteTarget} onOpenChange={(o) => !o && setTplDeleteTarget(null)}>
         <AlertDialogContent>
