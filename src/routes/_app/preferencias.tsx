@@ -163,7 +163,8 @@ function PreferenciasPage() {
       active: true,
       is_default: false,
       title: "",
-      body: "",
+      body_html: "",
+      body_text: "",
     };
   }
 
