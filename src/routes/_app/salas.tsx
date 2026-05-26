@@ -264,6 +264,7 @@ function SalasPage() {
                 </div>
               </div>
             </div>
+            <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
               <Button type="submit" disabled={saving}>{saving ? "Salvando..." : "Salvar"}</Button>
             </DialogFooter>
