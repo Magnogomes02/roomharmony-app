@@ -274,7 +274,9 @@ function ContratosPage() {
       locador_name: c.locador_name ?? "",
       signed_by_name: c.signed_by_name ?? "",
       signed_at: c.signed_at ? c.signed_at.slice(0, 10) : "",
+      template_id: c.template_id ?? "",
     });
+
     setSchedules((c.schedules ?? []).map((s) => {
       const start = s.start_time.slice(0, 5);
       const end = s.end_time.slice(0, 5);
