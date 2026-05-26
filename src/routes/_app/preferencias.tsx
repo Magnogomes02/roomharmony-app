@@ -497,6 +497,74 @@ function PreferenciasPage() {
               ))}
             </ul>
           )}
+
+          {canEdit && (
+            <div className="mt-6 space-y-4 rounded-md border bg-muted/30 p-4">
+              <div>
+                <h3 className="font-serif text-lg">Bloco de assinaturas</h3>
+                <p className="text-xs text-muted-foreground">
+                  Define como o marcador {"{{BLOCO_ASSINATURAS}}"} é renderizado no PDF.
+                  O espaço reservado permite a aposição de assinatura digital ou manuscrita.
+                </p>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Disposição</Label>
+                  <Select
+                    value={sigSettings.layout}
+                    onValueChange={(v) => setSigSettings({ ...sigSettings, layout: v as SignatureSettings["layout"] })}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="side_by_side">Lado a lado</SelectItem>
+                      <SelectItem value="stacked">Empilhado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Altura reservada (mm)</Label>
+                  <Input
+                    type="number" min={25} max={80}
+                    value={sigSettings.reserved_height_mm}
+                    onChange={(e) => setSigSettings({ ...sigSettings, reserved_height_mm: Number(e.target.value) || 40 })}
+                  />
+                </div>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={sigSettings.show_date}
+                    onCheckedChange={(v) => setSigSettings({ ...sigSettings, show_date: v })}
+                  />
+                  <Label>Mostrar data/local</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={sigSettings.show_qualification}
+                    onCheckedChange={(v) => setSigSettings({ ...sigSettings, show_qualification: v })}
+                  />
+                  <Label>Mostrar qualificação (Locador/Locatário)</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={sigSettings.show_party_document}
+                    onCheckedChange={(v) => setSigSettings({ ...sigSettings, show_party_document: v })}
+                  />
+                  <Label>Mostrar documento (CPF/CNPJ)</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={sigSettings.force_new_page_if_needed}
+                    onCheckedChange={(v) => setSigSettings({ ...sigSettings, force_new_page_if_needed: v })}
+                  />
+                  <Label>Forçar nova página se não couber</Label>
+                </div>
+              </div>
+              <Button size="sm" onClick={saveSigSettings} disabled={savingSig}>
+                {savingSig ? "Salvando..." : "Salvar configuração de assinatura"}
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
