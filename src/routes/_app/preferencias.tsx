@@ -30,7 +30,6 @@ import {
   loadContractTemplatesSettings,
   saveContractTemplatesSettings,
   getInitialContractTemplate,
-  renderContractTemplate,
   stripHtmlToText,
   DEFAULT_SIGNATURE_SETTINGS,
   type ContractTemplate,
