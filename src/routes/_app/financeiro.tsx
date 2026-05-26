@@ -520,6 +520,16 @@ function FinanceiroPage() {
               <Label className="flex items-center gap-2"><Paperclip className="h-4 w-4" /> Comprovante (opcional)</Label>
               <Input type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={(e) => setPayFile(e.target.files?.[0] ?? null)} />
             </div>
+            <div className="flex items-center gap-2 rounded-md border bg-muted/30 p-3">
+              <Checkbox
+                id="gen-receipt"
+                checked={generateReceiptAfterPay}
+                onCheckedChange={(v) => setGenerateReceiptAfterPay(v === true)}
+              />
+              <Label htmlFor="gen-receipt" className="cursor-pointer text-sm font-normal">
+                Gerar recibo automaticamente após a baixa
+              </Label>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setPayOpen(false)}>Cancelar</Button>
