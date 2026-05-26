@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { format, parseISO, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Check, Pencil, Trash2, RefreshCw, Undo2, Search, Paperclip, Download } from "lucide-react";
+import { Check, Pencil, Trash2, RefreshCw, Undo2, Search, Paperclip, Download, FileText, Ban } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
