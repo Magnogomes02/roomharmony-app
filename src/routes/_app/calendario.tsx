@@ -26,7 +26,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { entityColor, isValidHex } from "@/lib/entityColors";
+import { entityColor, isValidHex, sortRooms } from "@/lib/entityColors";
 
 export const Route = createFileRoute("/_app/calendario")({
   component: CalendarioPage,
