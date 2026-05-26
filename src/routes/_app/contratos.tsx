@@ -1054,6 +1054,42 @@ function ContratosPage() {
             <section className="space-y-4">
               <h3 className="font-serif text-lg">Cláusulas e observações</h3>
               <div className="space-y-2">
+                <Label>Modelo de contrato</Label>
+                {(() => {
+                  const activeTemplates = templates.filter((t) => t.active);
+                  const currentInactive = form.template_id
+                    && templates.find((t) => t.id === form.template_id && !t.active);
+                  const visible = currentInactive
+                    ? [...activeTemplates, currentInactive as ContractTemplate]
+                    : activeTemplates;
+                  if (templates.length === 0) {
+                    return (
+                      <p className="text-xs text-muted-foreground">
+                        Nenhum modelo cadastrado. O PDF usará o modelo padrão interno do sistema.
+                        Cadastre modelos em <strong>Preferências → Modelos de contrato</strong>.
+                      </p>
+                    );
+                  }
+                  return (
+                    <Select
+                      value={form.template_id || "__none__"}
+                      onValueChange={(v) => setForm({ ...form, template_id: v === "__none__" ? "" : v })}
+                    >
+                      <SelectTrigger><SelectValue placeholder="Selecione o modelo" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Usar modelo padrão</SelectItem>
+                        {visible.map((t) => (
+                          <SelectItem key={t.id} value={t.id}>
+                            {t.name}{t.is_default ? " (padrão)" : ""}{!t.active ? " — inativo" : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  );
+                })()}
+              </div>
+              <div className="space-y-2">
+
                 <Label>Cláusulas adicionais</Label>
                 <Textarea rows={6} maxLength={5000}
                   value={form.extra_clauses}
