@@ -39,6 +39,11 @@ import {
   DEFAULT_SHIFTS, SHIFT_LABELS, loadShiftDefaults, detectShift,
   type ShiftDefaults, type ShiftKey,
 } from "@/lib/shifts";
+import {
+  loadContractTemplates, getDefaultContractTemplate,
+  type ContractTemplate,
+} from "@/lib/contractTemplates";
+
 
 
 type LocalSchedule = ScheduleRow & { _mode?: "horario" | "turno"; _shift?: ShiftKey };
@@ -60,10 +65,11 @@ interface Contract {
   notes: string | null; extra_clauses: string | null;
   signed_at: string | null; signed_by_name: string | null; signature_hash: string | null;
   locador_name: string | null; created_at: string;
-  
+  template_id: string | null;
   professional?: Professional;
   schedules?: ScheduleRow[];
 }
+
 
 interface Attachment {
   id: string; professional_id: string; contract_id: string | null;
@@ -83,8 +89,9 @@ const emptyForm = {
   locador_name: "",
   signed_by_name: "",
   signed_at: "",
-  
+  template_id: "",
 };
+
 
 
 const statusVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
@@ -158,6 +165,9 @@ function ContratosPage() {
   const [form, setForm] = useState(emptyForm);
   const [schedules, setSchedules] = useState<LocalSchedule[]>([]);
   const [shiftDefs, setShiftDefs] = useState<ShiftDefaults>(DEFAULT_SHIFTS);
+  const [contractTemplates, setContractTemplates] = useState<ContractTemplate[]>([]);
+
+
   
 
 
@@ -207,6 +217,17 @@ function ContratosPage() {
   }
 
   useEffect(() => { load(); }, []);
+
+  // Load contract templates whenever the dialog opens
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    loadContractTemplates()
+      .then((t) => { if (!cancelled) setContractTemplates(t); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [open]);
+
 
   // Reload busy slots whenever the dialog opens or the edited contract id changes
   useEffect(() => {
@@ -262,6 +283,15 @@ function ContratosPage() {
     setOpen(true);
   }
 
+  // Auto-select default template for new contracts when templates are loaded
+  useEffect(() => {
+    if (!open || editing) return;
+    if (form.template_id) return;
+    const def = getDefaultContractTemplate(contractTemplates);
+    if (def) setForm((f) => ({ ...f, template_id: def.id }));
+  }, [open, editing, contractTemplates, form.template_id]);
+
+
   function openEdit(c: Contract) {
     setEditing(c);
     setForm({
@@ -276,8 +306,9 @@ function ContratosPage() {
       locador_name: c.locador_name ?? "",
       signed_by_name: c.signed_by_name ?? "",
       signed_at: c.signed_at ? c.signed_at.slice(0, 10) : "",
-      
+      template_id: c.template_id ?? "",
     });
+
 
     setSchedules((c.schedules ?? []).map((s) => {
       const start = s.start_time.slice(0, 5);
@@ -439,8 +470,9 @@ function ContratosPage() {
       locador_name: form.locador_name.trim() || null,
       signed_by_name: form.signed_by_name.trim() || null,
       signed_at: form.signed_at ? new Date(form.signed_at).toISOString() : null,
-      
+      template_id: form.template_id || null,
     };
+
 
 
     try {
@@ -701,7 +733,12 @@ function ContratosPage() {
                                 extra_clauses: c.extra_clauses, notes: c.notes,
                                 locador_name: c.locador_name, signed_by_name: c.signed_by_name,
                                 signed_at: c.signed_at,
+                                template_id: c.template_id,
+                                due_day: c.due_day,
+                                schedules_summary: summarizeSchedules(c.schedules),
+                                schedules_detail: detailSchedules(c.schedules),
                               });
+
 
                               await logAudit("contract.pdf_download", c.id);
                             } catch (err) {
@@ -1031,13 +1068,55 @@ function ContratosPage() {
             {/* Cláusulas */}
             <section className="space-y-4">
               <h3 className="font-serif text-lg">Cláusulas e observações</h3>
-              <div className="space-y-2">
 
+              <div className="space-y-2">
+                <Label>Modelo de contrato</Label>
+                {(() => {
+                  const activeTpls = contractTemplates.filter((t) => t.active);
+                  const currentTpl = contractTemplates.find((t) => t.id === form.template_id);
+                  const showInactive = currentTpl && !currentTpl.active;
+                  if (contractTemplates.length === 0) {
+                    return (
+                      <p className="text-xs text-destructive">
+                        Nenhum modelo cadastrado. Cadastre um modelo em Preferências para gerar o PDF.
+                      </p>
+                    );
+                  }
+                  return (
+                    <>
+                      <Select
+                        value={form.template_id || ""}
+                        onValueChange={(v) => setForm({ ...form, template_id: v })}
+                      >
+                        <SelectTrigger><SelectValue placeholder="Selecione um modelo" /></SelectTrigger>
+                        <SelectContent>
+                          {activeTpls.map((t) => (
+                            <SelectItem key={t.id} value={t.id}>
+                              {t.name}{t.is_default ? " (padrão)" : ""}
+                            </SelectItem>
+                          ))}
+                          {showInactive && currentTpl && (
+                            <SelectItem key={currentTpl.id} value={currentTpl.id}>
+                              {currentTpl.name} (inativo)
+                            </SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        Define o título e o corpo do contrato gerado em PDF. Gerencie modelos em Preferências.
+                      </p>
+                    </>
+                  );
+                })()}
+              </div>
+
+              <div className="space-y-2">
                 <Label>Cláusulas adicionais</Label>
                 <Textarea rows={6} maxLength={5000}
                   value={form.extra_clauses}
                   onChange={(e) => setForm({ ...form, extra_clauses: e.target.value })} />
               </div>
+
               <div className="space-y-2">
                 <Label>Observações internas</Label>
                 <Textarea rows={3} maxLength={2000}
