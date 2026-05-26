@@ -213,6 +213,15 @@ function ContratosPage() {
     return () => { cancelled = true; };
   }, [open, editing?.id]);
 
+  // Load shift defaults whenever the dialog opens
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    loadShiftDefaults().then((d) => { if (!cancelled) setShiftDefs(d); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [open]);
+
+
   const conflictsByRow = useMemo(
     () => schedules.map((s, i) => computeRowConflicts(s, i, schedules, busySlots)),
     [schedules, busySlots],
