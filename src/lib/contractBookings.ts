@@ -86,7 +86,7 @@ export async function planContractBookings(input: ContractGenInput): Promise<Gen
     .from("bookings")
     .select("id,room_id,start_at,end_at,status,contract_id")
     .in("room_id", roomIds)
-    .neq("status", "cancelada")
+    .in("status", ["ativa", "conflito"])
     .lt("start_at", winEnd)
     .gt("end_at", winStart);
   const others = (candidate ?? []).filter((b) => b.contract_id !== input.contract_id);
