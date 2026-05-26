@@ -184,20 +184,33 @@ function PreferenciasPage() {
 
   function fillInitialTemplate() {
     const init = getInitialContractTemplate();
-    setTplForm((f) => ({ ...f, title: init.title, body: init.body, name: f.name || "Sublocação padrão" }));
+    setTplForm((f) => ({ ...f, title: init.title, body_html: init.body_html, body_text: stripHtmlToText(init.body_html), name: f.name || "Sublocação padrão" }));
   }
 
   async function persistTemplates(next: ContractTemplate[]) {
-    await saveContractTemplates(next);
-    const reloaded = await loadContractTemplates();
-    setTemplates(reloaded);
+    await saveContractTemplatesSettings({ templates: next, signature_settings: sigSettings });
+    const reloaded = await loadContractTemplatesSettings();
+    setTemplates(reloaded.templates);
+    setSigSettings(reloaded.signature_settings ?? DEFAULT_SIGNATURE_SETTINGS);
+  }
+
+  async function saveSigSettings() {
+    setSavingSig(true);
+    try {
+      await saveContractTemplatesSettings({ templates, signature_settings: sigSettings });
+      toast.success("Configuração de assinatura salva");
+    } catch (err) {
+      toast.error("Erro", { description: err instanceof Error ? err.message : String(err) });
+    } finally {
+      setSavingSig(false);
+    }
   }
 
   async function submitTemplate(e: React.FormEvent) {
     e.preventDefault();
     if (!tplForm.name.trim()) { toast.error("Informe o nome do modelo."); return; }
     if (!tplForm.title.trim()) { toast.error("Informe o título do contrato."); return; }
-    if (!tplForm.body.trim()) { toast.error("Informe o corpo do contrato."); return; }
+    if (!tplForm.body_html.trim()) { toast.error("Informe o corpo do contrato."); return; }
     setTplSaving(true);
     try {
       let next = [...templates];
@@ -207,7 +220,8 @@ function PreferenciasPage() {
         name: tplForm.name.trim(),
         description: tplForm.description?.trim() || "",
         title: tplForm.title,
-        body: tplForm.body,
+        body_html: tplForm.body_html,
+        body_text: stripHtmlToText(tplForm.body_html),
       };
       if (idx >= 0) next[idx] = incoming;
       else next.push(incoming);
