@@ -325,11 +325,33 @@ function ContratosPage() {
   }
 
   function addSchedule() {
-    setSchedules((s) => [...s, { weekday: 1, room_id: rooms[0]?.id ?? "", start_time: "08:00", end_time: "09:00" }]);
+    setSchedules((s) => [...s, {
+      weekday: 1, room_id: rooms[0]?.id ?? "",
+      start_time: "08:00", end_time: "09:00",
+      _mode: "horario",
+    }]);
   }
-  function updateSchedule(idx: number, patch: Partial<ScheduleRow>) {
+  function updateSchedule(idx: number, patch: Partial<LocalSchedule>) {
     setSchedules((s) => s.map((row, i) => (i === idx ? { ...row, ...patch } : row)));
   }
+  function setRowMode(idx: number, mode: "horario" | "turno") {
+    setSchedules((s) => s.map((row, i) => {
+      if (i !== idx) return row;
+      if (mode === "turno") {
+        const k: ShiftKey = row._shift ?? "manha";
+        const r = shiftDefs[k];
+        return { ...row, _mode: "turno", _shift: k, start_time: r.start, end_time: r.end };
+      }
+      return { ...row, _mode: "horario" };
+    }));
+  }
+  function setRowShift(idx: number, k: ShiftKey) {
+    const r = shiftDefs[k];
+    setSchedules((s) => s.map((row, i) =>
+      i === idx ? { ...row, _mode: "turno", _shift: k, start_time: r.start, end_time: r.end } : row,
+    ));
+  }
+
   function removeSchedule(idx: number) {
     setSchedules((s) => s.filter((_, i) => i !== idx));
   }
