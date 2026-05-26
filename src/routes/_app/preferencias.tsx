@@ -24,11 +24,16 @@ import {
 } from "@/lib/shifts";
 import {
   CONTRACT_TEMPLATE_VARIABLES,
-  loadContractTemplates,
-  saveContractTemplates,
+  loadContractTemplatesSettings,
+  saveContractTemplatesSettings,
   getInitialContractTemplate,
+  renderContractTemplate,
+  stripHtmlToText,
+  DEFAULT_SIGNATURE_SETTINGS,
   type ContractTemplate,
+  type SignatureSettings,
 } from "@/lib/contractTemplates";
+import { RichContractEditor } from "@/components/RichContractEditor";
 
 export const Route = createFileRoute("/_app/preferencias")({
   component: PreferenciasPage,
