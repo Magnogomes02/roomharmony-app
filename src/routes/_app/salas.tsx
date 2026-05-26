@@ -153,23 +153,33 @@ function SalasPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-12">Cor</TableHead>
                   <TableHead>Nome</TableHead>
                   <TableHead>Descrição</TableHead>
                   <TableHead>Capacidade</TableHead>
+                  <TableHead>Ordem</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
-                  <TableRow><TableCell colSpan={5} className="py-8 text-center text-muted-foreground">Carregando...</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="py-8 text-center text-muted-foreground">Carregando...</TableCell></TableRow>
                 ) : filtered.length === 0 ? (
-                  <TableRow><TableCell colSpan={5} className="py-8 text-center text-muted-foreground">Nenhuma sala encontrada.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="py-8 text-center text-muted-foreground">Nenhuma sala encontrada.</TableCell></TableRow>
                 ) : filtered.map((r) => (
                   <TableRow key={r.id}>
+                    <TableCell>
+                      <span
+                        className="inline-block h-4 w-4 rounded-full border border-border"
+                        style={{ backgroundColor: entityColor(r.color_hex, r.id) }}
+                        aria-hidden
+                      />
+                    </TableCell>
                     <TableCell className="font-medium">{r.name}</TableCell>
                     <TableCell className="max-w-md text-sm text-muted-foreground">{r.description ?? "—"}</TableCell>
                     <TableCell>{r.capacity}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{r.sort_order ?? "—"}</TableCell>
                     <TableCell>
                       <Badge variant={r.active ? "default" : "secondary"}>
                         {r.active ? "Ativa" : "Inativa"}
