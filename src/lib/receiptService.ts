@@ -241,19 +241,35 @@ export async function cancelReceiptById(receiptId: string, reason: string): Prom
 }
 
 export async function downloadReceipt(receipt: ReceiptRow): Promise<void> {
-  // Try storage first
+  const triggerBlobDownload = (blob: Blob) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `recibo-${receipt.receipt_number}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  // 1. Try downloading the stored PDF as a Blob (avoids ERR_BLOCKED_BY_CLIENT from window.open)
   if (receipt.receipt_path) {
-    const { data, error } = await supabase.storage
-      .from(RECEIPTS_BUCKET).createSignedUrl(receipt.receipt_path, 60);
-    if (!error && data?.signedUrl) {
-      window.open(data.signedUrl, "_blank");
-      await audit("receivable.receipt_download", receipt.receivable_id, {
-        receipt_id: receipt.id, receipt_number: receipt.receipt_number,
-      });
-      return;
+    try {
+      const { data, error } = await supabase.storage
+        .from(RECEIPTS_BUCKET).download(receipt.receipt_path);
+      if (!error && data) {
+        triggerBlobDownload(data);
+        await audit("receivable.receipt_download", receipt.receivable_id, {
+          receipt_id: receipt.id, receipt_number: receipt.receipt_number,
+        });
+        return;
+      }
+    } catch (e) {
+      console.warn("[receiptService] storage download falhou, regenerando", e);
     }
   }
-  // Fallback: regenerate from snapshot using current branding/settings
+
+  // 2. Fallback: regenerate from snapshot using current branding/settings
   const [branding, settings] = await Promise.all([getClinicBranding(), loadReceiptSettings()]);
   const snapshotSettings = {
     ...settings,
@@ -262,14 +278,7 @@ export async function downloadReceipt(receipt: ReceiptRow): Promise<void> {
     footer: receipt.receipt_footer ?? settings.footer,
   };
   const blob = await renderReceiptPdf(toPdfData(receipt), branding, snapshotSettings);
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `recibo-${receipt.receipt_number}.pdf`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
+  triggerBlobDownload(blob);
   await audit("receivable.receipt_download", receipt.receivable_id, {
     receipt_id: receipt.id, receipt_number: receipt.receipt_number,
   });
