@@ -194,7 +194,7 @@ function CalendarioPage() {
       .from("bookings")
       .select("id,professional_id,room_id,start_at,end_at,status,source,contract_id,reallocated_from,reallocated_to")
       .eq("room_id", roomId)
-      .neq("status", "cancelada")
+      .in("status", ["ativa", "conflito"])
       .lt("start_at", end.toISOString())
       .gt("end_at", start.toISOString());
     return ((data as Booking[]) ?? []).filter((b) => b.id !== ignoreId);
