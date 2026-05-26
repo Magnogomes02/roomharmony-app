@@ -14,6 +14,9 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
@@ -27,7 +30,6 @@ import {
   loadContractTemplatesSettings,
   saveContractTemplatesSettings,
   getInitialContractTemplate,
-  renderContractTemplate,
   stripHtmlToText,
   DEFAULT_SIGNATURE_SETTINGS,
   type ContractTemplate,
@@ -494,6 +496,74 @@ function PreferenciasPage() {
               ))}
             </ul>
           )}
+
+          {canEdit && (
+            <div className="mt-6 space-y-4 rounded-md border bg-muted/30 p-4">
+              <div>
+                <h3 className="font-serif text-lg">Bloco de assinaturas</h3>
+                <p className="text-xs text-muted-foreground">
+                  Define como o marcador {"{{BLOCO_ASSINATURAS}}"} é renderizado no PDF.
+                  O espaço reservado permite a aposição de assinatura digital ou manuscrita.
+                </p>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Disposição</Label>
+                  <Select
+                    value={sigSettings.layout}
+                    onValueChange={(v) => setSigSettings({ ...sigSettings, layout: v as SignatureSettings["layout"] })}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="side_by_side">Lado a lado</SelectItem>
+                      <SelectItem value="stacked">Empilhado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Altura reservada (mm)</Label>
+                  <Input
+                    type="number" min={25} max={80}
+                    value={sigSettings.reserved_height_mm}
+                    onChange={(e) => setSigSettings({ ...sigSettings, reserved_height_mm: Number(e.target.value) || 40 })}
+                  />
+                </div>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={sigSettings.show_date}
+                    onCheckedChange={(v) => setSigSettings({ ...sigSettings, show_date: v })}
+                  />
+                  <Label>Mostrar data/local</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={sigSettings.show_qualification}
+                    onCheckedChange={(v) => setSigSettings({ ...sigSettings, show_qualification: v })}
+                  />
+                  <Label>Mostrar qualificação (Locador/Locatário)</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={sigSettings.show_party_document}
+                    onCheckedChange={(v) => setSigSettings({ ...sigSettings, show_party_document: v })}
+                  />
+                  <Label>Mostrar documento (CPF/CNPJ)</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={sigSettings.force_new_page_if_needed}
+                    onCheckedChange={(v) => setSigSettings({ ...sigSettings, force_new_page_if_needed: v })}
+                  />
+                  <Label>Forçar nova página se não couber</Label>
+                </div>
+              </div>
+              <Button size="sm" onClick={saveSigSettings} disabled={savingSig}>
+                {savingSig ? "Salvando..." : "Salvar configuração de assinatura"}
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -608,6 +678,42 @@ function PreferenciasPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* A4 Preview dialog */}
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="max-w-[900px] max-h-[92vh] overflow-y-auto bg-muted/40">
+          <DialogHeader>
+            <DialogTitle className="font-serif">Pré-visualização A4</DialogTitle>
+            <DialogDescription>
+              Renderização aproximada do conteúdo. As variáveis aparecem como {"{{NOME}}"} —
+              no PDF final elas serão substituídas pelos dados do contrato.
+            </DialogDescription>
+          </DialogHeader>
+          <div
+            className="mx-auto bg-white text-black shadow-md"
+            style={{ width: "210mm", minHeight: "297mm", padding: "25mm 20mm", boxSizing: "border-box" }}
+          >
+            {tplForm.title && (
+              <h1 className="mb-6 text-center text-xl font-bold uppercase">{tplForm.title}</h1>
+            )}
+            <div
+              className="prose prose-sm max-w-none [&_p]:my-2 [&_h1]:text-2xl [&_h2]:text-xl [&_h3]:text-lg [&_h1]:font-bold [&_h2]:font-bold [&_h3]:font-bold [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-6 [&_ol]:pl-6"
+              style={{ textAlign: "justify" }}
+              dangerouslySetInnerHTML={{ __html: tplForm.body_html || "<p><em>(modelo vazio)</em></p>" }}
+            />
+            <div
+              className="mt-10 border-t border-dashed border-gray-400 pt-3 text-center text-[10px] text-gray-500"
+              style={{ minHeight: `${sigSettings.reserved_height_mm}mm` }}
+            >
+              Espaço reservado para o bloco de assinaturas ({sigSettings.layout === "side_by_side" ? "lado a lado" : "empilhado"} · {sigSettings.reserved_height_mm}mm)
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPreviewOpen(false)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
 
       <AlertDialog open={!!tplDeleteTarget} onOpenChange={(o) => !o && setTplDeleteTarget(null)}>
         <AlertDialogContent>
