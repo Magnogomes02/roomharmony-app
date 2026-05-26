@@ -86,7 +86,9 @@ const emptyForm = {
   locador_name: "",
   signed_by_name: "",
   signed_at: "",
+  template_id: "",
 };
+
 
 const statusVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
   rascunho: "secondary", ativo: "default", encerrado: "outline", cancelado: "destructive",
