@@ -77,6 +77,9 @@ function PreferenciasPage() {
   const [tplDeleteTarget, setTplDeleteTarget] = useState<ContractTemplate | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
 
+  const [receipt, setReceipt] = useState<ReceiptSettings>(DEFAULT_RECEIPT_SETTINGS);
+  const [savingReceipt, setSavingReceipt] = useState(false);
+
   async function load() {
     setLoading(true);
     const [{ data }, sd, tplSettings] = await Promise.all([
