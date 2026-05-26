@@ -257,10 +257,18 @@ function ContratosPage() {
       signed_by_name: c.signed_by_name ?? "",
       signed_at: c.signed_at ? c.signed_at.slice(0, 10) : "",
     });
-    setSchedules((c.schedules ?? []).map((s) => ({
-      id: s.id, weekday: s.weekday, room_id: s.room_id,
-      start_time: s.start_time.slice(0, 5), end_time: s.end_time.slice(0, 5),
-    })));
+    setSchedules((c.schedules ?? []).map((s) => {
+      const start = s.start_time.slice(0, 5);
+      const end = s.end_time.slice(0, 5);
+      const shift = detectShift(start, end, shiftDefs);
+      return {
+        id: s.id, weekday: s.weekday, room_id: s.room_id,
+        start_time: start, end_time: end,
+        _mode: shift ? "turno" : "horario",
+        _shift: shift ?? undefined,
+      } as LocalSchedule;
+    }));
+
     setOpen(true);
   }
 
