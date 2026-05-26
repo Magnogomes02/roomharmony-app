@@ -35,6 +35,13 @@ import {
   type BusySlot,
 } from "@/lib/scheduleConflicts";
 import { cn } from "@/lib/utils";
+import {
+  DEFAULT_SHIFTS, SHIFT_LABELS, loadShiftDefaults, detectShift,
+  type ShiftDefaults, type ShiftKey,
+} from "@/lib/shifts";
+
+type LocalSchedule = ScheduleRow & { _mode?: "horario" | "turno"; _shift?: ShiftKey };
+
 
 export const Route = createFileRoute("/_app/contratos")({
   component: ContratosPage,
@@ -144,7 +151,9 @@ function ContratosPage() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Contract | null>(null);
   const [form, setForm] = useState(emptyForm);
-  const [schedules, setSchedules] = useState<ScheduleRow[]>([]);
+  const [schedules, setSchedules] = useState<LocalSchedule[]>([]);
+  const [shiftDefs, setShiftDefs] = useState<ShiftDefaults>(DEFAULT_SHIFTS);
+
   const [saving, setSaving] = useState(false);
 
   const [deleteTarget, setDeleteTarget] = useState<Contract | null>(null);
@@ -204,6 +213,25 @@ function ContratosPage() {
     return () => { cancelled = true; };
   }, [open, editing?.id]);
 
+  // Load shift defaults whenever the dialog opens
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    loadShiftDefaults().then((d) => {
+      if (cancelled) return;
+      setShiftDefs(d);
+      // Refresh times of any rows already in "turno" mode using new defaults
+      setSchedules((rows) => rows.map((row) => {
+        if (row._mode !== "turno" || !row._shift) return row;
+        const r = d[row._shift];
+        return { ...row, start_time: r.start, end_time: r.end };
+      }));
+    }).catch(() => {});
+
+    return () => { cancelled = true; };
+  }, [open]);
+
+
   const conflictsByRow = useMemo(
     () => schedules.map((s, i) => computeRowConflicts(s, i, schedules, busySlots)),
     [schedules, busySlots],
@@ -239,10 +267,18 @@ function ContratosPage() {
       signed_by_name: c.signed_by_name ?? "",
       signed_at: c.signed_at ? c.signed_at.slice(0, 10) : "",
     });
-    setSchedules((c.schedules ?? []).map((s) => ({
-      id: s.id, weekday: s.weekday, room_id: s.room_id,
-      start_time: s.start_time.slice(0, 5), end_time: s.end_time.slice(0, 5),
-    })));
+    setSchedules((c.schedules ?? []).map((s) => {
+      const start = s.start_time.slice(0, 5);
+      const end = s.end_time.slice(0, 5);
+      const shift = detectShift(start, end, shiftDefs);
+      return {
+        id: s.id, weekday: s.weekday, room_id: s.room_id,
+        start_time: start, end_time: end,
+        _mode: shift ? "turno" : "horario",
+        _shift: shift ?? undefined,
+      } as LocalSchedule;
+    }));
+
     setOpen(true);
   }
 
@@ -299,11 +335,33 @@ function ContratosPage() {
   }
 
   function addSchedule() {
-    setSchedules((s) => [...s, { weekday: 1, room_id: rooms[0]?.id ?? "", start_time: "08:00", end_time: "09:00" }]);
+    setSchedules((s) => [...s, {
+      weekday: 1, room_id: rooms[0]?.id ?? "",
+      start_time: "08:00", end_time: "09:00",
+      _mode: "horario",
+    }]);
   }
-  function updateSchedule(idx: number, patch: Partial<ScheduleRow>) {
+  function updateSchedule(idx: number, patch: Partial<LocalSchedule>) {
     setSchedules((s) => s.map((row, i) => (i === idx ? { ...row, ...patch } : row)));
   }
+  function setRowMode(idx: number, mode: "horario" | "turno") {
+    setSchedules((s) => s.map((row, i) => {
+      if (i !== idx) return row;
+      if (mode === "turno") {
+        const k: ShiftKey = row._shift ?? "manha";
+        const r = shiftDefs[k];
+        return { ...row, _mode: "turno", _shift: k, start_time: r.start, end_time: r.end };
+      }
+      return { ...row, _mode: "horario" };
+    }));
+  }
+  function setRowShift(idx: number, k: ShiftKey) {
+    const r = shiftDefs[k];
+    setSchedules((s) => s.map((row, i) =>
+      i === idx ? { ...row, _mode: "turno", _shift: k, start_time: r.start, end_time: r.end } : row,
+    ));
+  }
+
   function removeSchedule(idx: number) {
     setSchedules((s) => s.filter((_, i) => i !== idx));
   }
@@ -751,8 +809,8 @@ function ContratosPage() {
                         )}
                       >
                         <div className="grid grid-cols-12 items-end gap-2">
-                          <div className="col-span-3 space-y-1">
-                            <Label className="text-xs">Dia da semana</Label>
+                          <div className="col-span-2 space-y-1">
+                            <Label className="text-xs">Dia</Label>
                             <Select
                               value={String(s.weekday)}
                               onValueChange={(v) => updateSchedule(i, { weekday: Number(v) })}
@@ -765,7 +823,7 @@ function ContratosPage() {
                               </SelectContent>
                             </Select>
                           </div>
-                          <div className="col-span-4 space-y-1">
+                          <div className="col-span-3 space-y-1">
                             <Label className="text-xs">Sala</Label>
                             <Select value={s.room_id} onValueChange={(v) => updateSchedule(i, { room_id: v })}>
                               <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
@@ -777,21 +835,56 @@ function ContratosPage() {
                             </Select>
                           </div>
                           <div className="col-span-2 space-y-1">
-                            <Label className="text-xs">Início</Label>
-                            <Input type="time" value={s.start_time}
-                              onChange={(e) => updateSchedule(i, { start_time: e.target.value })} />
+                            <Label className="text-xs">Tipo</Label>
+                            <Select
+                              value={s._mode ?? "horario"}
+                              onValueChange={(v) => setRowMode(i, v as "horario" | "turno")}
+                            >
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="horario">Horário</SelectItem>
+                                <SelectItem value="turno">Turno</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </div>
-                          <div className="col-span-2 space-y-1">
-                            <Label className="text-xs">Fim</Label>
-                            <Input type="time" value={s.end_time}
-                              onChange={(e) => updateSchedule(i, { end_time: e.target.value })} />
-                          </div>
+                          {s._mode === "turno" ? (
+                            <div className="col-span-4 space-y-1">
+                              <Label className="text-xs">Turno</Label>
+                              <Select
+                                value={s._shift ?? "manha"}
+                                onValueChange={(v) => setRowShift(i, v as ShiftKey)}
+                              >
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  {(["manha", "tarde", "noite"] as ShiftKey[]).map((k) => (
+                                    <SelectItem key={k} value={k}>
+                                      {SHIFT_LABELS[k]} ({shiftDefs[k].start}–{shiftDefs[k].end})
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          ) : (
+                            <>
+                              <div className="col-span-2 space-y-1">
+                                <Label className="text-xs">Início</Label>
+                                <Input type="time" value={s.start_time}
+                                  onChange={(e) => updateSchedule(i, { start_time: e.target.value })} />
+                              </div>
+                              <div className="col-span-2 space-y-1">
+                                <Label className="text-xs">Fim</Label>
+                                <Input type="time" value={s.end_time}
+                                  onChange={(e) => updateSchedule(i, { end_time: e.target.value })} />
+                              </div>
+                            </>
+                          )}
                           <div className="col-span-1 flex justify-end">
                             <Button type="button" variant="ghost" size="icon" onClick={() => removeSchedule(i)} title="Remover">
                               <X className="h-4 w-4" />
                             </Button>
                           </div>
                         </div>
+
 
                         {/* Mini timeline do dia/sala */}
                         {s.room_id && s.start_time && s.end_time && tm(s.end_time) > tm(s.start_time) && (
