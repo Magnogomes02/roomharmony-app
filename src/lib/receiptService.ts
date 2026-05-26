@@ -110,6 +110,26 @@ export async function getReceiptsByReceivableIds(ids: string[]): Promise<Map<str
   return out;
 }
 
+async function resolveReceivableRoom(rec: { room_id: string | null; contract_id: string | null }): Promise<{ room_id: string | null; room_name: string | null }> {
+  if (rec.room_id) {
+    const { data } = await supabase.from("rooms").select("id,name").eq("id", rec.room_id).maybeSingle();
+    return { room_id: rec.room_id, room_name: data?.name ?? null };
+  }
+  if (rec.contract_id) {
+    const { data: schedules } = await supabase
+      .from("contract_schedules").select("room_id").eq("contract_id", rec.contract_id);
+    const uniqueIds = Array.from(new Set((schedules ?? []).map((s) => s.room_id).filter(Boolean) as string[]));
+    if (uniqueIds.length === 0) return { room_id: null, room_name: null };
+    const { data: rooms } = await supabase.from("rooms").select("id,name").in("id", uniqueIds);
+    const names = (rooms ?? []).map((r) => r.name).filter(Boolean);
+    if (uniqueIds.length === 1) {
+      return { room_id: uniqueIds[0], room_name: names[0] ?? null };
+    }
+    return { room_id: null, room_name: names.length ? names.join(", ") : null };
+  }
+  return { room_id: null, room_name: null };
+}
+
 export async function createReceiptForReceivable(receivableId: string): Promise<ReceiptRow> {
   // 1. receivable
   const { data: rec, error: recErr } = await supabase
