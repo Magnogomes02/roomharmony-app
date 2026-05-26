@@ -561,14 +561,13 @@ function PreferenciasPage() {
 
               <div className="space-y-2">
                 <Label>Corpo completo do contrato *</Label>
-                <Textarea
-                  rows={22} value={tplForm.body}
-                  placeholder="Cole aqui o contrato completo, usando os placeholders ao lado."
-                  onChange={(e) => setTplForm({ ...tplForm, body: e.target.value })}
-                  className="font-mono text-xs"
+                <RichContractEditor
+                  value={tplForm.body_html}
+                  onChange={(html) => setTplForm({ ...tplForm, body_html: html })}
+                  onPreview={() => setPreviewOpen(true)}
                 />
                 <p className="text-xs text-muted-foreground">
-                  As quebras de linha são preservadas. Linhas em branco viram parágrafos no PDF.
+                  Use a barra de ferramentas para formatar. Insira variáveis e o bloco de assinaturas pelos botões da toolbar.
                 </p>
               </div>
             </div>
