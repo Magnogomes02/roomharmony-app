@@ -36,6 +36,13 @@ import {
   type SignatureSettings,
 } from "@/lib/contractTemplates";
 import { RichContractEditor } from "@/components/RichContractEditor";
+import {
+  DEFAULT_RECEIPT_SETTINGS,
+  RECEIPT_TEMPLATE_VARIABLES,
+  loadReceiptSettings,
+  saveReceiptSettings,
+  type ReceiptSettings,
+} from "@/lib/receiptSettings";
 
 export const Route = createFileRoute("/_app/preferencias")({
   component: PreferenciasPage,
