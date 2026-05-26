@@ -32,7 +32,7 @@ export const Route = createFileRoute("/_app/calendario")({
   component: CalendarioPage,
 });
 
-interface Room { id: string; name: string; active: boolean; color_hex: string | null }
+interface Room { id: string; name: string; active: boolean; color_hex: string | null; sort_order: number | null }
 interface Professional { id: string; full_name: string; active: boolean; color_hex: string | null }
 interface Booking {
   id: string;
