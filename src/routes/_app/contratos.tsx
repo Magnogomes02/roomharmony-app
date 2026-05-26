@@ -63,9 +63,11 @@ interface Contract {
   notes: string | null; extra_clauses: string | null;
   signed_at: string | null; signed_by_name: string | null; signature_hash: string | null;
   locador_name: string | null; created_at: string;
+  template_id?: string | null;
   professional?: Professional;
   schedules?: ScheduleRow[];
 }
+
 interface Attachment {
   id: string; professional_id: string; contract_id: string | null;
   file_name: string; file_path: string; mime_type: string | null;
