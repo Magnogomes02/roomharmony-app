@@ -17,6 +17,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
+import { entityColor } from "@/lib/entityColors";
 
 export const Route = createFileRoute("/_app/profissionais")({
   component: ProfissionaisPage,
@@ -34,6 +35,7 @@ interface Professional {
   notes: string | null;
   active: boolean;
   created_at: string;
+  color_hex: string | null;
 }
 
 interface Attachment {
@@ -57,7 +59,7 @@ interface PendingAttachment {
 
 const empty = {
   full_name: "", cpf: "", registry: "", specialty: "",
-  phone: "", email: "", address: "", notes: "",
+  phone: "", email: "", address: "", notes: "", color_hex: "",
 };
 
 const MAX_SIZE = 10 * 1024 * 1024; // 10 MB
@@ -129,7 +131,7 @@ function ProfissionaisPage() {
     setForm({
       full_name: p.full_name ?? "", cpf: p.cpf ?? "", registry: p.registry ?? "",
       specialty: p.specialty ?? "", phone: p.phone ?? "", email: p.email ?? "",
-      address: p.address ?? "", notes: p.notes ?? "",
+      address: p.address ?? "", notes: p.notes ?? "", color_hex: p.color_hex ?? "",
     });
     resetAttachments();
     loadAttachments(p.id);
@@ -211,6 +213,11 @@ function ProfissionaisPage() {
       toast.error("Nome é obrigatório");
       return;
     }
+    const colorHex = form.color_hex.trim();
+    if (colorHex && !/^#[0-9A-Fa-f]{6}$/.test(colorHex)) {
+      toast.error("Cor inválida", { description: "Use formato #RRGGBB." });
+      return;
+    }
     setSaving(true);
     const payload = {
       full_name: form.full_name.trim(),
@@ -221,6 +228,7 @@ function ProfissionaisPage() {
       email: form.email.trim() || null,
       address: form.address.trim() || null,
       notes: form.notes.trim() || null,
+      color_hex: colorHex || null,
     };
 
     let profId: string | null = editing?.id ?? null;
