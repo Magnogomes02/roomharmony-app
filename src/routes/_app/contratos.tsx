@@ -39,9 +39,6 @@ import {
   DEFAULT_SHIFTS, SHIFT_LABELS, loadShiftDefaults, detectShift,
   type ShiftDefaults, type ShiftKey,
 } from "@/lib/shifts";
-import {
-  loadContractTemplates, type ContractTemplate,
-} from "@/lib/contractTemplates";
 
 
 type LocalSchedule = ScheduleRow & { _mode?: "horario" | "turno"; _shift?: ShiftKey };
@@ -63,7 +60,7 @@ interface Contract {
   notes: string | null; extra_clauses: string | null;
   signed_at: string | null; signed_by_name: string | null; signature_hash: string | null;
   locador_name: string | null; created_at: string;
-  template_id?: string | null;
+  
   professional?: Professional;
   schedules?: ScheduleRow[];
 }
@@ -86,7 +83,7 @@ const emptyForm = {
   locador_name: "",
   signed_by_name: "",
   signed_at: "",
-  template_id: "",
+  
 };
 
 
@@ -161,7 +158,7 @@ function ContratosPage() {
   const [form, setForm] = useState(emptyForm);
   const [schedules, setSchedules] = useState<LocalSchedule[]>([]);
   const [shiftDefs, setShiftDefs] = useState<ShiftDefaults>(DEFAULT_SHIFTS);
-  const [templates, setTemplates] = useState<ContractTemplate[]>([]);
+  
 
 
   const [saving, setSaving] = useState(false);
@@ -241,21 +238,6 @@ function ContratosPage() {
     return () => { cancelled = true; };
   }, [open]);
 
-  // Load contract templates whenever the dialog opens
-  useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
-    loadContractTemplates().then((list) => {
-      if (cancelled) return;
-      setTemplates(list);
-      // auto-select default in new contract
-      if (!editing) {
-        const def = list.find((t) => t.is_default && t.active) ?? list.find((t) => t.active);
-        if (def) setForm((f) => (f.template_id ? f : { ...f, template_id: def.id }));
-      }
-    }).catch(() => {});
-    return () => { cancelled = true; };
-  }, [open, editing]);
 
 
 
@@ -294,7 +276,7 @@ function ContratosPage() {
       locador_name: c.locador_name ?? "",
       signed_by_name: c.signed_by_name ?? "",
       signed_at: c.signed_at ? c.signed_at.slice(0, 10) : "",
-      template_id: c.template_id ?? "",
+      
     });
 
     setSchedules((c.schedules ?? []).map((s) => {
@@ -457,7 +439,7 @@ function ContratosPage() {
       locador_name: form.locador_name.trim() || null,
       signed_by_name: form.signed_by_name.trim() || null,
       signed_at: form.signed_at ? new Date(form.signed_at).toISOString() : null,
-      template_id: form.template_id || null,
+      
     };
 
 
@@ -719,10 +701,6 @@ function ContratosPage() {
                                 extra_clauses: c.extra_clauses, notes: c.notes,
                                 locador_name: c.locador_name, signed_by_name: c.signed_by_name,
                                 signed_at: c.signed_at,
-                                template_id: c.template_id ?? null,
-                                due_day: c.due_day,
-                                schedules_summary: summarizeSchedules(c.schedules),
-                                schedules_detail: detailSchedules(c.schedules),
                               });
 
                               await logAudit("contract.pdf_download", c.id);
@@ -1053,41 +1031,6 @@ function ContratosPage() {
             {/* Cláusulas */}
             <section className="space-y-4">
               <h3 className="font-serif text-lg">Cláusulas e observações</h3>
-              <div className="space-y-2">
-                <Label>Modelo de contrato</Label>
-                {(() => {
-                  const activeTemplates = templates.filter((t) => t.active);
-                  const currentInactive = form.template_id
-                    && templates.find((t) => t.id === form.template_id && !t.active);
-                  const visible = currentInactive
-                    ? [...activeTemplates, currentInactive as ContractTemplate]
-                    : activeTemplates;
-                  if (templates.length === 0) {
-                    return (
-                      <p className="text-xs text-muted-foreground">
-                        Nenhum modelo cadastrado. O PDF usará o modelo padrão interno do sistema.
-                        Cadastre modelos em <strong>Preferências → Modelos de contrato</strong>.
-                      </p>
-                    );
-                  }
-                  return (
-                    <Select
-                      value={form.template_id || "__none__"}
-                      onValueChange={(v) => setForm({ ...form, template_id: v === "__none__" ? "" : v })}
-                    >
-                      <SelectTrigger><SelectValue placeholder="Selecione o modelo" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">Usar modelo padrão</SelectItem>
-                        {visible.map((t) => (
-                          <SelectItem key={t.id} value={t.id}>
-                            {t.name}{t.is_default ? " (padrão)" : ""}{!t.active ? " — inativo" : ""}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  );
-                })()}
-              </div>
               <div className="space-y-2">
 
                 <Label>Cláusulas adicionais</Label>

@@ -287,7 +287,6 @@ export type Database = {
           signed_by_name: string | null
           start_date: string
           status: string
-          template_id: string | null
           updated_at: string
         }
         Insert: {
@@ -306,7 +305,6 @@ export type Database = {
           signed_by_name?: string | null
           start_date: string
           status?: string
-          template_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -325,7 +323,6 @@ export type Database = {
           signed_by_name?: string | null
           start_date?: string
           status?: string
-          template_id?: string | null
           updated_at?: string
         }
         Relationships: [

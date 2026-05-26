@@ -20,10 +20,6 @@ export interface ContractPdfData {
   locador_name?: string | null;
   signed_by_name?: string | null;
   signed_at?: string | null;
-  template_id?: string | null;
-  due_day?: number | null;
-  schedules_summary?: string | null;
-  schedules_detail?: string | null;
 }
 
 export interface ClinicBranding {
