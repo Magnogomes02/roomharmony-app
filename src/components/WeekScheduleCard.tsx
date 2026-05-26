@@ -43,9 +43,9 @@ export function WeekScheduleCard() {
     queryFn: async () => {
       const [bk, rms, pros] = await Promise.all([
         supabase.from("bookings").select("id,start_at,end_at,room_id,professional_id")
-          .gte("start_at", weekStart.toISOString())
           .lt("start_at", weekEnd.toISOString())
-          .neq("status", "cancelada")
+          .gt("end_at", weekStart.toISOString())
+          .in("status", ["ativa", "conflito"])
           .order("start_at"),
         supabase.from("rooms").select("id,name"),
         supabase.from("professionals").select("id,full_name"),
