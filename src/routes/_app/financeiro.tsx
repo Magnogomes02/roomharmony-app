@@ -201,13 +201,30 @@ function FinanceiroPage() {
     setPaying(false);
     if (error) return toast.error("Erro ao baixar", { description: error.message });
     await audit("receivable.pay", payRow.id, { amount: payForm.amount_paid, method: payForm.payment_method });
-    toast.success("Baixa registrada");
+
+    if (generateReceiptAfterPay) {
+      try {
+        await createReceiptForReceivable(payRow.id);
+        toast.success("Baixa registrada e recibo gerado");
+      } catch (e) {
+        toast.warning("Baixa registrada, mas não foi possível gerar o recibo", {
+          description: e instanceof Error ? e.message : String(e),
+        });
+      }
+    } else {
+      toast.success("Baixa registrada");
+    }
     setPayOpen(false);
     load();
   }
 
   async function revertPay(r: Receivable) {
-    if (!confirm("Estornar este pagamento? O recebível voltará para 'A receber'.")) return;
+    if (!confirm("Estornar este pagamento? O recebível voltará para 'A receber' e o recibo emitido (se houver) será cancelado.")) return;
+    try {
+      await cancelReceiptForReceivable(r.id, "Pagamento estornado");
+    } catch (e) {
+      console.warn("[revertPay] cancel receipt", e);
+    }
     const { error } = await supabase
       .from("receivables")
       .update({ status: "a_receber", amount_paid: null, paid_at: null, payment_method: null })
@@ -219,6 +236,9 @@ function FinanceiroPage() {
   }
 
   function openEdit(r: Receivable) {
+    if (receipts.has(r.id)) {
+      alert("Este recebível possui recibo emitido. Alterar valor/vencimento não altera o recibo já emitido.");
+    }
     setEditRow(r);
     setEditForm({
       amount_due: String(r.amount_due),
@@ -246,6 +266,10 @@ function FinanceiroPage() {
   }
 
   async function removeRow(r: Receivable) {
+    if (receipts.has(r.id)) {
+      toast.error("Este recebível possui recibo emitido. Cancele o recibo ou estorne o pagamento antes de excluir.");
+      return;
+    }
     if (!confirm("Excluir esta parcela? Esta ação não pode ser desfeita.")) return;
     const { error } = await supabase.from("receivables").delete().eq("id", r.id);
     if (error) return toast.error("Erro", { description: error.message });
@@ -253,6 +277,39 @@ function FinanceiroPage() {
     toast.success("Parcela excluída");
     load();
   }
+
+  async function handleGenerateReceipt(r: Receivable) {
+    try {
+      await createReceiptForReceivable(r.id);
+      toast.success("Recibo gerado");
+      load();
+    } catch (e) {
+      toast.error("Erro ao gerar recibo", { description: e instanceof Error ? e.message : String(e) });
+    }
+  }
+
+  async function handleDownloadReceipt(r: Receivable) {
+    const rc = receipts.get(r.id);
+    if (!rc) return;
+    try { await downloadReceipt(rc); } catch (e) {
+      toast.error("Erro ao baixar recibo", { description: e instanceof Error ? e.message : String(e) });
+    }
+  }
+
+  async function handleCancelReceipt(r: Receivable) {
+    const rc = receipts.get(r.id);
+    if (!rc) return;
+    const reason = prompt("Motivo do cancelamento do recibo:");
+    if (!reason || !reason.trim()) return;
+    try {
+      await cancelReceiptById(rc.id, reason.trim());
+      toast.success("Recibo cancelado");
+      load();
+    } catch (e) {
+      toast.error("Erro ao cancelar recibo", { description: e instanceof Error ? e.message : String(e) });
+    }
+  }
+
 
   async function regenerateContract(contractId: string) {
     const { data, error } = await supabase.rpc("regenerate_contract_receivables", { _contract_id: contractId });
