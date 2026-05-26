@@ -319,9 +319,24 @@ function FinanceiroPage() {
   }
 
   async function downloadAttachment(path: string) {
-    const { data, error } = await supabase.storage.from("contract-attachments").createSignedUrl(path, 60);
-    if (error || !data) return toast.error("Erro ao gerar link");
-    window.open(data.signedUrl, "_blank");
+    try {
+      const { data, error } = await supabase.storage.from("contract-attachments").download(path);
+      if (error || !data) {
+        toast.error("Não foi possível baixar o arquivo. Verifique permissões ou tente novamente.");
+        return;
+      }
+      const fileName = path.split("/").pop() || "comprovante";
+      const url = URL.createObjectURL(data);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error("Não foi possível baixar o arquivo. Verifique permissões ou tente novamente.");
+    }
   }
 
   function shiftMonth(delta: number) {
