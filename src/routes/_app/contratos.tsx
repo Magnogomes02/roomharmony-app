@@ -799,8 +799,8 @@ function ContratosPage() {
                         )}
                       >
                         <div className="grid grid-cols-12 items-end gap-2">
-                          <div className="col-span-3 space-y-1">
-                            <Label className="text-xs">Dia da semana</Label>
+                          <div className="col-span-2 space-y-1">
+                            <Label className="text-xs">Dia</Label>
                             <Select
                               value={String(s.weekday)}
                               onValueChange={(v) => updateSchedule(i, { weekday: Number(v) })}
@@ -813,7 +813,7 @@ function ContratosPage() {
                               </SelectContent>
                             </Select>
                           </div>
-                          <div className="col-span-4 space-y-1">
+                          <div className="col-span-3 space-y-1">
                             <Label className="text-xs">Sala</Label>
                             <Select value={s.room_id} onValueChange={(v) => updateSchedule(i, { room_id: v })}>
                               <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
@@ -825,21 +825,56 @@ function ContratosPage() {
                             </Select>
                           </div>
                           <div className="col-span-2 space-y-1">
-                            <Label className="text-xs">Início</Label>
-                            <Input type="time" value={s.start_time}
-                              onChange={(e) => updateSchedule(i, { start_time: e.target.value })} />
+                            <Label className="text-xs">Tipo</Label>
+                            <Select
+                              value={s._mode ?? "horario"}
+                              onValueChange={(v) => setRowMode(i, v as "horario" | "turno")}
+                            >
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="horario">Horário</SelectItem>
+                                <SelectItem value="turno">Turno</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </div>
-                          <div className="col-span-2 space-y-1">
-                            <Label className="text-xs">Fim</Label>
-                            <Input type="time" value={s.end_time}
-                              onChange={(e) => updateSchedule(i, { end_time: e.target.value })} />
-                          </div>
+                          {s._mode === "turno" ? (
+                            <div className="col-span-4 space-y-1">
+                              <Label className="text-xs">Turno</Label>
+                              <Select
+                                value={s._shift ?? "manha"}
+                                onValueChange={(v) => setRowShift(i, v as ShiftKey)}
+                              >
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  {(["manha", "tarde", "noite"] as ShiftKey[]).map((k) => (
+                                    <SelectItem key={k} value={k}>
+                                      {SHIFT_LABELS[k]} ({shiftDefs[k].start}–{shiftDefs[k].end})
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          ) : (
+                            <>
+                              <div className="col-span-2 space-y-1">
+                                <Label className="text-xs">Início</Label>
+                                <Input type="time" value={s.start_time}
+                                  onChange={(e) => updateSchedule(i, { start_time: e.target.value })} />
+                              </div>
+                              <div className="col-span-2 space-y-1">
+                                <Label className="text-xs">Fim</Label>
+                                <Input type="time" value={s.end_time}
+                                  onChange={(e) => updateSchedule(i, { end_time: e.target.value })} />
+                              </div>
+                            </>
+                          )}
                           <div className="col-span-1 flex justify-end">
                             <Button type="button" variant="ghost" size="icon" onClick={() => removeSchedule(i)} title="Remover">
                               <X className="h-4 w-4" />
                             </Button>
                           </div>
                         </div>
+
 
                         {/* Mini timeline do dia/sala */}
                         {s.room_id && s.start_time && s.end_time && tm(s.end_time) > tm(s.start_time) && (
