@@ -82,15 +82,17 @@ function PreferenciasPage() {
 
   async function load() {
     setLoading(true);
-    const [{ data }, sd, tplSettings] = await Promise.all([
+    const [{ data }, sd, tplSettings, rcp] = await Promise.all([
       supabase.from("settings").select("value").eq("key", "clinic_branding").maybeSingle(),
       loadShiftDefaults(),
       loadContractTemplatesSettings(),
+      loadReceiptSettings(),
     ]);
     setBranding(((data?.value as ClinicBranding) ?? {}) as ClinicBranding);
     setShifts(sd);
     setTemplates(tplSettings.templates);
     setSigSettings(tplSettings.signature_settings ?? DEFAULT_SIGNATURE_SETTINGS);
+    setReceipt(rcp);
     setLoading(false);
   }
 
