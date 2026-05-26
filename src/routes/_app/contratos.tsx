@@ -283,6 +283,15 @@ function ContratosPage() {
     setOpen(true);
   }
 
+  // Auto-select default template for new contracts when templates are loaded
+  useEffect(() => {
+    if (!open || editing) return;
+    if (form.template_id) return;
+    const def = getDefaultContractTemplate(contractTemplates);
+    if (def) setForm((f) => ({ ...f, template_id: def.id }));
+  }, [open, editing, contractTemplates, form.template_id]);
+
+
   function openEdit(c: Contract) {
     setEditing(c);
     setForm({
