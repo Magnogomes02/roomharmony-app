@@ -59,22 +59,26 @@ function PreferenciasPage() {
   const [uploading, setUploading] = useState(false);
 
   const [templates, setTemplates] = useState<ContractTemplate[]>([]);
+  const [sigSettings, setSigSettings] = useState<SignatureSettings>(DEFAULT_SIGNATURE_SETTINGS);
+  const [savingSig, setSavingSig] = useState(false);
   const [tplOpen, setTplOpen] = useState(false);
   const [tplEditing, setTplEditing] = useState<ContractTemplate | null>(null);
   const [tplForm, setTplForm] = useState<ContractTemplate>(() => emptyTemplate());
   const [tplSaving, setTplSaving] = useState(false);
   const [tplDeleteTarget, setTplDeleteTarget] = useState<ContractTemplate | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   async function load() {
     setLoading(true);
-    const [{ data }, sd, tpls] = await Promise.all([
+    const [{ data }, sd, tplSettings] = await Promise.all([
       supabase.from("settings").select("value").eq("key", "clinic_branding").maybeSingle(),
       loadShiftDefaults(),
-      loadContractTemplates(),
+      loadContractTemplatesSettings(),
     ]);
     setBranding(((data?.value as ClinicBranding) ?? {}) as ClinicBranding);
     setShifts(sd);
-    setTemplates(tpls);
+    setTemplates(tplSettings.templates);
+    setSigSettings(tplSettings.signature_settings ?? DEFAULT_SIGNATURE_SETTINGS);
     setLoading(false);
   }
 
