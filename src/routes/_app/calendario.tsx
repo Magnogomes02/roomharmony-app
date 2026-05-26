@@ -141,10 +141,10 @@ function CalendarioPage() {
 
   const loadStatic = useCallback(async () => {
     const [r, p] = await Promise.all([
-      supabase.from("rooms").select("id,name,active,color_hex").eq("active", true).order("name"),
+      supabase.from("rooms").select("id,name,active,color_hex,sort_order").eq("active", true),
       supabase.from("professionals").select("id,full_name,active,color_hex").eq("active", true).order("full_name"),
     ]);
-    setRooms((r.data as Room[]) ?? []);
+    setRooms(sortRooms((r.data as Room[]) ?? []));
     setProfessionals((p.data as Professional[]) ?? []);
   }, []);
 
