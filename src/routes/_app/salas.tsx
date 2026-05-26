@@ -48,9 +48,9 @@ function SalasPage() {
 
   async function load() {
     setLoading(true);
-    const { data, error } = await supabase.from("rooms").select("*").order("name");
+    const { data, error } = await supabase.from("rooms").select("*");
     if (error) toast.error("Erro ao carregar", { description: error.message });
-    setItems((data as Room[]) ?? []);
+    setItems(sortRooms((data as Room[]) ?? []));
     setLoading(false);
   }
 
@@ -64,7 +64,13 @@ function SalasPage() {
 
   function openEdit(r: Room) {
     setEditing(r);
-    setForm({ name: r.name, description: r.description ?? "", capacity: r.capacity });
+    setForm({
+      name: r.name,
+      description: r.description ?? "",
+      capacity: r.capacity,
+      color_hex: r.color_hex ?? "",
+      sort_order: r.sort_order != null ? String(r.sort_order) : "",
+    });
     setOpen(true);
   }
 
@@ -72,11 +78,17 @@ function SalasPage() {
     e.preventDefault();
     if (!form.name.trim()) return toast.error("Nome é obrigatório");
     if (form.capacity < 1) return toast.error("Capacidade deve ser ao menos 1");
+    const colorHex = form.color_hex.trim();
+    if (colorHex && !/^#[0-9A-Fa-f]{6}$/.test(colorHex)) {
+      return toast.error("Cor inválida", { description: "Use formato #RRGGBB." });
+    }
     setSaving(true);
     const payload = {
       name: form.name.trim(),
       description: form.description.trim() || null,
       capacity: form.capacity,
+      color_hex: colorHex || null,
+      sort_order: form.sort_order.trim() === "" ? null : parseInt(form.sort_order, 10),
     };
     const res = editing
       ? await supabase.from("rooms").update(payload).eq("id", editing.id)
