@@ -35,6 +35,13 @@ import {
   type BusySlot,
 } from "@/lib/scheduleConflicts";
 import { cn } from "@/lib/utils";
+import {
+  DEFAULT_SHIFTS, SHIFT_LABELS, loadShiftDefaults, detectShift,
+  type ShiftDefaults, type ShiftKey,
+} from "@/lib/shifts";
+
+type LocalSchedule = ScheduleRow & { _mode?: "horario" | "turno"; _shift?: ShiftKey };
+
 
 export const Route = createFileRoute("/_app/contratos")({
   component: ContratosPage,
