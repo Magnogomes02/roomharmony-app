@@ -371,9 +371,11 @@ function FinanceiroPage() {
 
         <TabsContent value="recebiveis" className="mt-4 space-y-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
-            <p className="text-muted-foreground capitalize">
-              Recebíveis de {format(monthRef, "MMMM 'de' yyyy", { locale: ptBR })}
-            </p>
+            <div>
+              <p className="text-muted-foreground capitalize">
+                Recebíveis por vencimento · {format(monthRef, "MMMM 'de' yyyy", { locale: ptBR })}
+              </p>
+            </div>
             <div className="flex items-center gap-2">
               <Button variant="outline" onClick={() => shiftMonth(-1)}>Mês anterior</Button>
               <Button variant="outline" onClick={() => setMonthRef(startOfMonth(new Date()))}>Mês atual</Button>
