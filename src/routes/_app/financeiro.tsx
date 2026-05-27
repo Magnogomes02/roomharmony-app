@@ -32,6 +32,7 @@ import {
   type ReceiptRow,
 } from "@/lib/receiptService";
 import { FinancialAnalysisPanel } from "@/components/finance/FinancialAnalysisPanel";
+import { getEffectiveReceivableStatus } from "@/lib/financeStatus";
 
 export const Route = createFileRoute("/_app/financeiro")({
   component: FinanceiroPage,
@@ -107,6 +108,12 @@ function FinanceiroPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    // Atualiza no banco os recebíveis que viraram atrasados (status efetivo aplicado em DB).
+    try {
+      await supabase.rpc("mark_overdue_receivables");
+    } catch (e) {
+      console.warn("[financeiro] mark_overdue_receivables falhou", e);
+    }
     const monthStart = startOfMonth(monthRef);
     const monthEnd = endOfMonth(monthRef);
     const [{ data: rec, error }, p, r] = await Promise.all([
@@ -133,7 +140,8 @@ function FinanceiroPage() {
 
   const filtered = useMemo(() => {
     return rows.filter((row) => {
-      if (tab !== "todos" && row.status !== tab) return false;
+      const effective = getEffectiveReceivableStatus(row);
+      if (tab !== "todos" && effective !== tab) return false;
       if (kindFilter !== "all" && row.kind !== kindFilter) return false;
       if (search) {
         const q = search.toLowerCase();
@@ -147,9 +155,10 @@ function FinanceiroPage() {
   const totals = useMemo(() => {
     const sum = { a_receber: 0, recebido: 0, atrasado: 0 };
     for (const r of rows) {
-      if (r.status === "a_receber") sum.a_receber += Number(r.amount_due);
-      else if (r.status === "atrasado") sum.atrasado += Number(r.amount_due);
-      else if (r.status === "recebido") sum.recebido += Number(r.amount_paid ?? r.amount_due);
+      const effective = getEffectiveReceivableStatus(r);
+      if (effective === "a_receber") sum.a_receber += Number(r.amount_due);
+      else if (effective === "atrasado") sum.atrasado += Number(r.amount_due);
+      else if (effective === "recebido") sum.recebido += Number(r.amount_paid ?? r.amount_due);
     }
     return sum;
   }, [rows]);
@@ -362,9 +371,11 @@ function FinanceiroPage() {
 
         <TabsContent value="recebiveis" className="mt-4 space-y-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
-            <p className="text-muted-foreground capitalize">
-              Recebíveis de {format(monthRef, "MMMM 'de' yyyy", { locale: ptBR })}
-            </p>
+            <div>
+              <p className="text-muted-foreground capitalize">
+                Recebíveis por vencimento · {format(monthRef, "MMMM 'de' yyyy", { locale: ptBR })}
+              </p>
+            </div>
             <div className="flex items-center gap-2">
               <Button variant="outline" onClick={() => shiftMonth(-1)}>Mês anterior</Button>
               <Button variant="outline" onClick={() => setMonthRef(startOfMonth(new Date()))}>Mês atual</Button>
@@ -443,7 +454,7 @@ function FinanceiroPage() {
                             <span className="ml-1 text-xs text-muted-foreground">(prev. {brl(r.amount_due)})</span>
                           )}
                         </TableCell>
-                        <TableCell><Badge variant={STATUS_VARIANT[r.status]}>{STATUS_LABEL[r.status]}</Badge></TableCell>
+                        <TableCell>{(() => { const eff = getEffectiveReceivableStatus(r); return <Badge variant={STATUS_VARIANT[eff]}>{STATUS_LABEL[eff]}</Badge>; })()}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1">
                             {r.attachment_path && (
