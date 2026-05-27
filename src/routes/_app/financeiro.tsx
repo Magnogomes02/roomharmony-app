@@ -502,6 +502,12 @@ function FinanceiroPage() {
           </Tabs>
         </CardContent>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="analise" className="mt-4">
+          <FinancialAnalysisPanel />
+        </TabsContent>
+      </Tabs>
 
       {/* Baixa manual */}
       <Dialog open={payOpen} onOpenChange={setPayOpen}>
