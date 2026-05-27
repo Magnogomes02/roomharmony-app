@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { getEffectiveReceivableStatus } from "@/lib/financeStatus";
 
 export interface MonthlyFinancialSummary {
   month: string; // YYYY-MM
@@ -94,14 +95,14 @@ export async function loadAnnualFinancialSummary(year: number): Promise<AnnualFi
     const due = num(r.amount_due);
     const paid = num(r.amount_paid);
     bucket.expected += due;
-    if (r.status === "recebido") {
+
+    const effective = getEffectiveReceivableStatus({ status: r.status, due_date: r.due_date });
+    if (effective === "recebido") {
       bucket.received += paid || due;
-    } else if (r.status === "atrasado") {
+    } else if (effective === "atrasado") {
       bucket.overdue += due;
-    } else if (r.status === "a_receber") {
-      const dd = new Date(r.due_date);
-      if (dd < today) bucket.overdue += due;
-      else bucket.receivable += due;
+    } else if (effective === "a_receber") {
+      bucket.receivable += due;
     }
   }
 
