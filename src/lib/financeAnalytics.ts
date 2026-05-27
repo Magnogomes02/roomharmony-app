@@ -63,8 +63,8 @@ export async function loadAnnualFinancialSummary(year: number): Promise<AnnualFi
     .lte("reference_month", end);
   if (error) throw error;
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+
+
 
   const rows = (data ?? []) as ReceivableRow[];
 
