@@ -349,19 +349,28 @@ function FinanceiroPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="font-serif text-3xl">Financeiro</h1>
-          <p className="text-muted-foreground capitalize">
-            Recebíveis de {format(monthRef, "MMMM 'de' yyyy", { locale: ptBR })}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => shiftMonth(-1)}>Mês anterior</Button>
-          <Button variant="outline" onClick={() => setMonthRef(startOfMonth(new Date()))}>Mês atual</Button>
-          <Button variant="outline" onClick={() => shiftMonth(1)}>Próximo mês</Button>
-        </div>
+      <div>
+        <h1 className="font-serif text-3xl">Financeiro</h1>
+        <p className="text-muted-foreground">Gestão de recebíveis e análise anual.</p>
       </div>
+
+      <Tabs value={financeView} onValueChange={(v) => setFinanceView(v as typeof financeView)}>
+        <TabsList>
+          <TabsTrigger value="recebiveis">Recebíveis</TabsTrigger>
+          <TabsTrigger value="analise">Análise Financeira</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="recebiveis" className="mt-4 space-y-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <p className="text-muted-foreground capitalize">
+              Recebíveis de {format(monthRef, "MMMM 'de' yyyy", { locale: ptBR })}
+            </p>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={() => shiftMonth(-1)}>Mês anterior</Button>
+              <Button variant="outline" onClick={() => setMonthRef(startOfMonth(new Date()))}>Mês atual</Button>
+              <Button variant="outline" onClick={() => shiftMonth(1)}>Próximo mês</Button>
+            </div>
+          </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Card>
