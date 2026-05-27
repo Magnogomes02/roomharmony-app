@@ -31,6 +31,7 @@ import {
   getReceiptsByReceivableIds,
   type ReceiptRow,
 } from "@/lib/receiptService";
+import { FinancialAnalysisPanel } from "@/components/finance/FinancialAnalysisPanel";
 
 export const Route = createFileRoute("/_app/financeiro")({
   component: FinanceiroPage,
@@ -87,6 +88,7 @@ function FinanceiroPage() {
   const [search, setSearch] = useState("");
   const [kindFilter, setKindFilter] = useState<"all" | "contrato" | "avulso">("all");
   const [tab, setTab] = useState<"a_receber" | "recebido" | "atrasado" | "todos">("a_receber");
+  const [financeView, setFinanceView] = useState<"recebiveis" | "analise">("recebiveis");
 
   const [payOpen, setPayOpen] = useState(false);
   const [payRow, setPayRow] = useState<Receivable | null>(null);
