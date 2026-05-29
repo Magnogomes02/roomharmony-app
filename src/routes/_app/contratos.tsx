@@ -706,8 +706,8 @@ function ContratosPage() {
                     <TableCell className="font-medium">{c.professional?.full_name ?? "—"}</TableCell>
                     <TableCell className="text-sm">{summarizeSchedules(c.schedules)}</TableCell>
                     <TableCell className="text-sm">
-                      {new Date(c.start_date).toLocaleDateString("pt-BR")}
-                      {c.end_date && <> – {new Date(c.end_date).toLocaleDateString("pt-BR")}</>}
+                      {formatDateOnlyBR(c.start_date)}
+                      {c.end_date && <> – {formatDateOnlyBR(c.end_date)}</>}
                     </TableCell>
                     <TableCell>
                       {Number(c.monthly_value).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
