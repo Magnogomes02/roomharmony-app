@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Pencil, FileText, Paperclip, Download, Trash2, Search, FileDown, X, AlertTriangle } from "lucide-react";
 import { generateContractPdf } from "@/lib/contractPdf";
+import { formatDateOnlyBR } from "@/lib/dateOnly";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -705,8 +706,8 @@ function ContratosPage() {
                     <TableCell className="font-medium">{c.professional?.full_name ?? "—"}</TableCell>
                     <TableCell className="text-sm">{summarizeSchedules(c.schedules)}</TableCell>
                     <TableCell className="text-sm">
-                      {new Date(c.start_date).toLocaleDateString("pt-BR")}
-                      {c.end_date && <> – {new Date(c.end_date).toLocaleDateString("pt-BR")}</>}
+                      {formatDateOnlyBR(c.start_date)}
+                      {c.end_date && <> – {formatDateOnlyBR(c.end_date)}</>}
                     </TableCell>
                     <TableCell>
                       {Number(c.monthly_value).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}

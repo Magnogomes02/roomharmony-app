@@ -1,3 +1,5 @@
+import { parseDateOnlyLocal } from "@/lib/dateOnly";
+
 export type ReceivableStatus = "a_receber" | "recebido" | "atrasado" | "cancelado";
 
 export interface ReceivableLike {
@@ -20,7 +22,7 @@ export function getEffectiveReceivableStatus(row: ReceivableLike): ReceivableSta
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const due = new Date(row.due_date);
+  const due = parseDateOnlyLocal(row.due_date);
   due.setHours(0, 0, 0, 0);
 
   if (row.status === "a_receber" && due < today) return "atrasado";

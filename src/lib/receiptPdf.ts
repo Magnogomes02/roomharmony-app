@@ -1,6 +1,7 @@
 import { jsPDF } from "jspdf";
 import { getClinicBranding, type ClinicBranding } from "@/lib/contractPdf";
 import { loadReceiptSettings, renderReceiptTemplate, type ReceiptSettings } from "@/lib/receiptSettings";
+import { formatAnyDateBR, isDateOnly, parseDateOnlyLocal } from "@/lib/dateOnly";
 
 export interface ReceiptPdfData {
   receipt_number: string;
@@ -28,11 +29,10 @@ function brl(v: number) {
   return Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 function fmtDate(d?: string | null) {
-  if (!d) return "";
-  return new Date(d).toLocaleDateString("pt-BR");
+  return formatAnyDateBR(d);
 }
 function fmtMonth(d: string) {
-  const x = new Date(d);
+  const x = isDateOnly(d) ? parseDateOnlyLocal(d) : new Date(d);
   return `${String(x.getMonth() + 1).padStart(2, "0")}/${x.getFullYear()}`;
 }
 

@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { getEffectiveReceivableStatus } from "@/lib/financeStatus";
+import { getMonthIndexFromDateOnly, getYearFromDateOnly } from "@/lib/dateOnly";
 
 export interface MonthlyFinancialSummary {
   month: string; // YYYY-MM
@@ -87,9 +88,9 @@ export async function loadAnnualFinancialSummary(year: number): Promise<AnnualFi
 
   for (const r of rows) {
     if (r.status === "cancelado") continue;
-    const ref = new Date(r.reference_month);
-    if (ref.getFullYear() !== year) continue;
-    const idx = ref.getMonth();
+    const refYear = getYearFromDateOnly(r.reference_month);
+    if (refYear !== year) continue;
+    const idx = getMonthIndexFromDateOnly(r.reference_month);
     const bucket = monthly[idx];
     if (!bucket) continue;
     const due = num(r.amount_due);
