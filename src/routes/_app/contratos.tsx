@@ -470,7 +470,7 @@ function ContratosPage() {
       notes: form.notes.trim() || null,
       locador_name: form.locador_name.trim() || null,
       signed_by_name: form.signed_by_name.trim() || null,
-      signed_at: form.signed_at ? new Date(form.signed_at).toISOString() : null,
+      signed_at: form.signed_at ? dateOnlyToLocalNoonISOString(form.signed_at) : null,
       template_id: form.template_id || null,
     };
 
