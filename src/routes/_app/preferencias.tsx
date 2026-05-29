@@ -828,10 +828,10 @@ function PreferenciasPage() {
         </CardContent>
       </Card>
 
-
-
+      <AccessDiagnosticsCard />
 
       <AlertDialog open={!!tplDeleteTarget} onOpenChange={(o) => !o && setTplDeleteTarget(null)}>
+
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="font-serif">Excluir modelo</AlertDialogTitle>
