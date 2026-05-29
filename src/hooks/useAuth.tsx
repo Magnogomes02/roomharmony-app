@@ -8,10 +8,12 @@ interface AuthContextValue {
   user: User | null;
   session: Session | null;
   role: AppRole | null;
+  isOwner: boolean;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
+  revalidateAccess: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -20,6 +22,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [role, setRole] = useState<AppRole | null>(null);
+  const [isOwner, setIsOwner] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -27,28 +30,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(s);
       setUser(s?.user ?? null);
       if (s?.user) {
-        // defer role fetch to avoid deadlock
-        setTimeout(() => fetchRole(s.user.id), 0);
+        // defer to avoid deadlock inside the auth callback
+        setTimeout(() => { void resolveAccess(); }, 0);
       } else {
         setRole(null);
+        setIsOwner(false);
       }
     });
 
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
+    supabase.auth.getSession().then(async ({ data: { session: s } }) => {
       setSession(s);
       setUser(s?.user ?? null);
-      if (s?.user) fetchRole(s.user.id);
+      if (s?.user) await resolveAccess();
       setLoading(false);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  async function fetchRole(userId: string) {
+  async function resolveAccess() {
+    // 1) Owner self-heal: guarantees profile + gestor role for owner emails.
+    try {
+      const { data: ensured } = await supabase.rpc("ensure_owner_access");
+      const payload = ensured as { ok?: boolean; is_owner?: boolean } | null;
+      if (payload?.ok && payload.is_owner) {
+        setIsOwner(true);
+        setRole("gestor");
+        return;
+      }
+    } catch {
+      // RPC may not exist in legacy envs — fall through to user_roles lookup
+    }
+
+    // 2) Fallback: read user_roles. Never downgrade an owner.
+    setIsOwner(false);
     const { data } = await supabase
       .from("user_roles")
       .select("role")
-      .eq("user_id", userId)
       .order("role", { ascending: true })
       .limit(1)
       .maybeSingle();
@@ -76,8 +94,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
   }
 
+  async function revalidateAccess() {
+    await resolveAccess();
+  }
+
   return (
-    <AuthContext.Provider value={{ user, session, role, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider
+      value={{ user, session, role, isOwner, loading, signIn, signUp, signOut, revalidateAccess }}
+    >
       {children}
     </AuthContext.Provider>
   );
