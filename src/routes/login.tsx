@@ -13,6 +13,10 @@ export const Route = createFileRoute("/login")({
   component: LoginPage,
 });
 
+// Flag local: quando true, expõe o formulário público de cadastro.
+// Mantida em false enquanto o portal opera apenas com acesso de gestor.
+const ENABLE_PUBLIC_SIGNUP = false;
+
 function LoginPage() {
   const { user, signIn, signUp } = useAuth();
   const navigate = useNavigate();
@@ -43,11 +47,6 @@ function LoginPage() {
     else toast.success("Cadastro realizado", { description: "Verifique seu e-mail se necessário." });
   }
 
-  function fillDemo(role: "gestor" | "profissional" | "visualizador") {
-    setEmail(`${role}@versaosaude.com`);
-    setPassword("senha123");
-  }
-
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
       {/* Painel esquerdo - apresentação */}
@@ -69,7 +68,7 @@ function LoginPage() {
           </p>
         </div>
         <p className="text-xs text-sidebar-foreground/50">
-          © {new Date().getFullYear()} Versão Saúde · Protótipo MVP
+          © {new Date().getFullYear()} Versão Saúde · Gestão clínica
         </p>
       </div>
 
@@ -78,66 +77,87 @@ function LoginPage() {
         <Card className="w-full max-w-md border-border/60 shadow-sm">
           <CardHeader>
             <CardTitle className="font-serif text-2xl">Acessar plataforma</CardTitle>
-            <CardDescription>Entre com sua conta ou cadastre-se</CardDescription>
+            <CardDescription>Entre com sua conta autorizada</CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="signin">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="signin">Entrar</TabsTrigger>
-                <TabsTrigger value="signup">Cadastrar</TabsTrigger>
-              </TabsList>
+            {ENABLE_PUBLIC_SIGNUP ? (
+              <Tabs defaultValue="signin">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="signin">Entrar</TabsTrigger>
+                  <TabsTrigger value="signup">Cadastrar</TabsTrigger>
+                </TabsList>
 
-              <TabsContent value="signin">
-                <form onSubmit={onSignIn} className="space-y-4 pt-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="email">E-mail</Label>
-                    <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="password">Senha</Label>
-                    <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
-                  </div>
-                  <Button type="submit" className="w-full" disabled={loading}>
-                    {loading ? "Entrando..." : "Entrar"}
-                  </Button>
+                <TabsContent value="signin">
+                  <SignInForm
+                    email={email}
+                    password={password}
+                    loading={loading}
+                    onEmail={setEmail}
+                    onPassword={setPassword}
+                    onSubmit={onSignIn}
+                  />
+                </TabsContent>
 
-                  <div className="space-y-2 rounded-lg border border-dashed border-border bg-muted/40 p-3">
-                    <p className="text-xs font-medium text-muted-foreground">Contas de demonstração (senha: senha123)</p>
-                    <div className="flex flex-wrap gap-2">
-                      <Button type="button" size="sm" variant="outline" onClick={() => fillDemo("gestor")}>Gestor</Button>
-                      <Button type="button" size="sm" variant="outline" onClick={() => fillDemo("profissional")}>Profissional</Button>
-                      <Button type="button" size="sm" variant="outline" onClick={() => fillDemo("visualizador")}>Visualizador</Button>
+                <TabsContent value="signup">
+                  <form onSubmit={onSignUp} className="space-y-4 pt-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="fullName">Nome completo</Label>
+                      <Input id="fullName" required value={fullName} onChange={(e) => setFullName(e.target.value)} />
                     </div>
-                  </div>
-                </form>
-              </TabsContent>
-
-              <TabsContent value="signup">
-                <form onSubmit={onSignUp} className="space-y-4 pt-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="fullName">Nome completo</Label>
-                    <Input id="fullName" required value={fullName} onChange={(e) => setFullName(e.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email2">E-mail</Label>
-                    <Input id="email2" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="password2">Senha</Label>
-                    <Input id="password2" type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} />
-                  </div>
-                  <Button type="submit" className="w-full" disabled={loading}>
-                    {loading ? "Cadastrando..." : "Cadastrar"}
-                  </Button>
-                  <p className="text-xs text-muted-foreground">
-                    Novos usuários iniciam como <strong>Visualizador</strong>. Um gestor pode ajustar permissões depois.
-                  </p>
-                </form>
-              </TabsContent>
-            </Tabs>
+                    <div className="space-y-2">
+                      <Label htmlFor="email2">E-mail</Label>
+                      <Input id="email2" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="password2">Senha</Label>
+                      <Input id="password2" type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} />
+                    </div>
+                    <Button type="submit" className="w-full" disabled={loading}>
+                      {loading ? "Cadastrando..." : "Cadastrar"}
+                    </Button>
+                  </form>
+                </TabsContent>
+              </Tabs>
+            ) : (
+              <SignInForm
+                email={email}
+                password={password}
+                loading={loading}
+                onEmail={setEmail}
+                onPassword={setPassword}
+                onSubmit={onSignIn}
+              />
+            )}
           </CardContent>
         </Card>
       </div>
     </div>
+  );
+}
+
+interface SignInFormProps {
+  email: string;
+  password: string;
+  loading: boolean;
+  onEmail: (v: string) => void;
+  onPassword: (v: string) => void;
+  onSubmit: (e: React.FormEvent) => void;
+}
+
+function SignInForm({ email, password, loading, onEmail, onPassword, onSubmit }: SignInFormProps) {
+  return (
+    <form onSubmit={onSubmit} className="space-y-4 pt-2">
+      <div className="space-y-2">
+        <Label htmlFor="email">E-mail</Label>
+        <Input id="email" type="email" required value={email} onChange={(e) => onEmail(e.target.value)} />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="password">Senha</Label>
+        <Input id="password" type="password" required value={password} onChange={(e) => onPassword(e.target.value)} />
+      </div>
+      <Button type="submit" className="w-full" disabled={loading}>
+        {loading ? "Entrando..." : "Entrar"}
+      </Button>
+    </form>
   );
 }
