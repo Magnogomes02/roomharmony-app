@@ -1,6 +1,7 @@
 import { jsPDF } from "jspdf";
 import { getClinicBranding, type ClinicBranding } from "@/lib/contractPdf";
 import { loadReceiptSettings, renderReceiptTemplate, type ReceiptSettings } from "@/lib/receiptSettings";
+import { formatAnyDateBR, isDateOnly, parseDateOnlyLocal } from "@/lib/dateOnly";
 
 export interface ReceiptPdfData {
   receipt_number: string;
