@@ -204,7 +204,7 @@ function FinanceiroPage() {
       .update({
         status: "recebido",
         amount_paid: Number(payForm.amount_paid),
-        paid_at: new Date(payForm.paid_at).toISOString(),
+        paid_at: dateOnlyToLocalNoonISOString(payForm.paid_at),
         payment_method: payForm.payment_method,
         notes: payForm.notes || null,
         attachment_path,
