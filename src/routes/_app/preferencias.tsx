@@ -828,10 +828,10 @@ function PreferenciasPage() {
         </CardContent>
       </Card>
 
-
-
+      <AccessDiagnosticsCard />
 
       <AlertDialog open={!!tplDeleteTarget} onOpenChange={(o) => !o && setTplDeleteTarget(null)}>
+
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="font-serif">Excluir modelo</AlertDialogTitle>
@@ -867,3 +867,68 @@ function emptyTemplate(): ContractTemplate {
     body_text: "",
   };
 }
+
+function AccessDiagnosticsCard() {
+  const { user, role, isOwner, revalidateAccess } = useAuth();
+  const [revalidating, setRevalidating] = useState(false);
+  const [profId, setProfId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from("profiles")
+      .select("professional_id")
+      .eq("id", user.id)
+      .maybeSingle()
+      .then(({ data }) => setProfId((data?.professional_id as string | null) ?? null));
+  }, [user]);
+
+  async function handleRevalidate() {
+    setRevalidating(true);
+    try {
+      const { data, error } = await supabase.rpc("ensure_owner_access");
+      if (error) throw error;
+      await revalidateAccess();
+      const payload = data as { ok?: boolean; is_owner?: boolean; reason?: string } | null;
+      if (payload?.ok && payload.is_owner) toast.success("Acesso de Owner revalidado.");
+      else toast.info("Você não está cadastrado como Owner.");
+    } catch (e) {
+      toast.error("Falha ao revalidar acesso: " + (e instanceof Error ? e.message : "erro"));
+    } finally {
+      setRevalidating(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="font-serif">Diagnóstico de acesso</CardTitle>
+        <CardDescription>
+          Informações da sessão atual e ferramenta para revalidar o acesso do Owner/Gestor principal.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-2 text-sm">
+        <div><span className="text-muted-foreground">E-mail:</span> {user?.email ?? "—"}</div>
+        <div><span className="text-muted-foreground">UID:</span> {user?.id ?? "—"}</div>
+        <div>
+          <span className="text-muted-foreground">Role detectada:</span>{" "}
+          <Badge variant="secondary">{role ?? "—"}</Badge>
+        </div>
+        <div>
+          <span className="text-muted-foreground">Owner/Gestor principal:</span>{" "}
+          {isOwner ? <Badge>Sim</Badge> : <Badge variant="outline">Não</Badge>}
+        </div>
+        <div>
+          <span className="text-muted-foreground">Professional vinculado:</span>{" "}
+          {profId ?? "—"}
+        </div>
+        <div className="pt-2">
+          <Button onClick={handleRevalidate} disabled={revalidating}>
+            {revalidating ? "Revalidando..." : "Revalidar meu acesso"}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+

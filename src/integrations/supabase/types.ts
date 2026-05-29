@@ -14,6 +14,24 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_admins: {
+        Row: {
+          active: boolean
+          created_at: string
+          email: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          email: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          email?: string
+        }
+        Relationships: []
+      }
       audit_logs: {
         Row: {
           action: string
@@ -800,6 +818,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      ensure_owner_access: { Args: never; Returns: Json }
       generate_contract_receivables: {
         Args: { _contract_id: string }
         Returns: number
@@ -811,6 +830,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_owner_admin: { Args: never; Returns: boolean }
       mark_overdue_receivables: { Args: never; Returns: number }
       regenerate_contract_receivables: {
         Args: { _contract_id: string }
