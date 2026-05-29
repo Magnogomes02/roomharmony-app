@@ -26,7 +26,11 @@ export function formatDateOnlyBR(value?: string | null): string {
 
 export function formatDateTimeBR(value?: string | null): string {
   if (!value) return "";
-  return new Date(value).toLocaleDateString("pt-BR");
+  return new Date(value).toLocaleDateString("pt-BR", { timeZone: "America/Recife" });
+}
+
+export function dateOnlyToLocalNoonISOString(value: string): string {
+  return parseDateOnlyLocal(value).toISOString();
 }
 
 export function formatAnyDateBR(value?: string | null): string {
