@@ -72,8 +72,7 @@ export async function getClinicBranding(): Promise<ClinicBranding> {
 }
 
 function fmtDate(d?: string | null) {
-  if (!d) return "";
-  return new Date(d).toLocaleDateString("pt-BR");
+  return formatAnyDateBR(d);
 }
 
 function fmtBRL(v: number) {
