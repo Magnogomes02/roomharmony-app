@@ -248,17 +248,6 @@ export async function renderReceiptPdf(
   doc.text(bodyLines, margin, y, { align: "justify", maxWidth: pageW - margin * 2 });
   y += bodyLines.length * 5 + 8;
 
-  // Signature line
-  y += 6;
-  doc.setDrawColor(180);
-  doc.setLineWidth(0.3);
-  const sigW = 80;
-  const sigX = (pageW - sigW) / 2;
-  doc.line(sigX, y, sigX + sigW, y);
-  doc.setFontSize(9);
-  doc.setTextColor(80);
-  doc.text(branding.clinic_name || "Versão Saúde", pageW / 2, y + 4, { align: "center" });
-  y += 12;
 
   // Footer
   const footerText = renderReceiptTemplate(settings.footer || "", placeholderData);
