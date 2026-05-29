@@ -33,6 +33,7 @@ import {
 } from "@/lib/receiptService";
 import { FinancialAnalysisPanel } from "@/components/finance/FinancialAnalysisPanel";
 import { getEffectiveReceivableStatus } from "@/lib/financeStatus";
+import { dateOnlyToLocalNoonISOString } from "@/lib/dateOnly";
 
 export const Route = createFileRoute("/_app/financeiro")({
   component: FinanceiroPage,
