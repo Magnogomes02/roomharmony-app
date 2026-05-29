@@ -9,6 +9,7 @@ import {
   type ContractTemplateRenderData,
   type SignatureSettings,
 } from "@/lib/contractTemplates";
+import { formatAnyDateBR, formatDateOnlyBR } from "@/lib/dateOnly";
 
 export interface ContractPdfData {
   professional: {
