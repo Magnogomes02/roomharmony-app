@@ -42,7 +42,7 @@ function DashboardPage() {
           .gt("end_at", weekStart.toISOString())
           .in("status", ["ativa", "conflito"]),
         supabase.from("booking_conflicts").select("id", { count: "exact", head: true }).eq("status", "pendente"),
-        supabase.from("receivables").select("kind,status,amount_due,amount_paid")
+        supabase.from("receivables").select("kind,status,due_date,amount_due,amount_paid")
           .gte("due_date", monthStart).lte("due_date", monthEnd),
         supabase.from("audit_logs").select("id, action, entity_type, created_at, metadata").order("created_at", { ascending: false }).limit(5),
         supabase.from("contracts").select("id,professional_id,end_date,status").eq("status", "ativo").not("end_date", "is", null),
