@@ -32,7 +32,7 @@ function DashboardPage() {
       const monthStart = startOfMonth(now).toISOString().slice(0, 10);
       const monthEnd = endOfMonth(now).toISOString().slice(0, 10);
 
-      const [profs, rooms, contracts, weekBookings, conflicts, receivables, audits] = await Promise.all([
+      const [profs, rooms, contracts, weekBookings, conflicts, receivables, audits, expiringContracts, allProfessionals, allSchedules, allRooms] = await Promise.all([
         supabase.from("professionals").select("id", { count: "exact", head: true }).eq("active", true),
         supabase.from("rooms").select("id", { count: "exact", head: true }).eq("active", true),
         supabase.from("contracts").select("id", { count: "exact", head: true }).eq("status", "ativo"),
@@ -44,6 +44,10 @@ function DashboardPage() {
         supabase.from("receivables").select("kind,status,amount_due,amount_paid")
           .gte("due_date", monthStart).lte("due_date", monthEnd),
         supabase.from("audit_logs").select("id, action, entity_type, created_at, metadata").order("created_at", { ascending: false }).limit(5),
+        supabase.from("contracts").select("id,professional_id,end_date,status").eq("status", "ativo").not("end_date", "is", null),
+        supabase.from("professionals").select("id,full_name"),
+        supabase.from("contract_schedules").select("contract_id,room_id"),
+        supabase.from("rooms").select("id,name"),
       ]);
 
       const fin = {
