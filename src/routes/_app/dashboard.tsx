@@ -9,7 +9,8 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { WeekScheduleByRoomCard } from "@/components/WeekScheduleByRoomCard";
 import { startOfMonth, endOfMonth, startOfWeek, addDays } from "date-fns";
-import { parseDateOnlyLocal, formatDateOnlyBR } from "@/lib/dateOnly";
+import { parseDateOnlyLocal, formatDateOnlyBR, toDateOnlyString } from "@/lib/dateOnly";
+import { getEffectiveReceivableStatus, type ReceivableStatus } from "@/lib/financeStatus";
 
 export const Route = createFileRoute("/_app/dashboard")({
   component: DashboardPage,
@@ -29,8 +30,8 @@ function DashboardPage() {
       const weekStart = startOfWeek(now, { weekStartsOn: 1 });
       weekStart.setHours(0, 0, 0, 0);
       const weekEnd = addDays(weekStart, 7);
-      const monthStart = startOfMonth(now).toISOString().slice(0, 10);
-      const monthEnd = endOfMonth(now).toISOString().slice(0, 10);
+      const monthStart = toDateOnlyString(startOfMonth(now));
+      const monthEnd = toDateOnlyString(endOfMonth(now));
 
       const [profs, rooms, contracts, weekBookings, conflicts, receivables, audits, expiringContracts, allProfessionals, allSchedules, allRooms] = await Promise.all([
         supabase.from("professionals").select("id", { count: "exact", head: true }).eq("active", true),
@@ -41,7 +42,7 @@ function DashboardPage() {
           .gt("end_at", weekStart.toISOString())
           .in("status", ["ativa", "conflito"]),
         supabase.from("booking_conflicts").select("id", { count: "exact", head: true }).eq("status", "pendente"),
-        supabase.from("receivables").select("kind,status,amount_due,amount_paid")
+        supabase.from("receivables").select("kind,status,due_date,amount_due,amount_paid")
           .gte("due_date", monthStart).lte("due_date", monthEnd),
         supabase.from("audit_logs").select("id, action, entity_type, created_at, metadata").order("created_at", { ascending: false }).limit(5),
         supabase.from("contracts").select("id,professional_id,end_date,status").eq("status", "ativo").not("end_date", "is", null),
@@ -55,13 +56,14 @@ function DashboardPage() {
         recebidoContrato: 0, recebidoAvulso: 0,
         atrasadoContrato: 0, atrasadoAvulso: 0,
       };
-      for (const r of (receivables.data ?? []) as { kind: string; status: string; amount_due: number; amount_paid: number | null }[]) {
+      for (const r of (receivables.data ?? []) as { kind: string; status: ReceivableStatus; due_date: string; amount_due: number; amount_paid: number | null }[]) {
         const v = Number(r.amount_due);
         const vPago = Number(r.amount_paid ?? r.amount_due);
         const k = r.kind === "avulso" ? "Avulso" : "Contrato";
-        if (r.status === "a_receber") fin[`aReceber${k}` as keyof typeof fin] += v;
-        else if (r.status === "atrasado") fin[`atrasado${k}` as keyof typeof fin] += v;
-        else if (r.status === "recebido") fin[`recebido${k}` as keyof typeof fin] += vPago;
+        const effectiveStatus = getEffectiveReceivableStatus({ status: r.status, due_date: r.due_date });
+        if (effectiveStatus === "a_receber") fin[`aReceber${k}` as keyof typeof fin] += v;
+        else if (effectiveStatus === "atrasado") fin[`atrasado${k}` as keyof typeof fin] += v;
+        else if (effectiveStatus === "recebido") fin[`recebido${k}` as keyof typeof fin] += vPago;
       }
 
       const weekRows = (weekBookings.data ?? []) as { status: string }[];
