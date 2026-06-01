@@ -9,7 +9,8 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { WeekScheduleByRoomCard } from "@/components/WeekScheduleByRoomCard";
 import { startOfMonth, endOfMonth, startOfWeek, addDays } from "date-fns";
-import { parseDateOnlyLocal, formatDateOnlyBR } from "@/lib/dateOnly";
+import { parseDateOnlyLocal, formatDateOnlyBR, toDateOnlyString } from "@/lib/dateOnly";
+import { getEffectiveReceivableStatus, type ReceivableStatus } from "@/lib/financeStatus";
 
 export const Route = createFileRoute("/_app/dashboard")({
   component: DashboardPage,
