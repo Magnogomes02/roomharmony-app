@@ -182,7 +182,50 @@ function DashboardPage() {
         ))}
       </div>
 
+      <Card className={stats?.expiring && stats.expiring.length > 0 ? "border-warning/60" : "border-border/60"}>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="flex items-center gap-2 font-serif text-xl">
+            <AlertTriangle className={`h-5 w-5 ${stats?.expiring && stats.expiring.length > 0 ? "text-warning" : "text-muted-foreground"}`} />
+            Contratos próximos do vencimento
+          </CardTitle>
+          <Link to="/contratos" className="text-xs text-primary hover:underline">Ver tudo →</Link>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <p className="text-sm text-muted-foreground">Carregando…</p>
+          ) : !stats?.expiring || stats.expiring.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nenhum contrato vencendo nos próximos 30 dias.</p>
+          ) : (
+            <>
+              <p className="mb-3 text-sm">
+                <span className="font-medium">{stats.expiring.length}</span>{" "}
+                contrato{stats.expiring.length === 1 ? "" : "s"} vencendo nos próximos 30 dias.
+              </p>
+              <ul className="divide-y divide-border">
+                {stats.expiring.slice(0, 5).map((c) => (
+                  <li key={c.id} className="flex items-center justify-between py-2 text-sm">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">{c.professional_name}</p>
+                      {c.rooms_summary && (
+                        <p className="truncate text-xs text-muted-foreground">{c.rooms_summary}</p>
+                      )}
+                    </div>
+                    <div className="ml-3 text-right">
+                      <p className="text-xs">{formatDateOnlyBR(c.end_date)}</p>
+                      <p className="text-xs text-warning">
+                        {c.days_left === 0 ? "vence hoje" : `${c.days_left} dia${c.days_left === 1 ? "" : "s"}`}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
       <WeekScheduleByRoomCard />
+
 
       <Card>
         <CardHeader>
