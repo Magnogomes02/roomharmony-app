@@ -56,13 +56,14 @@ function DashboardPage() {
         recebidoContrato: 0, recebidoAvulso: 0,
         atrasadoContrato: 0, atrasadoAvulso: 0,
       };
-      for (const r of (receivables.data ?? []) as { kind: string; status: string; amount_due: number; amount_paid: number | null }[]) {
+      for (const r of (receivables.data ?? []) as { kind: string; status: ReceivableStatus; due_date: string; amount_due: number; amount_paid: number | null }[]) {
         const v = Number(r.amount_due);
         const vPago = Number(r.amount_paid ?? r.amount_due);
         const k = r.kind === "avulso" ? "Avulso" : "Contrato";
-        if (r.status === "a_receber") fin[`aReceber${k}` as keyof typeof fin] += v;
-        else if (r.status === "atrasado") fin[`atrasado${k}` as keyof typeof fin] += v;
-        else if (r.status === "recebido") fin[`recebido${k}` as keyof typeof fin] += vPago;
+        const effectiveStatus = getEffectiveReceivableStatus({ status: r.status, due_date: r.due_date });
+        if (effectiveStatus === "a_receber") fin[`aReceber${k}` as keyof typeof fin] += v;
+        else if (effectiveStatus === "atrasado") fin[`atrasado${k}` as keyof typeof fin] += v;
+        else if (effectiveStatus === "recebido") fin[`recebido${k}` as keyof typeof fin] += vPago;
       }
 
       const weekRows = (weekBookings.data ?? []) as { status: string }[];
