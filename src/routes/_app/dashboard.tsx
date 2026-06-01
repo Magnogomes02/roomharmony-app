@@ -68,6 +68,39 @@ function DashboardPage() {
       const weekActive = weekRows.filter((b) => b.status === "ativa").length;
       const weekConflict = weekRows.filter((b) => b.status === "conflito").length;
 
+      // Contratos próximos do vencimento (próximos 30 dias)
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const profMap = new Map<string, string>(
+        ((allProfessionals.data ?? []) as { id: string; full_name: string }[]).map((p) => [p.id, p.full_name]),
+      );
+      const roomMap = new Map<string, string>(
+        ((allRooms.data ?? []) as { id: string; name: string }[]).map((r) => [r.id, r.name]),
+      );
+      const schedulesByContract = new Map<string, Set<string>>();
+      for (const s of (allSchedules.data ?? []) as { contract_id: string; room_id: string }[]) {
+        const set = schedulesByContract.get(s.contract_id) ?? new Set<string>();
+        set.add(s.room_id);
+        schedulesByContract.set(s.contract_id, set);
+      }
+      const expiring = ((expiringContracts.data ?? []) as { id: string; professional_id: string; end_date: string | null }[])
+        .filter((c) => !!c.end_date)
+        .map((c) => {
+          const end = parseDateOnlyLocal(c.end_date as string);
+          const diff = Math.floor((end.getTime() - today.getTime()) / 86400000);
+          const roomIds = Array.from(schedulesByContract.get(c.id) ?? []);
+          const roomsSummary = roomIds.map((id) => roomMap.get(id) ?? "Sala").join(", ");
+          return {
+            id: c.id,
+            professional_name: profMap.get(c.professional_id) ?? "—",
+            end_date: c.end_date as string,
+            days_left: diff,
+            rooms_summary: roomsSummary,
+          };
+        })
+        .filter((c) => c.days_left >= 0 && c.days_left <= 30)
+        .sort((a, b) => a.days_left - b.days_left);
+
       return {
         professionals: profs.count ?? 0,
         rooms: rooms.count ?? 0,
@@ -78,6 +111,7 @@ function DashboardPage() {
         conflicts: conflicts.count ?? 0,
         fin,
         audits: audits.data ?? [],
+        expiring,
       };
     },
   });
