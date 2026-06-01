@@ -9,6 +9,7 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { WeekScheduleByRoomCard } from "@/components/WeekScheduleByRoomCard";
 import { startOfMonth, endOfMonth, startOfWeek, addDays } from "date-fns";
+import { parseDateOnlyLocal, formatDateOnlyBR } from "@/lib/dateOnly";
 
 export const Route = createFileRoute("/_app/dashboard")({
   component: DashboardPage,
