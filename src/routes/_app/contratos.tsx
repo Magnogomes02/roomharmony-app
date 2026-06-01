@@ -3,8 +3,11 @@ import { useEffect, useMemo, useState } from "react";
 import { Plus, Pencil, FileText, Paperclip, Download, Trash2, Search, FileDown, X, AlertTriangle } from "lucide-react";
 import { generateContractPdf } from "@/lib/contractPdf";
 import {
-  formatDateOnlyBR, dateOnlyToLocalNoonISOString,
-  getMonthIndexFromDateOnly, getYearFromDateOnly,
+  formatDateOnlyBR,
+  dateOnlyToLocalNoonISOString,
+  getMonthIndexFromDateOnly,
+  getYearFromDateOnly,
+  toDateOnlyString,
 } from "@/lib/dateOnly";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
