@@ -86,7 +86,7 @@ interface Attachment {
 
 const emptyForm = {
   professional_id: "",
-  start_date: new Date().toISOString().slice(0, 10),
+  start_date: toDateOnlyString(new Date()),
   end_date: "",
   monthly_value: "",
   due_day: "5",
