@@ -636,6 +636,70 @@ function ContratosPage() {
     return false;
   });
 
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const minV = minValueFilter ? Number(minValueFilter) : null;
+    const maxV = maxValueFilter ? Number(maxValueFilter) : null;
+    return contracts.filter((c) => {
+      if (statusFilter !== "todos" && c.status !== statusFilter) return false;
+      if (roomFilter !== "todos") {
+        if (!(c.schedules ?? []).some((s) => s.room_id === roomFilter)) return false;
+      }
+      if (startMonthFilter !== "todos") {
+        if (getMonthIndexFromDateOnly(c.start_date) + 1 !== Number(startMonthFilter)) return false;
+      }
+      if (startYearFilter !== "todos") {
+        if (getYearFromDateOnly(c.start_date) !== Number(startYearFilter)) return false;
+      }
+      if (endMonthFilter !== "todos") {
+        if (!c.end_date) return false;
+        if (getMonthIndexFromDateOnly(c.end_date) + 1 !== Number(endMonthFilter)) return false;
+      }
+      if (endYearFilter !== "todos") {
+        if (!c.end_date) return false;
+        if (getYearFromDateOnly(c.end_date) !== Number(endYearFilter)) return false;
+      }
+      const mv = Number(c.monthly_value ?? 0);
+      if (minV !== null && !Number.isNaN(minV) && mv < minV) return false;
+      if (maxV !== null && !Number.isNaN(maxV) && mv > maxV) return false;
+      if (q) {
+        const profMatch = (c.professional?.full_name ?? "").toLowerCase().includes(q);
+        const statusMatch = c.status.toLowerCase().includes(q);
+        const roomMatch = (c.schedules ?? []).some((s) =>
+          (roomMap.get(s.room_id)?.name ?? "").toLowerCase().includes(q),
+        );
+        if (!profMatch && !statusMatch && !roomMatch) return false;
+      }
+      return true;
+    });
+  }, [contracts, search, statusFilter, roomFilter, startMonthFilter, startYearFilter, endMonthFilter, endYearFilter, minValueFilter, maxValueFilter, roomMap]);
+
+  const availableYears = useMemo(() => {
+    const set = new Set<number>();
+    for (const c of contracts) {
+      if (c.start_date) set.add(getYearFromDateOnly(c.start_date));
+      if (c.end_date) set.add(getYearFromDateOnly(c.end_date));
+    }
+    return Array.from(set).sort((a, b) => b - a);
+  }, [contracts]);
+
+  const MONTHS = [
+    "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+  ];
+
+  function clearFilters() {
+    setSearch("");
+    setStatusFilter("ativo");
+    setRoomFilter("todos");
+    setStartMonthFilter("todos");
+    setStartYearFilter("todos");
+    setEndMonthFilter("todos");
+    setEndYearFilter("todos");
+    setMinValueFilter("");
+    setMaxValueFilter("");
+  }
+
   function summarizeSchedules(list: ScheduleRow[] | undefined) {
     if (!list || list.length === 0) return "—";
     const byRoom = new Map<string, ScheduleRow[]>();
