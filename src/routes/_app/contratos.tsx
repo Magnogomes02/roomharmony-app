@@ -627,14 +627,6 @@ function ContratosPage() {
     if (attachContract) refreshAttachments(attachContract.professional_id);
   }
 
-  const filtered = contracts.filter((c) => {
-    const q = search.toLowerCase();
-    if (!q) return true;
-    if ((c.professional?.full_name ?? "").toLowerCase().includes(q)) return true;
-    if (c.status.toLowerCase().includes(q)) return true;
-    if ((c.schedules ?? []).some((s) => (roomMap.get(s.room_id)?.name ?? "").toLowerCase().includes(q))) return true;
-    return false;
-  });
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
