@@ -30,8 +30,8 @@ function DashboardPage() {
       const weekStart = startOfWeek(now, { weekStartsOn: 1 });
       weekStart.setHours(0, 0, 0, 0);
       const weekEnd = addDays(weekStart, 7);
-      const monthStart = startOfMonth(now).toISOString().slice(0, 10);
-      const monthEnd = endOfMonth(now).toISOString().slice(0, 10);
+      const monthStart = toDateOnlyString(startOfMonth(now));
+      const monthEnd = toDateOnlyString(endOfMonth(now));
 
       const [profs, rooms, contracts, weekBookings, conflicts, receivables, audits, expiringContracts, allProfessionals, allSchedules, allRooms] = await Promise.all([
         supabase.from("professionals").select("id", { count: "exact", head: true }).eq("active", true),
