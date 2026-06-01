@@ -742,14 +742,103 @@ function ContratosPage() {
 
       <Card>
         <CardContent className="p-4 space-y-4">
-          <div className="relative max-w-sm">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por profissional, sala ou status..."
-              className="pl-9" value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por profissional, sala ou status..."
+                className="pl-9" value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos os status</SelectItem>
+                <SelectItem value="rascunho">Rascunho</SelectItem>
+                <SelectItem value="ativo">Ativo</SelectItem>
+                <SelectItem value="encerrado">Encerrado</SelectItem>
+                <SelectItem value="cancelado">Cancelado</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={roomFilter} onValueChange={setRoomFilter}>
+              <SelectTrigger><SelectValue placeholder="Sala" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todas as salas</SelectItem>
+                {rooms.map((r) => (
+                  <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
+
+          <div className="grid gap-3 md:grid-cols-4">
+            <Select value={startMonthFilter} onValueChange={setStartMonthFilter}>
+              <SelectTrigger><SelectValue placeholder="Mês início" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Mês início (todos)</SelectItem>
+                {MONTHS.map((m, i) => (
+                  <SelectItem key={m} value={String(i + 1)}>{m}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={startYearFilter} onValueChange={setStartYearFilter}>
+              <SelectTrigger><SelectValue placeholder="Ano início" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Ano início (todos)</SelectItem>
+                {availableYears.map((y) => (
+                  <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={endMonthFilter} onValueChange={setEndMonthFilter}>
+              <SelectTrigger><SelectValue placeholder="Mês fim" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Mês fim (todos)</SelectItem>
+                {MONTHS.map((m, i) => (
+                  <SelectItem key={m} value={String(i + 1)}>{m}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={endYearFilter} onValueChange={setEndYearFilter}>
+              <SelectTrigger><SelectValue placeholder="Ano fim" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Ano fim (todos)</SelectItem>
+                {availableYears.map((y) => (
+                  <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
+            <div>
+              <Label className="text-xs text-muted-foreground">Valor mínimo (R$)</Label>
+              <Input
+                type="number" min="0" step="0.01" inputMode="decimal"
+                placeholder="0,00"
+                value={minValueFilter}
+                onChange={(e) => setMinValueFilter(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground">Valor máximo (R$)</Label>
+              <Input
+                type="number" min="0" step="0.01" inputMode="decimal"
+                placeholder="0,00"
+                value={maxValueFilter}
+                onChange={(e) => setMaxValueFilter(e.target.value)}
+              />
+            </div>
+            <Button variant="outline" onClick={clearFilters}>
+              <X className="mr-2 h-4 w-4" /> Limpar filtros
+            </Button>
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            Exibindo {filtered.length} de {contracts.length} contratos
+          </p>
+
 
           <div className="rounded-md border">
             <Table>
