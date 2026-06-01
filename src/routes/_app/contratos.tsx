@@ -2,7 +2,10 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Pencil, FileText, Paperclip, Download, Trash2, Search, FileDown, X, AlertTriangle } from "lucide-react";
 import { generateContractPdf } from "@/lib/contractPdf";
-import { formatDateOnlyBR, dateOnlyToLocalNoonISOString } from "@/lib/dateOnly";
+import {
+  formatDateOnlyBR, dateOnlyToLocalNoonISOString,
+  getMonthIndexFromDateOnly, getYearFromDateOnly,
+} from "@/lib/dateOnly";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
