@@ -163,6 +163,14 @@ function ContratosPage() {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ativo");
+  const [roomFilter, setRoomFilter] = useState("todos");
+  const [startMonthFilter, setStartMonthFilter] = useState("todos");
+  const [startYearFilter, setStartYearFilter] = useState("todos");
+  const [endMonthFilter, setEndMonthFilter] = useState("todos");
+  const [endYearFilter, setEndYearFilter] = useState("todos");
+  const [minValueFilter, setMinValueFilter] = useState("");
+  const [maxValueFilter, setMaxValueFilter] = useState("");
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Contract | null>(null);
