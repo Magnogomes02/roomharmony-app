@@ -84,14 +84,15 @@ export async function loadAnnualFinancialSummary(year: number): Promise<AnnualFi
       receivable: 0,
       overdue: 0,
       pending: 0,
+      lost: 0,
       receivedRate: 0,
       overdueRate: 0,
+      lossRate: 0,
       accumulatedReceived: 0,
     };
   });
 
   for (const r of rows) {
-    if (r.status === "cancelado") continue;
     const refYear = getYearFromDateOnly(r.reference_month);
     if (refYear !== year) continue;
     const idx = getMonthIndexFromDateOnly(r.reference_month);
