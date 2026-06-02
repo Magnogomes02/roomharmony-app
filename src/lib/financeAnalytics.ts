@@ -109,6 +109,8 @@ export async function loadAnnualFinancialSummary(year: number): Promise<AnnualFi
       bucket.overdue += due;
     } else if (effective === "a_receber") {
       bucket.receivable += due;
+    } else if (effective === "cancelado") {
+      bucket.lost += due;
     }
   }
 
@@ -117,6 +119,7 @@ export async function loadAnnualFinancialSummary(year: number): Promise<AnnualFi
     m.pending = m.receivable + m.overdue;
     m.receivedRate = safeRate(m.received, m.expected);
     m.overdueRate = safeRate(m.overdue, m.expected);
+    m.lossRate = safeRate(m.lost, m.expected);
     acc += m.received;
     m.accumulatedReceived = acc;
   }
@@ -127,14 +130,17 @@ export async function loadAnnualFinancialSummary(year: number): Promise<AnnualFi
     receivable: monthly.reduce((s, m) => s + m.receivable, 0),
     overdue: monthly.reduce((s, m) => s + m.overdue, 0),
     pending: 0,
+    lost: monthly.reduce((s, m) => s + m.lost, 0),
     receivedRate: 0,
     overdueRate: 0,
+    lossRate: 0,
     averageMonthlyReceived: 0,
     bestMonth: null,
   };
   totals.pending = totals.receivable + totals.overdue;
   totals.receivedRate = safeRate(totals.received, totals.expected);
   totals.overdueRate = safeRate(totals.overdue, totals.expected);
+  totals.lossRate = safeRate(totals.lost, totals.expected);
   const monthsWithExpected = monthly.filter((m) => m.expected > 0).length || 1;
   totals.averageMonthlyReceived = totals.received / monthsWithExpected;
   const best = monthly.reduce<MonthlyFinancialSummary | null>(
