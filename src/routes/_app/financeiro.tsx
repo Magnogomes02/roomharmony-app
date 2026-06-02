@@ -428,6 +428,7 @@ function FinanceiroPage() {
               <TabsTrigger value="a_receber">A receber</TabsTrigger>
               <TabsTrigger value="recebido">Recebidos</TabsTrigger>
               <TabsTrigger value="atrasado">Em atraso</TabsTrigger>
+              <TabsTrigger value="perda">Perdas</TabsTrigger>
               <TabsTrigger value="todos">Todos</TabsTrigger>
             </TabsList>
 
