@@ -12,8 +12,10 @@ export interface MonthlyFinancialSummary {
   receivable: number;
   overdue: number;
   pending: number;
+  lost: number;
   receivedRate: number;
   overdueRate: number;
+  lossRate: number;
   accumulatedReceived: number;
 }
 
@@ -23,8 +25,10 @@ export interface AnnualFinancialSummary {
   receivable: number;
   overdue: number;
   pending: number;
+  lost: number;
   receivedRate: number;
   overdueRate: number;
+  lossRate: number;
   averageMonthlyReceived: number;
   bestMonth: string | null;
 }
