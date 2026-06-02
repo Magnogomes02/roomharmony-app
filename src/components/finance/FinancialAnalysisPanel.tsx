@@ -118,14 +118,16 @@ export function FinancialAnalysisPanel() {
                   <TableHead className="text-right">Recebido</TableHead>
                   <TableHead className="text-right">A receber</TableHead>
                   <TableHead className="text-right">Em atraso</TableHead>
+                  <TableHead className="text-right">Perda</TableHead>
                   <TableHead className="text-right">% Recebido</TableHead>
                   <TableHead className="text-right">% Atraso</TableHead>
+                  <TableHead className="text-right">% Perda</TableHead>
                   <TableHead className="text-right">Acumulado recebido</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
-                  <TableRow><TableCell colSpan={8} className="py-8 text-center text-muted-foreground">Carregando...</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={10} className="py-8 text-center text-muted-foreground">Carregando...</TableCell></TableRow>
                 ) : (data?.monthlyRows ?? []).map((m) => (
                   <TableRow key={m.month}>
                     <TableCell className="font-medium capitalize">{m.monthLabel}</TableCell>
@@ -133,8 +135,10 @@ export function FinancialAnalysisPanel() {
                     <TableCell className="text-right text-success">{brl(m.received)}</TableCell>
                     <TableCell className="text-right text-warning">{brl(m.receivable)}</TableCell>
                     <TableCell className="text-right text-destructive">{brl(m.overdue)}</TableCell>
+                    <TableCell className="text-right text-destructive">{brl(m.lost)}</TableCell>
                     <TableCell className="text-right">{pct(m.receivedRate)}</TableCell>
                     <TableCell className="text-right">{pct(m.overdueRate)}</TableCell>
+                    <TableCell className="text-right">{pct(m.lossRate)}</TableCell>
                     <TableCell className="text-right">{brl(m.accumulatedReceived)}</TableCell>
                   </TableRow>
                 ))}
