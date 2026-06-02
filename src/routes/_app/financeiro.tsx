@@ -89,7 +89,7 @@ function FinanceiroPage() {
   const [monthRef, setMonthRef] = useState<Date>(startOfMonth(new Date()));
   const [search, setSearch] = useState("");
   const [kindFilter, setKindFilter] = useState<"all" | "contrato" | "avulso">("all");
-  const [tab, setTab] = useState<"a_receber" | "recebido" | "atrasado" | "todos">("a_receber");
+  const [tab, setTab] = useState<"a_receber" | "recebido" | "atrasado" | "perda" | "todos">("a_receber");
   const [financeView, setFinanceView] = useState<"recebiveis" | "analise">("recebiveis");
 
   const [payOpen, setPayOpen] = useState(false);
