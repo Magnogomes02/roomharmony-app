@@ -142,7 +142,9 @@ function FinanceiroPage() {
   const filtered = useMemo(() => {
     return rows.filter((row) => {
       const effective = getEffectiveReceivableStatus(row);
-      if (tab !== "todos" && effective !== tab) return false;
+      if (tab === "perda") {
+        if (effective !== "cancelado") return false;
+      } else if (tab !== "todos" && effective !== tab) return false;
       if (kindFilter !== "all" && row.kind !== kindFilter) return false;
       if (search) {
         const q = search.toLowerCase();
@@ -154,12 +156,13 @@ function FinanceiroPage() {
   }, [rows, tab, kindFilter, search, profs]);
 
   const totals = useMemo(() => {
-    const sum = { a_receber: 0, recebido: 0, atrasado: 0 };
+    const sum = { a_receber: 0, recebido: 0, atrasado: 0, lost: 0 };
     for (const r of rows) {
       const effective = getEffectiveReceivableStatus(r);
       if (effective === "a_receber") sum.a_receber += Number(r.amount_due);
       else if (effective === "atrasado") sum.atrasado += Number(r.amount_due);
       else if (effective === "recebido") sum.recebido += Number(r.amount_paid ?? r.amount_due);
+      else if (effective === "cancelado") sum.lost += Number(r.amount_due);
     }
     return sum;
   }, [rows]);
