@@ -387,7 +387,7 @@ function FinanceiroPage() {
             </div>
           </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">A receber</CardTitle></CardHeader>
           <CardContent><div className="font-serif text-3xl text-warning">{brl(totals.a_receber)}</div></CardContent>
@@ -399,6 +399,10 @@ function FinanceiroPage() {
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Em atraso</CardTitle></CardHeader>
           <CardContent><div className="font-serif text-3xl text-destructive">{brl(totals.atrasado)}</div></CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Perda do mês</CardTitle></CardHeader>
+          <CardContent><div className="font-serif text-3xl text-destructive">{brl(totals.lost)}</div></CardContent>
         </Card>
       </div>
 
