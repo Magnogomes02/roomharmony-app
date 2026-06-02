@@ -95,6 +95,13 @@ export function FinancialAnalysisPanel() {
           <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Taxa de inadimplência</CardTitle></CardHeader>
           <CardContent><div className="font-serif text-2xl text-destructive">{pct(totals?.overdueRate ?? 0)}</div></CardContent>
         </Card>
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Perda no ano</CardTitle></CardHeader>
+          <CardContent>
+            <div className="font-serif text-2xl text-destructive">{brl(totals?.lost ?? 0)}</div>
+            <p className="mt-1 text-xs text-muted-foreground">Taxa de perda: {pct(totals?.lossRate ?? 0)}</p>
+          </CardContent>
+        </Card>
       </div>
 
       <Card>
@@ -111,14 +118,16 @@ export function FinancialAnalysisPanel() {
                   <TableHead className="text-right">Recebido</TableHead>
                   <TableHead className="text-right">A receber</TableHead>
                   <TableHead className="text-right">Em atraso</TableHead>
+                  <TableHead className="text-right">Perda</TableHead>
                   <TableHead className="text-right">% Recebido</TableHead>
                   <TableHead className="text-right">% Atraso</TableHead>
+                  <TableHead className="text-right">% Perda</TableHead>
                   <TableHead className="text-right">Acumulado recebido</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
-                  <TableRow><TableCell colSpan={8} className="py-8 text-center text-muted-foreground">Carregando...</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={10} className="py-8 text-center text-muted-foreground">Carregando...</TableCell></TableRow>
                 ) : (data?.monthlyRows ?? []).map((m) => (
                   <TableRow key={m.month}>
                     <TableCell className="font-medium capitalize">{m.monthLabel}</TableCell>
@@ -126,8 +135,10 @@ export function FinancialAnalysisPanel() {
                     <TableCell className="text-right text-success">{brl(m.received)}</TableCell>
                     <TableCell className="text-right text-warning">{brl(m.receivable)}</TableCell>
                     <TableCell className="text-right text-destructive">{brl(m.overdue)}</TableCell>
+                    <TableCell className="text-right text-destructive">{brl(m.lost)}</TableCell>
                     <TableCell className="text-right">{pct(m.receivedRate)}</TableCell>
                     <TableCell className="text-right">{pct(m.overdueRate)}</TableCell>
+                    <TableCell className="text-right">{pct(m.lossRate)}</TableCell>
                     <TableCell className="text-right">{brl(m.accumulatedReceived)}</TableCell>
                   </TableRow>
                 ))}

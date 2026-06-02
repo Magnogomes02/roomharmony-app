@@ -89,7 +89,7 @@ function FinanceiroPage() {
   const [monthRef, setMonthRef] = useState<Date>(startOfMonth(new Date()));
   const [search, setSearch] = useState("");
   const [kindFilter, setKindFilter] = useState<"all" | "contrato" | "avulso">("all");
-  const [tab, setTab] = useState<"a_receber" | "recebido" | "atrasado" | "todos">("a_receber");
+  const [tab, setTab] = useState<"a_receber" | "recebido" | "atrasado" | "perda" | "todos">("a_receber");
   const [financeView, setFinanceView] = useState<"recebiveis" | "analise">("recebiveis");
 
   const [payOpen, setPayOpen] = useState(false);
@@ -142,7 +142,9 @@ function FinanceiroPage() {
   const filtered = useMemo(() => {
     return rows.filter((row) => {
       const effective = getEffectiveReceivableStatus(row);
-      if (tab !== "todos" && effective !== tab) return false;
+      if (tab === "perda") {
+        if (effective !== "cancelado") return false;
+      } else if (tab !== "todos" && effective !== tab) return false;
       if (kindFilter !== "all" && row.kind !== kindFilter) return false;
       if (search) {
         const q = search.toLowerCase();
@@ -154,12 +156,13 @@ function FinanceiroPage() {
   }, [rows, tab, kindFilter, search, profs]);
 
   const totals = useMemo(() => {
-    const sum = { a_receber: 0, recebido: 0, atrasado: 0 };
+    const sum = { a_receber: 0, recebido: 0, atrasado: 0, lost: 0 };
     for (const r of rows) {
       const effective = getEffectiveReceivableStatus(r);
       if (effective === "a_receber") sum.a_receber += Number(r.amount_due);
       else if (effective === "atrasado") sum.atrasado += Number(r.amount_due);
       else if (effective === "recebido") sum.recebido += Number(r.amount_paid ?? r.amount_due);
+      else if (effective === "cancelado") sum.lost += Number(r.amount_due);
     }
     return sum;
   }, [rows]);
@@ -384,7 +387,7 @@ function FinanceiroPage() {
             </div>
           </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">A receber</CardTitle></CardHeader>
           <CardContent><div className="font-serif text-3xl text-warning">{brl(totals.a_receber)}</div></CardContent>
@@ -396,6 +399,10 @@ function FinanceiroPage() {
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Em atraso</CardTitle></CardHeader>
           <CardContent><div className="font-serif text-3xl text-destructive">{brl(totals.atrasado)}</div></CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Perda do mês</CardTitle></CardHeader>
+          <CardContent><div className="font-serif text-3xl text-destructive">{brl(totals.lost)}</div></CardContent>
         </Card>
       </div>
 
@@ -421,6 +428,7 @@ function FinanceiroPage() {
               <TabsTrigger value="a_receber">A receber</TabsTrigger>
               <TabsTrigger value="recebido">Recebidos</TabsTrigger>
               <TabsTrigger value="atrasado">Em atraso</TabsTrigger>
+              <TabsTrigger value="perda">Perdas</TabsTrigger>
               <TabsTrigger value="todos">Todos</TabsTrigger>
             </TabsList>
 
