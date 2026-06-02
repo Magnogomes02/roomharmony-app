@@ -95,6 +95,13 @@ export function FinancialAnalysisPanel() {
           <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Taxa de inadimplência</CardTitle></CardHeader>
           <CardContent><div className="font-serif text-2xl text-destructive">{pct(totals?.overdueRate ?? 0)}</div></CardContent>
         </Card>
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Perda no ano</CardTitle></CardHeader>
+          <CardContent>
+            <div className="font-serif text-2xl text-destructive">{brl(totals?.lost ?? 0)}</div>
+            <p className="mt-1 text-xs text-muted-foreground">Taxa de perda: {pct(totals?.lossRate ?? 0)}</p>
+          </CardContent>
+        </Card>
       </div>
 
       <Card>
