@@ -155,7 +155,7 @@ export async function createReceiptForReceivable(
       .eq("id", paymentId).single();
     if (payErr || !pay) throw new Error(payErr?.message ?? "Pagamento não encontrado");
     if (pay.status !== "ativo") throw new Error("Pagamento não está ativo.");
-    paymentRow = pay as typeof paymentRow;
+    paymentRow = pay as PaymentSnap;
 
     // ensure no active receipt already on this payment
     const { data: dup } = await supabase
