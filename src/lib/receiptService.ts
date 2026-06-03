@@ -131,18 +131,44 @@ async function resolveReceivableRoom(rec: { room_id: string | null; contract_id:
   return { room_id: null, room_name: null };
 }
 
-export async function createReceiptForReceivable(receivableId: string): Promise<ReceiptRow> {
+export async function createReceiptForReceivable(
+  receivableId: string,
+  paymentId?: string,
+): Promise<ReceiptRow> {
   // 1. receivable
   const { data: rec, error: recErr } = await supabase
     .from("receivables").select("*").eq("id", receivableId).single();
   if (recErr || !rec) throw new Error(recErr?.message ?? "Recebível não encontrado");
-  if (rec.status !== "recebido") throw new Error("O recebível precisa estar com status 'recebido'.");
-  if (!rec.amount_paid || Number(rec.amount_paid) <= 0) throw new Error("Valor pago inválido.");
-  if (!rec.paid_at) throw new Error("Data de pagamento ausente.");
 
-  // 1b. block if already an active receipt exists
-  const existing = await getReceiptByReceivableId(receivableId);
-  if (existing) throw new Error("Já existe um recibo emitido para este recebível.");
+  let paymentRow: {
+    id: string;
+    amount: number;
+    paid_at: string;
+    payment_method: string | null;
+    status: string;
+  } | null = null;
+
+  if (paymentId) {
+    const { data: pay, error: payErr } = await supabase
+      .from("receivable_payments").select("id, amount, paid_at, payment_method, status")
+      .eq("id", paymentId).single();
+    if (payErr || !pay) throw new Error(payErr?.message ?? "Pagamento não encontrado");
+    if (pay.status !== "ativo") throw new Error("Pagamento não está ativo.");
+    paymentRow = pay as typeof paymentRow;
+
+    // ensure no active receipt already on this payment
+    const { data: dup } = await supabase
+      .from("receivable_receipts")
+      .select("id").eq("payment_id", paymentId).eq("status", "emitido").maybeSingle();
+    if (dup) throw new Error("Este pagamento já possui recibo emitido.");
+  } else {
+    // legacy: usa campos resumo do recebível (precisa estar recebido)
+    if (rec.status !== "recebido") throw new Error("O recebível precisa estar com status 'recebido'.");
+    if (!rec.amount_paid || Number(rec.amount_paid) <= 0) throw new Error("Valor pago inválido.");
+    if (!rec.paid_at) throw new Error("Data de pagamento ausente.");
+    const existing = await getReceiptByReceivableId(receivableId);
+    if (existing) throw new Error("Já existe um recibo emitido para este recebível.");
+  }
 
   // 2. related
   const [{ data: prof }, resolvedRoom, branding, settings, userQ] = await Promise.all([
@@ -158,10 +184,14 @@ export async function createReceiptForReceivable(receivableId: string): Promise<
   const tempId = crypto.randomUUID();
   const authCode = buildReceiptAuthenticationCode(tempId, receiptNumber);
 
-  // 3. insert snapshot
+  const snapshotPaid = paymentRow
+    ? { paid_at: paymentRow.paid_at, payment_method: paymentRow.payment_method, amount_paid: paymentRow.amount }
+    : { paid_at: rec.paid_at!, payment_method: rec.payment_method, amount_paid: rec.amount_paid! };
+
   const insertPayload = {
     id: tempId,
     receivable_id: rec.id,
+    payment_id: paymentRow?.id ?? null,
     receipt_number: receiptNumber,
     status: "emitido",
     issued_by: userQ.data.user?.id ?? null,
@@ -175,10 +205,10 @@ export async function createReceiptForReceivable(receivableId: string): Promise<
     kind: rec.kind,
     reference_month: rec.reference_month,
     due_date: rec.due_date,
-    paid_at: rec.paid_at,
-    payment_method: rec.payment_method,
+    paid_at: snapshotPaid.paid_at as string,
+    payment_method: snapshotPaid.payment_method,
     amount_due: rec.amount_due,
-    amount_paid: rec.amount_paid,
+    amount_paid: snapshotPaid.amount_paid,
     clinic_name: branding.clinic_name ?? null,
     clinic_cnpj: branding.cnpj ?? null,
     clinic_address: branding.address ?? null,
@@ -193,7 +223,6 @@ export async function createReceiptForReceivable(receivableId: string): Promise<
   if (insErr || !inserted) throw new Error(insErr?.message ?? "Falha ao criar recibo");
   const row = inserted as ReceiptRow;
 
-  // 4. PDF + upload
   try {
     const pdfData: ReceiptPdfData = toPdfData(row);
     const blob = await renderReceiptPdf(pdfData, branding, settings);
@@ -207,18 +236,31 @@ export async function createReceiptForReceivable(receivableId: string): Promise<
       row.receipt_path = path;
     }
   } catch (e) {
-    // PDF/upload failure is non-fatal; row stays so user can re-download
     console.warn("[receiptService] PDF upload falhou", e);
   }
 
   await audit("receivable.receipt_create", rec.id, {
     receipt_id: row.id,
     receipt_number: row.receipt_number,
-    amount_paid: rec.amount_paid,
+    payment_id: paymentRow?.id ?? null,
+    amount_paid: snapshotPaid.amount_paid,
   });
 
   return row;
 }
+
+export async function getReceiptsByPaymentIds(ids: string[]): Promise<Map<string, ReceiptRow>> {
+  const out = new Map<string, ReceiptRow>();
+  if (ids.length === 0) return out;
+  const { data } = await supabase
+    .from("receivable_receipts").select("*")
+    .in("payment_id", ids).eq("status", "emitido");
+  for (const r of (data ?? []) as ReceiptRow[]) {
+    if (r.payment_id) out.set(r.payment_id, r);
+  }
+  return out;
+}
+
 
 export async function cancelReceiptForReceivable(receivableId: string, reason: string): Promise<void> {
   const existing = await getReceiptByReceivableId(receivableId);
