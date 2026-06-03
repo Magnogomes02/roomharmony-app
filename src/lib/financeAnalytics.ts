@@ -1,7 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { getEffectiveReceivableStatus } from "@/lib/financeStatus";
+
 import { getMonthIndexFromDateOnly, getYearFromDateOnly } from "@/lib/dateOnly";
 
 export interface MonthlyFinancialSummary {
