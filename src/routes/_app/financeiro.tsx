@@ -3,8 +3,19 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { format, parseISO, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
-  Check, Pencil, Trash2, RefreshCw, Undo2, Search, Paperclip, Download,
-  FileText, Ban, Plus, XCircle, History,
+  Check,
+  Pencil,
+  Trash2,
+  RefreshCw,
+  Undo2,
+  Search,
+  Paperclip,
+  Download,
+  FileText,
+  Ban,
+  Plus,
+  XCircle,
+  History,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -16,13 +27,27 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -76,8 +101,14 @@ interface Receivable {
   cancel_reason: string | null;
 }
 
-interface ProfessionalLite { id: string; full_name: string; }
-interface RoomLite { id: string; name: string; }
+interface ProfessionalLite {
+  id: string;
+  full_name: string;
+}
+interface RoomLite {
+  id: string;
+  name: string;
+}
 interface ContractLite {
   id: string;
   professional_id: string;
@@ -99,13 +130,14 @@ const STATUS_LABEL: Record<EffectiveStatus, string> = {
   cancelado: "Cancelado",
 };
 
-const STATUS_VARIANT: Record<EffectiveStatus, "default" | "secondary" | "destructive" | "outline"> = {
-  a_receber: "secondary",
-  parcial: "secondary",
-  recebido: "default",
-  atrasado: "destructive",
-  cancelado: "outline",
-};
+const STATUS_VARIANT: Record<EffectiveStatus, "default" | "secondary" | "destructive" | "outline"> =
+  {
+    a_receber: "secondary",
+    parcial: "secondary",
+    recebido: "default",
+    atrasado: "destructive",
+    cancelado: "outline",
+  };
 
 function brl(v: number | null | undefined) {
   return (Number(v) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -136,8 +168,10 @@ function FinanceiroPage() {
   const [payOpen, setPayOpen] = useState(false);
   const [payRow, setPayRow] = useState<Receivable | null>(null);
   const [payForm, setPayForm] = useState({
-    amount_paid: "", paid_at: toDateOnlyString(new Date()),
-    payment_method: "PIX", notes: "",
+    amount_paid: "",
+    paid_at: toDateOnlyString(new Date()),
+    payment_method: "PIX",
+    notes: "",
   });
   const [payFile, setPayFile] = useState<File | null>(null);
   const [paying, setPaying] = useState(false);
@@ -158,7 +192,9 @@ function FinanceiroPage() {
   // cancel-typed dialog
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelRow, setCancelRow] = useState<Receivable | null>(null);
-  const [cancelType, setCancelType] = useState<"perda_contrato" | "cobranca_errada">("perda_contrato");
+  const [cancelType, setCancelType] = useState<"perda_contrato" | "cobranca_errada">(
+    "perda_contrato",
+  );
   const [cancelReason, setCancelReason] = useState("");
 
   // history dialog
@@ -201,7 +237,9 @@ function FinanceiroPage() {
         .order("due_date"),
       supabase.from("professionals").select("id,full_name").order("full_name"),
       supabase.from("rooms").select("id,name"),
-      supabase.from("contracts").select("id,professional_id,status,start_date,end_date,monthly_value,due_day,room_id"),
+      supabase
+        .from("contracts")
+        .select("id,professional_id,status,start_date,end_date,monthly_value,due_day,room_id"),
     ]);
     if (error) toast.error("Erro ao carregar", { description: error.message });
     const list = (rec as Receivable[]) ?? [];
@@ -213,7 +251,9 @@ function FinanceiroPage() {
     const ids = list.map((x) => x.id);
     const payments = await getActivePaymentsForReceivables(ids);
     setPaymentsByRec(payments);
-    const allPaymentIds = Array.from(payments.values()).flat().map((x) => x.id);
+    const allPaymentIds = Array.from(payments.values())
+      .flat()
+      .map((x) => x.id);
     const [recRecs, payRecs] = await Promise.all([
       getReceiptsByReceivableIds(ids),
       getReceiptsByPaymentIds(allPaymentIds),
@@ -223,7 +263,9 @@ function FinanceiroPage() {
     setLoading(false);
   }, [monthRef]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const profMap = useMemo(() => new Map(profs.map((p) => [p.id, p.full_name])), [profs]);
   const roomMap = useMemo(() => new Map(rooms.map((r) => [r.id, r.name])), [rooms]);
@@ -284,11 +326,21 @@ function FinanceiroPage() {
     return sum;
   }, [rows]);
 
-  async function audit(action: string, entity_id: string | null, metadata: Record<string, unknown>) {
-    const { data: { user } } = await supabase.auth.getUser();
+  async function audit(
+    action: string,
+    entity_id: string | null,
+    metadata: Record<string, unknown>,
+  ) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) return;
     await supabase.from("audit_logs").insert({
-      actor_id: user.id, action, entity_type: "receivable", entity_id, metadata: metadata as never,
+      actor_id: user.id,
+      action,
+      entity_type: "receivable",
+      entity_id,
+      metadata: metadata as never,
     });
   }
 
@@ -426,7 +478,9 @@ function FinanceiroPage() {
       return;
     }
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       // cancel all active payments + receipts when "cobranca_errada"
       if (cancelType === "cobranca_errada") {
         const actives = paymentsByRec.get(cancelRow.id)?.filter((p) => p.status === "ativo") ?? [];
@@ -453,9 +507,11 @@ function FinanceiroPage() {
         .eq("id", cancelRow.id);
       if (error) throw error;
       await audit(
-        cancelType === "perda_contrato" ? "receivable.cancel_as_loss" : "receivable.cancel_as_wrong_charge",
+        cancelType === "perda_contrato"
+          ? "receivable.cancel_as_loss"
+          : "receivable.cancel_as_wrong_charge",
         cancelRow.id,
-        { cancel_type: cancelType, reason: cancelReason.trim() }
+        { cancel_type: cancelType, reason: cancelReason.trim() },
       );
       toast.success("Recebível cancelado");
       setCancelOpen(false);
@@ -474,7 +530,9 @@ function FinanceiroPage() {
 
   function openEdit(r: Receivable) {
     if (receiptsByRec.has(r.id)) {
-      alert("Este recebível possui recibo emitido. Alterar valor/vencimento não altera o recibo já emitido.");
+      alert(
+        "Este recebível possui recibo emitido. Alterar valor/vencimento não altera o recibo já emitido.",
+      );
     }
     setEditRow(r);
     setEditForm({
@@ -505,7 +563,9 @@ function FinanceiroPage() {
 
   async function removeRow(r: Receivable) {
     if (receiptsByRec.has(r.id)) {
-      toast.error("Este recebível possui recibo emitido. Cancele o recibo ou estorne o pagamento antes de excluir.");
+      toast.error(
+        "Este recebível possui recibo emitido. Cancele o recibo ou estorne o pagamento antes de excluir.",
+      );
       return;
     }
     if (!confirm("Excluir esta parcela? Esta ação não pode ser desfeita.")) return;
@@ -530,7 +590,9 @@ function FinanceiroPage() {
       toast.success("Recibo gerado");
       load();
     } catch (e) {
-      toast.error("Erro ao gerar recibo", { description: e instanceof Error ? e.message : String(e) });
+      toast.error("Erro ao gerar recibo", {
+        description: e instanceof Error ? e.message : String(e),
+      });
     }
   }
 
@@ -541,13 +603,21 @@ function FinanceiroPage() {
       const actives = paymentsByRec.get(r.id) ?? [];
       const first = actives.map((p) => receiptsByPayment.get(p.id)).find(Boolean);
       if (!first) return;
-      try { await downloadReceipt(first); } catch (e) {
-        toast.error("Erro ao baixar recibo", { description: e instanceof Error ? e.message : String(e) });
+      try {
+        await downloadReceipt(first);
+      } catch (e) {
+        toast.error("Erro ao baixar recibo", {
+          description: e instanceof Error ? e.message : String(e),
+        });
       }
       return;
     }
-    try { await downloadReceipt(rc); } catch (e) {
-      toast.error("Erro ao baixar recibo", { description: e instanceof Error ? e.message : String(e) });
+    try {
+      await downloadReceipt(rc);
+    } catch (e) {
+      toast.error("Erro ao baixar recibo", {
+        description: e instanceof Error ? e.message : String(e),
+      });
     }
   }
 
@@ -561,12 +631,16 @@ function FinanceiroPage() {
       toast.success("Recibo cancelado");
       load();
     } catch (e) {
-      toast.error("Erro ao cancelar recibo", { description: e instanceof Error ? e.message : String(e) });
+      toast.error("Erro ao cancelar recibo", {
+        description: e instanceof Error ? e.message : String(e),
+      });
     }
   }
 
   async function regenerateContract(contractId: string) {
-    const { data, error } = await supabase.rpc("regenerate_contract_receivables", { _contract_id: contractId });
+    const { data, error } = await supabase.rpc("regenerate_contract_receivables", {
+      _contract_id: contractId,
+    });
     if (error) return toast.error("Erro ao regerar", { description: error.message });
     toast.success(`Regerado`, { description: `${data ?? 0} parcela(s) criadas.` });
     load();
@@ -620,12 +694,12 @@ function FinanceiroPage() {
 
   const contractsForProf = useMemo(
     () => contracts.filter((c) => c.professional_id === newForm.professional_id),
-    [contracts, newForm.professional_id]
+    [contracts, newForm.professional_id],
   );
 
   const selectedContract = useMemo(
     () => contracts.find((c) => c.id === newForm.contract_id) ?? null,
-    [contracts, newForm.contract_id]
+    [contracts, newForm.contract_id],
   );
 
   // when contract changes, autofill
@@ -640,7 +714,7 @@ function FinanceiroPage() {
       due_date: due,
       room_id: selectedContract.room_id ?? f.room_id,
     }));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [newForm.contract_id, newForm.year, newForm.month]);
 
   // load year receivables for the contract/professional
@@ -664,7 +738,7 @@ function FinanceiroPage() {
 
   const monthAvailability = useMemo(() => {
     const yearExisting = new Set(
-      yearReceivables.map((r) => Number(r.reference_month.slice(5, 7)) - 1)
+      yearReceivables.map((r) => Number(r.reference_month.slice(5, 7)) - 1),
     );
     let startIdx = 0;
     let endIdx = 11;
@@ -684,10 +758,17 @@ function FinanceiroPage() {
     }));
   }, [yearReceivables, selectedContract, newForm.year]);
 
-  async function insertOneReceivable(monthIdx: number, overrides?: { amount?: number; due?: string }, allowDuplicate = false): Promise<{ ok: boolean; reason?: string }> {
+  async function insertOneReceivable(
+    monthIdx: number,
+    overrides?: { amount?: number; due?: string },
+    allowDuplicate = false,
+  ): Promise<{ ok: boolean; reason?: string }> {
     const referenceMonth = `${newForm.year}-${String(monthIdx + 1).padStart(2, "0")}-01`;
-    const due = overrides?.due
-      ?? (selectedContract ? buildDueDate(newForm.year, monthIdx, selectedContract.due_day || 5) : newForm.due_date);
+    const due =
+      overrides?.due ??
+      (selectedContract
+        ? buildDueDate(newForm.year, monthIdx, selectedContract.due_day || 5)
+        : newForm.due_date);
     const amount = overrides?.amount ?? Number(newForm.amount_due);
     if (!due) return { ok: false, reason: "Vencimento ausente" };
     if (!(amount > 0)) return { ok: false, reason: "Valor inválido" };
@@ -714,7 +795,10 @@ function FinanceiroPage() {
       status: "a_receber" as const,
     };
     const { data: ins, error } = await supabase
-      .from("receivables").insert(insertPayload).select("id").single();
+      .from("receivables")
+      .insert(insertPayload)
+      .select("id")
+      .single();
     if (error) return { ok: false, reason: error.message };
     await audit("receivable.manual_create", ins?.id ?? null, {
       ...insertPayload,
@@ -758,7 +842,9 @@ function FinanceiroPage() {
 
   async function saveNewReceivableBatch() {
     if (!newForm.professional_id) return toast.error("Selecione um profissional.");
-    const months = Object.entries(monthsChecked).filter(([, v]) => v).map(([k]) => Number(k));
+    const months = Object.entries(monthsChecked)
+      .filter(([, v]) => v)
+      .map(([k]) => Number(k));
     if (months.length === 0) return toast.error("Marque pelo menos um mês.");
     setSavingNew(true);
     try {
@@ -774,7 +860,11 @@ function FinanceiroPage() {
       let allowDup = false;
       if (dupMonths.length > 0) {
         const names = dupMonths.map((i) => MONTHS_PT[i]).join(", ");
-        if (!confirm(`Já existem recebíveis para: ${names}.\n\nGerar mesmo assim para todos os meses marcados?`)) {
+        if (
+          !confirm(
+            `Já existem recebíveis para: ${names}.\n\nGerar mesmo assim para todos os meses marcados?`,
+          )
+        ) {
           setSavingNew(false);
           return;
         }
@@ -814,31 +904,64 @@ function FinanceiroPage() {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" onClick={() => shiftMonth(-1)}>Mês anterior</Button>
-              <Button variant="outline" onClick={() => setMonthRef(startOfMonth(new Date()))}>Mês atual</Button>
-              <Button variant="outline" onClick={() => shiftMonth(1)}>Próximo mês</Button>
+              <Button variant="outline" onClick={() => shiftMonth(-1)}>
+                Mês anterior
+              </Button>
+              <Button variant="outline" onClick={() => setMonthRef(startOfMonth(new Date()))}>
+                Mês atual
+              </Button>
+              <Button variant="outline" onClick={() => shiftMonth(1)}>
+                Próximo mês
+              </Button>
               {canEdit && (
-                <Button onClick={openNewReceivable}><Plus className="mr-2 h-4 w-4" />Novo recebível</Button>
+                <Button onClick={openNewReceivable}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Novo recebível
+                </Button>
               )}
             </div>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">A receber</CardTitle></CardHeader>
-              <CardContent><div className="font-serif text-3xl text-warning">{brl(totals.a_receber)}</div></CardContent>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  A receber
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="font-serif text-3xl text-warning">{brl(totals.a_receber)}</div>
+              </CardContent>
             </Card>
             <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Recebido</CardTitle></CardHeader>
-              <CardContent><div className="font-serif text-3xl text-success">{brl(totals.recebido)}</div></CardContent>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Recebido
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="font-serif text-3xl text-success">{brl(totals.recebido)}</div>
+              </CardContent>
             </Card>
             <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Em atraso</CardTitle></CardHeader>
-              <CardContent><div className="font-serif text-3xl text-destructive">{brl(totals.atrasado)}</div></CardContent>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Em atraso
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="font-serif text-3xl text-destructive">{brl(totals.atrasado)}</div>
+              </CardContent>
             </Card>
             <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Perda do mês</CardTitle></CardHeader>
-              <CardContent><div className="font-serif text-3xl text-destructive">{brl(totals.lost)}</div></CardContent>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Perda do mês
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="font-serif text-3xl text-destructive">{brl(totals.lost)}</div>
+              </CardContent>
             </Card>
           </div>
 
@@ -847,10 +970,20 @@ function FinanceiroPage() {
               <div className="flex flex-wrap items-center gap-3">
                 <div className="relative max-w-sm flex-1">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input placeholder="Buscar profissional..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+                  <Input
+                    placeholder="Buscar profissional..."
+                    className="pl-9"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
                 </div>
-                <Select value={kindFilter} onValueChange={(v) => setKindFilter(v as typeof kindFilter)}>
-                  <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
+                <Select
+                  value={kindFilter}
+                  onValueChange={(v) => setKindFilter(v as typeof kindFilter)}
+                >
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos os tipos</SelectItem>
                     <SelectItem value="contrato">Apenas contratos</SelectItem>
@@ -886,96 +1019,187 @@ function FinanceiroPage() {
                       </TableHeader>
                       <TableBody>
                         {loading ? (
-                          <TableRow><TableCell colSpan={7} className="py-8 text-center text-muted-foreground">Carregando...</TableCell></TableRow>
+                          <TableRow>
+                            <TableCell
+                              colSpan={7}
+                              className="py-8 text-center text-muted-foreground"
+                            >
+                              Carregando...
+                            </TableCell>
+                          </TableRow>
                         ) : filtered.length === 0 ? (
-                          <TableRow><TableCell colSpan={7} className="py-8 text-center text-muted-foreground">Nenhum recebível.</TableCell></TableRow>
-                        ) : filtered.map((r) => {
-                          const eff = effectiveOf(r);
-                          const due = Number(r.amount_due);
-                          const paid = Number(r.amount_paid ?? 0);
-                          const saldo = Math.max(due - paid, 0);
-                          const showPartial = eff === "parcial" || (eff === "atrasado" && paid > 0);
-                          const isLoss = r.status === "cancelado" && r.cancel_type === "perda_contrato";
-                          const isWrong = r.status === "cancelado" && r.cancel_type === "cobranca_errada";
-                          const label = isLoss ? "Perdido" : isWrong ? "Cancelada (errada)" : STATUS_LABEL[eff];
-                          const hasReceiptForRec = receiptsByRec.has(r.id);
-                          const hasAnyPaymentWithoutReceipt = (paymentsByRec.get(r.id) ?? [])
-                            .some((p) => p.status === "ativo" && !receiptsByPayment.has(p.id));
-                          return (
-                            <TableRow key={r.id}>
-                              <TableCell className="font-medium">{profMap.get(r.professional_id) ?? "—"}</TableCell>
-                              <TableCell><Badge variant="outline" className="capitalize">{r.kind}</Badge></TableCell>
-                              <TableCell className="text-sm">{r.room_id ? roomMap.get(r.room_id) ?? "—" : "—"}</TableCell>
-                              <TableCell className="text-sm">{format(parseISO(r.due_date), "dd/MM/yyyy")}</TableCell>
-                              <TableCell className="text-sm">
-                                <div>{brl(due)}</div>
-                                {showPartial && (
-                                  <div className="text-xs text-muted-foreground">
-                                    Pago {brl(paid)} · Saldo {brl(saldo)}
+                          <TableRow>
+                            <TableCell
+                              colSpan={7}
+                              className="py-8 text-center text-muted-foreground"
+                            >
+                              Nenhum recebível.
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          filtered.map((r) => {
+                            const eff = effectiveOf(r);
+                            const due = Number(r.amount_due);
+                            const paid = Number(r.amount_paid ?? 0);
+                            const saldo = Math.max(due - paid, 0);
+                            const showPartial =
+                              eff === "parcial" || (eff === "atrasado" && paid > 0);
+                            const isLoss =
+                              r.status === "cancelado" && r.cancel_type === "perda_contrato";
+                            const isWrong =
+                              r.status === "cancelado" && r.cancel_type === "cobranca_errada";
+                            const label = isLoss
+                              ? "Perdido"
+                              : isWrong
+                                ? "Cancelada (errada)"
+                                : STATUS_LABEL[eff];
+                            const hasReceiptForRec = receiptsByRec.has(r.id);
+                            const hasAnyPaymentWithoutReceipt = (
+                              paymentsByRec.get(r.id) ?? []
+                            ).some((p) => p.status === "ativo" && !receiptsByPayment.has(p.id));
+                            return (
+                              <TableRow key={r.id}>
+                                <TableCell className="font-medium">
+                                  {profMap.get(r.professional_id) ?? "—"}
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant="outline" className="capitalize">
+                                    {r.kind}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-sm">
+                                  {r.room_id ? (roomMap.get(r.room_id) ?? "—") : "—"}
+                                </TableCell>
+                                <TableCell className="text-sm">
+                                  {format(parseISO(r.due_date), "dd/MM/yyyy")}
+                                </TableCell>
+                                <TableCell className="text-sm">
+                                  <div>{brl(due)}</div>
+                                  {showPartial && (
+                                    <div className="text-xs text-muted-foreground">
+                                      Pago {brl(paid)} · Saldo {brl(saldo)}
+                                    </div>
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant={STATUS_VARIANT[eff]}>{label}</Badge>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <div className="flex justify-end gap-1">
+                                    {r.attachment_path && (
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        title="Baixar comprovante"
+                                        onClick={() => downloadAttachment(r.attachment_path!)}
+                                      >
+                                        <Download className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      title="Histórico de pagamentos"
+                                      onClick={() => openHistory(r)}
+                                    >
+                                      <History className="h-4 w-4" />
+                                    </Button>
+                                    {canEdit && r.status !== "cancelado" && saldo > 0 && (
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        title="Dar baixa"
+                                        onClick={() => openPay(r)}
+                                      >
+                                        <Check className="h-4 w-4 text-success" />
+                                      </Button>
+                                    )}
+                                    {canEdit && paid > 0 && r.status !== "cancelado" && (
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        title="Estornar pagamento"
+                                        onClick={() => openRevert(r)}
+                                      >
+                                        <Undo2 className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                    {canEdit && hasAnyPaymentWithoutReceipt && (
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        title="Gerar recibo"
+                                        onClick={() => handleGenerateReceipt(r)}
+                                      >
+                                        <FileText className="h-4 w-4 text-primary" />
+                                      </Button>
+                                    )}
+                                    {hasReceiptForRec && (
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        title="Baixar recibo"
+                                        onClick={() => handleDownloadReceipt(r)}
+                                      >
+                                        <FileText className="h-4 w-4 text-success" />
+                                      </Button>
+                                    )}
+                                    {canEdit && hasReceiptForRec && (
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        title="Cancelar recibo"
+                                        onClick={() => handleCancelReceipt(r)}
+                                      >
+                                        <Ban className="h-4 w-4 text-destructive" />
+                                      </Button>
+                                    )}
+                                    {canEdit && r.status !== "cancelado" && (
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        title="Cancelar recebível (perda/errada)"
+                                        onClick={() => openCancel(r)}
+                                      >
+                                        <XCircle className="h-4 w-4 text-destructive" />
+                                      </Button>
+                                    )}
+                                    {canEdit && (
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        title="Editar"
+                                        onClick={() => openEdit(r)}
+                                      >
+                                        <Pencil className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                    {canEdit && r.kind === "contrato" && r.contract_id && (
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        title="Regerar parcelas do contrato"
+                                        onClick={() => regenerateContract(r.contract_id!)}
+                                      >
+                                        <RefreshCw className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                    {canEdit && (
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        title="Excluir"
+                                        onClick={() => removeRow(r)}
+                                      >
+                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                      </Button>
+                                    )}
                                   </div>
-                                )}
-                              </TableCell>
-                              <TableCell><Badge variant={STATUS_VARIANT[eff]}>{label}</Badge></TableCell>
-                              <TableCell className="text-right">
-                                <div className="flex justify-end gap-1">
-                                  {r.attachment_path && (
-                                    <Button size="icon" variant="ghost" title="Baixar comprovante" onClick={() => downloadAttachment(r.attachment_path!)}>
-                                      <Download className="h-4 w-4" />
-                                    </Button>
-                                  )}
-                                  <Button size="icon" variant="ghost" title="Histórico de pagamentos" onClick={() => openHistory(r)}>
-                                    <History className="h-4 w-4" />
-                                  </Button>
-                                  {canEdit && r.status !== "cancelado" && saldo > 0 && (
-                                    <Button size="icon" variant="ghost" title="Dar baixa" onClick={() => openPay(r)}>
-                                      <Check className="h-4 w-4 text-success" />
-                                    </Button>
-                                  )}
-                                  {canEdit && paid > 0 && r.status !== "cancelado" && (
-                                    <Button size="icon" variant="ghost" title="Estornar pagamento" onClick={() => openRevert(r)}>
-                                      <Undo2 className="h-4 w-4" />
-                                    </Button>
-                                  )}
-                                  {canEdit && hasAnyPaymentWithoutReceipt && (
-                                    <Button size="icon" variant="ghost" title="Gerar recibo" onClick={() => handleGenerateReceipt(r)}>
-                                      <FileText className="h-4 w-4 text-primary" />
-                                    </Button>
-                                  )}
-                                  {hasReceiptForRec && (
-                                    <Button size="icon" variant="ghost" title="Baixar recibo" onClick={() => handleDownloadReceipt(r)}>
-                                      <FileText className="h-4 w-4 text-success" />
-                                    </Button>
-                                  )}
-                                  {canEdit && hasReceiptForRec && (
-                                    <Button size="icon" variant="ghost" title="Cancelar recibo" onClick={() => handleCancelReceipt(r)}>
-                                      <Ban className="h-4 w-4 text-destructive" />
-                                    </Button>
-                                  )}
-                                  {canEdit && r.status !== "cancelado" && (
-                                    <Button size="icon" variant="ghost" title="Cancelar recebível (perda/errada)" onClick={() => openCancel(r)}>
-                                      <XCircle className="h-4 w-4 text-destructive" />
-                                    </Button>
-                                  )}
-                                  {canEdit && (
-                                    <Button size="icon" variant="ghost" title="Editar" onClick={() => openEdit(r)}>
-                                      <Pencil className="h-4 w-4" />
-                                    </Button>
-                                  )}
-                                  {canEdit && r.kind === "contrato" && r.contract_id && (
-                                    <Button size="icon" variant="ghost" title="Regerar parcelas do contrato" onClick={() => regenerateContract(r.contract_id!)}>
-                                      <RefreshCw className="h-4 w-4" />
-                                    </Button>
-                                  )}
-                                  {canEdit && (
-                                    <Button size="icon" variant="ghost" title="Excluir" onClick={() => removeRow(r)}>
-                                      <Trash2 className="h-4 w-4 text-destructive" />
-                                    </Button>
-                                  )}
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })
+                        )}
                       </TableBody>
                     </Table>
                   </div>
@@ -998,8 +1222,8 @@ function FinanceiroPage() {
             <DialogDescription>
               {payRow && (
                 <>
-                  {profMap.get(payRow.professional_id)} · previsto {brl(payRow.amount_due)} ·
-                  saldo {brl(Math.max(Number(payRow.amount_due) - Number(payRow.amount_paid ?? 0), 0))} ·
+                  {profMap.get(payRow.professional_id)} · previsto {brl(payRow.amount_due)} · saldo{" "}
+                  {brl(Math.max(Number(payRow.amount_due) - Number(payRow.amount_paid ?? 0), 0))} ·
                   venc. {format(parseISO(payRow.due_date), "dd/MM/yyyy")}
                 </>
               )}
@@ -1009,31 +1233,57 @@ function FinanceiroPage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Valor pago (R$)</Label>
-                <Input type="number" step="0.01" value={payForm.amount_paid}
-                  onChange={(e) => setPayForm({ ...payForm, amount_paid: e.target.value })} />
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={payForm.amount_paid}
+                  onChange={(e) => setPayForm({ ...payForm, amount_paid: e.target.value })}
+                />
               </div>
               <div className="space-y-2">
                 <Label>Data do pagamento</Label>
-                <Input type="date" value={payForm.paid_at}
-                  onChange={(e) => setPayForm({ ...payForm, paid_at: e.target.value })} />
+                <Input
+                  type="date"
+                  value={payForm.paid_at}
+                  onChange={(e) => setPayForm({ ...payForm, paid_at: e.target.value })}
+                />
               </div>
             </div>
             <div className="space-y-2">
               <Label>Forma de pagamento</Label>
-              <Select value={payForm.payment_method} onValueChange={(v) => setPayForm({ ...payForm, payment_method: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+              <Select
+                value={payForm.payment_method}
+                onValueChange={(v) => setPayForm({ ...payForm, payment_method: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
-                  {PAYMENT_METHODS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                  {PAYMENT_METHODS.map((m) => (
+                    <SelectItem key={m} value={m}>
+                      {m}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
               <Label>Observação</Label>
-              <Textarea rows={3} value={payForm.notes} onChange={(e) => setPayForm({ ...payForm, notes: e.target.value })} />
+              <Textarea
+                rows={3}
+                value={payForm.notes}
+                onChange={(e) => setPayForm({ ...payForm, notes: e.target.value })}
+              />
             </div>
             <div className="space-y-2">
-              <Label className="flex items-center gap-2"><Paperclip className="h-4 w-4" /> Comprovante (opcional)</Label>
-              <Input type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={(e) => setPayFile(e.target.files?.[0] ?? null)} />
+              <Label className="flex items-center gap-2">
+                <Paperclip className="h-4 w-4" /> Comprovante (opcional)
+              </Label>
+              <Input
+                type="file"
+                accept=".pdf,.png,.jpg,.jpeg"
+                onChange={(e) => setPayFile(e.target.files?.[0] ?? null)}
+              />
             </div>
             <div className="flex items-center gap-2 rounded-md border bg-muted/30 p-3">
               <Checkbox
@@ -1047,8 +1297,12 @@ function FinanceiroPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setPayOpen(false)}>Cancelar</Button>
-            <Button onClick={confirmPay} disabled={paying}>{paying ? "Salvando..." : "Registrar pagamento"}</Button>
+            <Button variant="outline" onClick={() => setPayOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={confirmPay} disabled={paying}>
+              {paying ? "Salvando..." : "Registrar pagamento"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1059,7 +1313,8 @@ function FinanceiroPage() {
           <DialogHeader>
             <DialogTitle className="font-serif">Estornar pagamento</DialogTitle>
             <DialogDescription>
-              Selecione qual pagamento deseja estornar. O recibo vinculado (se houver) será cancelado.
+              Selecione qual pagamento deseja estornar. O recibo vinculado (se houver) será
+              cancelado.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
@@ -1067,12 +1322,18 @@ function FinanceiroPage() {
               {revPayments.map((p) => {
                 const hasRec = receiptsByPayment.has(p.id);
                 return (
-                  <Label key={p.id} className="flex items-center gap-3 rounded-md border p-3 cursor-pointer">
+                  <Label
+                    key={p.id}
+                    className="flex items-center gap-3 rounded-md border p-3 cursor-pointer"
+                  >
                     <RadioGroupItem value={p.id} />
                     <div className="flex-1 text-sm">
-                      <div className="font-medium">{brl(Number(p.amount))} · {p.payment_method ?? "—"}</div>
+                      <div className="font-medium">
+                        {brl(Number(p.amount))} · {p.payment_method ?? "—"}
+                      </div>
                       <div className="text-xs text-muted-foreground">
-                        Pago em {format(parseISO(p.paid_at), "dd/MM/yyyy")} {hasRec && "· Recibo emitido"}
+                        Pago em {format(parseISO(p.paid_at), "dd/MM/yyyy")}{" "}
+                        {hasRec && "· Recibo emitido"}
                       </div>
                     </div>
                   </Label>
@@ -1081,12 +1342,21 @@ function FinanceiroPage() {
             </RadioGroup>
             <div className="space-y-2">
               <Label>Motivo do estorno</Label>
-              <Textarea rows={3} value={revReason} onChange={(e) => setRevReason(e.target.value)} placeholder="Obrigatório" />
+              <Textarea
+                rows={3}
+                value={revReason}
+                onChange={(e) => setRevReason(e.target.value)}
+                placeholder="Obrigatório"
+              />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRevOpen(false)}>Cancelar</Button>
-            <Button variant="destructive" onClick={confirmRevert}>Confirmar estorno</Button>
+            <Button variant="outline" onClick={() => setRevOpen(false)}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={confirmRevert}>
+              Confirmar estorno
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1102,7 +1372,10 @@ function FinanceiroPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
-            <RadioGroup value={cancelType} onValueChange={(v) => setCancelType(v as typeof cancelType)}>
+            <RadioGroup
+              value={cancelType}
+              onValueChange={(v) => setCancelType(v as typeof cancelType)}
+            >
               <Label className="flex items-start gap-3 rounded-md border p-3 cursor-pointer">
                 <RadioGroupItem value="perda_contrato" className="mt-1" />
                 <div>
@@ -1117,20 +1390,29 @@ function FinanceiroPage() {
                 <div>
                   <div className="font-medium">Cobrança gerada errada</div>
                   <div className="text-xs text-muted-foreground">
-                    Cobrança duplicada/incorreta. Não entra como previsto nem como perda.
-                    Pagamentos e recibos vinculados serão cancelados.
+                    Cobrança duplicada/incorreta. Não entra como previsto nem como perda. Pagamentos
+                    e recibos vinculados serão cancelados.
                   </div>
                 </div>
               </Label>
             </RadioGroup>
             <div className="space-y-2">
               <Label>Motivo</Label>
-              <Textarea rows={3} value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} placeholder="Obrigatório" />
+              <Textarea
+                rows={3}
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                placeholder="Obrigatório"
+              />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCancelOpen(false)}>Voltar</Button>
-            <Button variant="destructive" onClick={confirmCancel}>Confirmar cancelamento</Button>
+            <Button variant="outline" onClick={() => setCancelOpen(false)}>
+              Voltar
+            </Button>
+            <Button variant="destructive" onClick={confirmCancel}>
+              Confirmar cancelamento
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1141,7 +1423,11 @@ function FinanceiroPage() {
           <DialogHeader>
             <DialogTitle className="font-serif">Histórico de pagamentos</DialogTitle>
             <DialogDescription>
-              {histRow && <>{profMap.get(histRow.professional_id)} · {brl(histRow.amount_due)}</>}
+              {histRow && (
+                <>
+                  {profMap.get(histRow.professional_id)} · {brl(histRow.amount_due)}
+                </>
+              )}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
@@ -1149,9 +1435,14 @@ function FinanceiroPage() {
               <p className="text-sm text-muted-foreground">Nenhum pagamento registrado.</p>
             )}
             {histPayments.map((p) => (
-              <div key={p.id} className="flex items-center justify-between rounded-md border p-3 text-sm">
+              <div
+                key={p.id}
+                className="flex items-center justify-between rounded-md border p-3 text-sm"
+              >
                 <div>
-                  <div className="font-medium">{brl(Number(p.amount))} · {p.payment_method ?? "—"}</div>
+                  <div className="font-medium">
+                    {brl(Number(p.amount))} · {p.payment_method ?? "—"}
+                  </div>
                   <div className="text-xs text-muted-foreground">
                     {format(parseISO(p.paid_at), "dd/MM/yyyy")}
                     {p.status !== "ativo" && ` · ${p.status}`}
@@ -1163,7 +1454,9 @@ function FinanceiroPage() {
             ))}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setHistOpen(false)}>Fechar</Button>
+            <Button variant="outline" onClick={() => setHistOpen(false)}>
+              Fechar
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1178,22 +1471,35 @@ function FinanceiroPage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Valor previsto (R$)</Label>
-                <Input type="number" step="0.01" value={editForm.amount_due}
-                  onChange={(e) => setEditForm({ ...editForm, amount_due: e.target.value })} />
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={editForm.amount_due}
+                  onChange={(e) => setEditForm({ ...editForm, amount_due: e.target.value })}
+                />
               </div>
               <div className="space-y-2">
                 <Label>Vencimento</Label>
-                <Input type="date" value={editForm.due_date}
-                  onChange={(e) => setEditForm({ ...editForm, due_date: e.target.value })} />
+                <Input
+                  type="date"
+                  value={editForm.due_date}
+                  onChange={(e) => setEditForm({ ...editForm, due_date: e.target.value })}
+                />
               </div>
             </div>
             <div className="space-y-2">
               <Label>Observação</Label>
-              <Textarea rows={3} value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} />
+              <Textarea
+                rows={3}
+                value={editForm.notes}
+                onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+              />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditOpen(false)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => setEditOpen(false)}>
+              Cancelar
+            </Button>
             <Button onClick={saveEdit}>Salvar</Button>
           </DialogFooter>
         </DialogContent>
@@ -1205,18 +1511,29 @@ function FinanceiroPage() {
           <DialogHeader>
             <DialogTitle className="font-serif">Novo recebível</DialogTitle>
             <DialogDescription>
-              Crie um recebível manualmente. Permitido para recriar cobranças excluídas
-              ou para registros avulsos.
+              Crie um recebível manualmente. Permitido para recriar cobranças excluídas ou para
+              registros avulsos.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Profissional *</Label>
-                <Select value={newForm.professional_id} onValueChange={(v) => setNewForm({ ...newForm, professional_id: v, contract_id: "" })}>
-                  <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                <Select
+                  value={newForm.professional_id}
+                  onValueChange={(v) =>
+                    setNewForm({ ...newForm, professional_id: v, contract_id: "" })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione..." />
+                  </SelectTrigger>
                   <SelectContent>
-                    {profs.map((p) => <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>)}
+                    {profs.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.full_name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -1224,15 +1541,24 @@ function FinanceiroPage() {
                 <Label>Contrato (opcional)</Label>
                 <Select
                   value={newForm.contract_id || "none"}
-                  onValueChange={(v) => setNewForm({ ...newForm, contract_id: v === "none" ? "" : v, kind: v === "none" ? "avulso" : "contrato" })}
+                  onValueChange={(v) =>
+                    setNewForm({
+                      ...newForm,
+                      contract_id: v === "none" ? "" : v,
+                      kind: v === "none" ? "avulso" : "contrato",
+                    })
+                  }
                   disabled={!newForm.professional_id}
                 >
-                  <SelectTrigger><SelectValue placeholder="Sem contrato (avulso)" /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sem contrato (avulso)" />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">Sem contrato (avulso)</SelectItem>
                     {contractsForProf.map((c) => (
                       <SelectItem key={c.id} value={c.id}>
-                        {c.status} · {c.start_date}{c.end_date ? ` → ${c.end_date}` : ""} · {brl(c.monthly_value)}
+                        {c.status} · {c.start_date}
+                        {c.end_date ? ` → ${c.end_date}` : ""} · {brl(c.monthly_value)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1243,38 +1569,66 @@ function FinanceiroPage() {
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-2">
                 <Label>Ano</Label>
-                <Input type="number" value={newForm.year}
-                  onChange={(e) => setNewForm({ ...newForm, year: Number(e.target.value) })} />
+                <Input
+                  type="number"
+                  value={newForm.year}
+                  onChange={(e) => setNewForm({ ...newForm, year: Number(e.target.value) })}
+                />
               </div>
               <div className="space-y-2">
                 <Label>Mês</Label>
-                <Select value={String(newForm.month)} onValueChange={(v) => setNewForm({ ...newForm, month: Number(v) })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                <Select
+                  value={String(newForm.month)}
+                  onValueChange={(v) => setNewForm({ ...newForm, month: Number(v) })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
-                    {MONTHS_PT.map((m, i) => <SelectItem key={i} value={String(i)}>{m}</SelectItem>)}
+                    {MONTHS_PT.map((m, i) => (
+                      <SelectItem key={i} value={String(i)}>
+                        {m}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
                 <Label>Vencimento</Label>
-                <Input type="date" value={newForm.due_date}
-                  onChange={(e) => setNewForm({ ...newForm, due_date: e.target.value })} />
+                <Input
+                  type="date"
+                  value={newForm.due_date}
+                  onChange={(e) => setNewForm({ ...newForm, due_date: e.target.value })}
+                />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Valor (R$)</Label>
-                <Input type="number" step="0.01" value={newForm.amount_due}
-                  onChange={(e) => setNewForm({ ...newForm, amount_due: e.target.value })} />
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={newForm.amount_due}
+                  onChange={(e) => setNewForm({ ...newForm, amount_due: e.target.value })}
+                />
               </div>
               <div className="space-y-2">
                 <Label>Sala (opcional)</Label>
-                <Select value={newForm.room_id || "none"} onValueChange={(v) => setNewForm({ ...newForm, room_id: v === "none" ? "" : v })}>
-                  <SelectTrigger><SelectValue placeholder="Sem sala" /></SelectTrigger>
+                <Select
+                  value={newForm.room_id || "none"}
+                  onValueChange={(v) => setNewForm({ ...newForm, room_id: v === "none" ? "" : v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sem sala" />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">Sem sala</SelectItem>
-                    {rooms.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
+                    {rooms.map((r) => (
+                      <SelectItem key={r.id} value={r.id}>
+                        {r.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -1282,33 +1636,51 @@ function FinanceiroPage() {
 
             <div className="space-y-2">
               <Label>Observação / motivo</Label>
-              <Textarea rows={2} value={newForm.notes}
+              <Textarea
+                rows={2}
+                value={newForm.notes}
                 onChange={(e) => setNewForm({ ...newForm, notes: e.target.value })}
-                placeholder="Ex.: Recebível recriado por exclusão indevida." />
+                placeholder="Ex.: Recebível recriado por exclusão indevida."
+              />
             </div>
 
             {newForm.professional_id && (
               <div className="rounded-md border p-3 space-y-2">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium">Meses sem recebível encontrado · {newForm.year}</p>
+                  <p className="text-sm font-medium">
+                    Meses sem recebível encontrado · {newForm.year}
+                  </p>
                 </div>
                 <div className="grid grid-cols-2 gap-1 sm:grid-cols-3">
                   {monthAvailability.map((m) => {
-                    if (!m.inRange) return (
-                      <div key={m.idx} className="rounded p-2 text-xs text-muted-foreground italic">
-                        {m.label} — fora do contrato
-                      </div>
-                    );
-                    if (m.exists) return (
-                      <div key={m.idx} className="rounded bg-muted/40 p-2 text-xs text-muted-foreground">
-                        {m.label} — já existe
-                      </div>
-                    );
+                    if (!m.inRange)
+                      return (
+                        <div
+                          key={m.idx}
+                          className="rounded p-2 text-xs text-muted-foreground italic"
+                        >
+                          {m.label} — fora do contrato
+                        </div>
+                      );
+                    if (m.exists)
+                      return (
+                        <div
+                          key={m.idx}
+                          className="rounded bg-muted/40 p-2 text-xs text-muted-foreground"
+                        >
+                          {m.label} — já existe
+                        </div>
+                      );
                     return (
-                      <Label key={m.idx} className="flex items-center gap-2 rounded p-2 text-xs cursor-pointer hover:bg-muted/30">
+                      <Label
+                        key={m.idx}
+                        className="flex items-center gap-2 rounded p-2 text-xs cursor-pointer hover:bg-muted/30"
+                      >
                         <Checkbox
                           checked={!!monthsChecked[m.idx]}
-                          onCheckedChange={(v) => setMonthsChecked((s) => ({ ...s, [m.idx]: v === true }))}
+                          onCheckedChange={(v) =>
+                            setMonthsChecked((s) => ({ ...s, [m.idx]: v === true }))
+                          }
                         />
                         {m.label} — gerar
                       </Label>
@@ -1319,7 +1691,9 @@ function FinanceiroPage() {
             )}
           </div>
           <DialogFooter className="flex-wrap gap-2">
-            <Button variant="outline" onClick={() => setNewOpen(false)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => setNewOpen(false)}>
+              Cancelar
+            </Button>
             <Button variant="secondary" disabled={savingNew} onClick={saveNewReceivableBatch}>
               Gerar meses marcados
             </Button>

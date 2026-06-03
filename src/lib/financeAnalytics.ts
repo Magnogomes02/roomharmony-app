@@ -162,4 +162,3 @@ export async function loadAnnualFinancialSummary(year: number): Promise<AnnualFi
 
   return { year, monthlyRows: monthly, annualTotals: totals };
 }
-

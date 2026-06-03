@@ -27,12 +27,7 @@ export interface ReceivableLikeFull {
   cancel_type?: string | null;
 }
 
-export type EffectiveStatus =
-  | "a_receber"
-  | "parcial"
-  | "recebido"
-  | "atrasado"
-  | "cancelado";
+export type EffectiveStatus = "a_receber" | "parcial" | "recebido" | "atrasado" | "cancelado";
 
 export function computeEffectiveStatus(r: ReceivableLikeFull): EffectiveStatus {
   if (r.status === "cancelado") return "cancelado";
@@ -53,7 +48,7 @@ export function computeEffectiveStatus(r: ReceivableLikeFull): EffectiveStatus {
 }
 
 export async function getActivePaymentsForReceivables(
-  receivableIds: string[]
+  receivableIds: string[],
 ): Promise<Map<string, ReceivablePayment[]>> {
   const out = new Map<string, ReceivablePayment[]>();
   if (receivableIds.length === 0) return out;
@@ -72,7 +67,7 @@ export async function getActivePaymentsForReceivables(
 }
 
 export async function getAllPaymentsForReceivable(
-  receivableId: string
+  receivableId: string,
 ): Promise<ReceivablePayment[]> {
   const { data, error } = await supabase
     .from("receivable_payments")
@@ -143,7 +138,9 @@ export interface CreatePaymentInput {
 }
 
 export async function createPayment(input: CreatePaymentInput): Promise<ReceivablePayment> {
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   const { data, error } = await supabase
     .from("receivable_payments")
     .insert({
@@ -171,7 +168,9 @@ export async function reversePayment(paymentId: string, reason: string): Promise
     .single();
   if (getErr || !pay) throw getErr ?? new Error("Pagamento não encontrado");
   if (pay.status !== "ativo") throw new Error("Pagamento não está ativo.");
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   const { error } = await supabase
     .from("receivable_payments")
     .update({
@@ -192,13 +191,15 @@ export async function findDuplicateReceivables(args: {
   professional_id: string;
   contract_id: string | null;
   reference_month: string; // YYYY-MM-01
-}): Promise<Array<{
-  id: string;
-  amount_due: number;
-  status: string;
-  due_date: string;
-  reference_month: string;
-}>> {
+}): Promise<
+  Array<{
+    id: string;
+    amount_due: number;
+    status: string;
+    due_date: string;
+    reference_month: string;
+  }>
+> {
   let q = supabase
     .from("receivables")
     .select("id, amount_due, status, due_date, reference_month")
@@ -225,6 +226,16 @@ export function buildDueDate(year: number, monthIdx0: number, dueDay: number): s
 }
 
 export const MONTHS_PT = [
-  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+  "Janeiro",
+  "Fevereiro",
+  "Março",
+  "Abril",
+  "Maio",
+  "Junho",
+  "Julho",
+  "Agosto",
+  "Setembro",
+  "Outubro",
+  "Novembro",
+  "Dezembro",
 ];
