@@ -16,6 +16,7 @@ const RECEIPTS_BUCKET = "contract-attachments";
 export interface ReceiptRow {
   id: string;
   receivable_id: string;
+  payment_id: string | null;
   receipt_number: string;
   status: "emitido" | "cancelado";
   issued_at: string;
