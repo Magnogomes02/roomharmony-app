@@ -45,6 +45,7 @@ interface ReceivableRow {
   amount_due: number | string | null;
   amount_paid: number | string | null;
   status: "a_receber" | "recebido" | "atrasado" | "cancelado";
+  cancel_type: string | null;
 }
 
 function num(v: number | string | null | undefined): number {
@@ -63,13 +64,10 @@ export async function loadAnnualFinancialSummary(year: number): Promise<AnnualFi
   const end = `${year}-12-31`;
   const { data, error } = await supabase
     .from("receivables")
-    .select("reference_month,due_date,amount_due,amount_paid,status")
+    .select("reference_month,due_date,amount_due,amount_paid,status,cancel_type")
     .gte("reference_month", start)
     .lte("reference_month", end);
   if (error) throw error;
-
-
-
 
   const rows = (data ?? []) as ReceivableRow[];
 
@@ -92,25 +90,38 @@ export async function loadAnnualFinancialSummary(year: number): Promise<AnnualFi
     };
   });
 
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
   for (const r of rows) {
     const refYear = getYearFromDateOnly(r.reference_month);
     if (refYear !== year) continue;
     const idx = getMonthIndexFromDateOnly(r.reference_month);
     const bucket = monthly[idx];
     if (!bucket) continue;
+
+    // cobrança gerada errada não entra em previsto/recebido/perda
+    if (r.status === "cancelado" && r.cancel_type === "cobranca_errada") continue;
+
     const due = num(r.amount_due);
     const paid = num(r.amount_paid);
     bucket.expected += due;
 
-    const effective = getEffectiveReceivableStatus({ status: r.status, due_date: r.due_date });
-    if (effective === "recebido") {
-      bucket.received += paid || due;
-    } else if (effective === "atrasado") {
-      bucket.overdue += due;
-    } else if (effective === "a_receber") {
-      bucket.receivable += due;
-    } else if (effective === "cancelado") {
-      bucket.lost += due;
+    // pagamento parcial conta como recebido
+    if (paid > 0) bucket.received += Math.min(paid, due);
+
+    if (r.status === "cancelado") {
+      // perda = saldo aberto (perda_contrato é o único cenário restante)
+      const saldo = Math.max(due - paid, 0);
+      bucket.lost += saldo;
+      continue;
+    }
+
+    const saldo = Math.max(due - paid, 0);
+    if (saldo > 0) {
+      const dueDate = new Date(r.due_date + "T12:00:00");
+      if (dueDate < today) bucket.overdue += saldo;
+      else bucket.receivable += saldo;
     }
   }
 
@@ -151,3 +162,4 @@ export async function loadAnnualFinancialSummary(year: number): Promise<AnnualFi
 
   return { year, monthlyRows: monthly, annualTotals: totals };
 }
+
