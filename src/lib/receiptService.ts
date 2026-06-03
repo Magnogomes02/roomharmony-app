@@ -140,13 +140,14 @@ export async function createReceiptForReceivable(
     .from("receivables").select("*").eq("id", receivableId).single();
   if (recErr || !rec) throw new Error(recErr?.message ?? "Recebível não encontrado");
 
-  let paymentRow: {
+  type PaymentSnap = {
     id: string;
     amount: number;
     paid_at: string;
     payment_method: string | null;
     status: string;
-  } | null = null;
+  };
+  let paymentRow: PaymentSnap | null = null;
 
   if (paymentId) {
     const { data: pay, error: payErr } = await supabase
