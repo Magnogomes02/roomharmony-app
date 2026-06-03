@@ -1,6 +1,7 @@
 import { parseDateOnlyLocal } from "@/lib/dateOnly";
 
 export type ReceivableStatus = "a_receber" | "recebido" | "atrasado" | "cancelado";
+export type ReceivableEffectiveStatus = ReceivableStatus | "parcial";
 
 export interface ReceivableLike {
   status: ReceivableStatus;

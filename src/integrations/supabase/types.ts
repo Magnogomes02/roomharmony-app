@@ -524,6 +524,62 @@ export type Database = {
         }
         Relationships: []
       }
+      receivable_payments: {
+        Row: {
+          amount: number
+          attachment_path: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          paid_at: string
+          payment_method: string | null
+          receivable_id: string
+          reverse_reason: string | null
+          reversed_at: string | null
+          reversed_by: string | null
+          status: string
+        }
+        Insert: {
+          amount: number
+          attachment_path?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          paid_at: string
+          payment_method?: string | null
+          receivable_id: string
+          reverse_reason?: string | null
+          reversed_at?: string | null
+          reversed_by?: string | null
+          status?: string
+        }
+        Update: {
+          amount?: number
+          attachment_path?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          paid_at?: string
+          payment_method?: string | null
+          receivable_id?: string
+          reverse_reason?: string | null
+          reversed_at?: string | null
+          reversed_by?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "receivable_payments_receivable_id_fkey"
+            columns: ["receivable_id"]
+            isOneToOne: false
+            referencedRelation: "receivables"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       receivable_receipts: {
         Row: {
           amount_due: number
@@ -543,6 +599,7 @@ export type Database = {
           kind: string
           metadata: Json | null
           paid_at: string
+          payment_id: string | null
           payment_method: string | null
           professional_document: string | null
           professional_email: string | null
@@ -579,6 +636,7 @@ export type Database = {
           kind: string
           metadata?: Json | null
           paid_at: string
+          payment_id?: string | null
           payment_method?: string | null
           professional_document?: string | null
           professional_email?: string | null
@@ -615,6 +673,7 @@ export type Database = {
           kind?: string
           metadata?: Json | null
           paid_at?: string
+          payment_id?: string | null
           payment_method?: string | null
           professional_document?: string | null
           professional_email?: string | null
@@ -635,6 +694,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "receivable_receipts_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "receivable_payments"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "receivable_receipts_receivable_id_fkey"
             columns: ["receivable_id"]
             isOneToOne: false
@@ -649,6 +715,10 @@ export type Database = {
           amount_paid: number | null
           attachment_path: string | null
           booking_id: string | null
+          cancel_reason: string | null
+          cancel_type: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
           contract_id: string | null
           created_at: string
           due_date: string
@@ -668,6 +738,10 @@ export type Database = {
           amount_paid?: number | null
           attachment_path?: string | null
           booking_id?: string | null
+          cancel_reason?: string | null
+          cancel_type?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           contract_id?: string | null
           created_at?: string
           due_date: string
@@ -687,6 +761,10 @@ export type Database = {
           amount_paid?: number | null
           attachment_path?: string | null
           booking_id?: string | null
+          cancel_reason?: string | null
+          cancel_type?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           contract_id?: string | null
           created_at?: string
           due_date?: string

@@ -1,9 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { getClinicBranding } from "@/lib/contractPdf";
-import {
-  loadReceiptSettings,
-  renderReceiptTemplate,
-} from "@/lib/receiptSettings";
+import { loadReceiptSettings, renderReceiptTemplate } from "@/lib/receiptSettings";
 import {
   buildReceiptAuthenticationCode,
   renderReceiptPdf,
@@ -16,6 +13,7 @@ const RECEIPTS_BUCKET = "contract-attachments";
 export interface ReceiptRow {
   id: string;
   receivable_id: string;
+  payment_id: string | null;
   receipt_number: string;
   status: "emitido" | "cancelado";
   issued_at: string;
@@ -45,7 +43,9 @@ export interface ReceiptRow {
   authentication_code: string | null;
 }
 
-function pad(n: number, w = 2) { return String(n).padStart(w, "0"); }
+function pad(n: number, w = 2) {
+  return String(n).padStart(w, "0");
+}
 
 function generateReceiptNumber(): string {
   const d = new Date();
@@ -57,7 +57,8 @@ function generateReceiptNumber(): string {
 function toPdfData(row: ReceiptRow, overrides?: { cancelled?: boolean }): ReceiptPdfData {
   return {
     receipt_number: row.receipt_number,
-    authentication_code: row.authentication_code ?? buildReceiptAuthenticationCode(row.id, row.receipt_number),
+    authentication_code:
+      row.authentication_code ?? buildReceiptAuthenticationCode(row.id, row.receipt_number),
     issued_at: row.issued_at,
     cancelled: overrides?.cancelled ?? row.status === "cancelado",
     professional_name: row.professional_name,
@@ -77,7 +78,9 @@ function toPdfData(row: ReceiptRow, overrides?: { cancelled?: boolean }): Receip
 }
 
 async function audit(action: string, entity_id: string, metadata: Record<string, unknown>) {
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) return;
   await supabase.from("audit_logs").insert({
     actor_id: user.id,
@@ -110,15 +113,26 @@ export async function getReceiptsByReceivableIds(ids: string[]): Promise<Map<str
   return out;
 }
 
-async function resolveReceivableRoom(rec: { room_id: string | null; contract_id: string | null }): Promise<{ room_id: string | null; room_name: string | null }> {
+async function resolveReceivableRoom(rec: {
+  room_id: string | null;
+  contract_id: string | null;
+}): Promise<{ room_id: string | null; room_name: string | null }> {
   if (rec.room_id) {
-    const { data } = await supabase.from("rooms").select("id,name").eq("id", rec.room_id).maybeSingle();
+    const { data } = await supabase
+      .from("rooms")
+      .select("id,name")
+      .eq("id", rec.room_id)
+      .maybeSingle();
     return { room_id: rec.room_id, room_name: data?.name ?? null };
   }
   if (rec.contract_id) {
     const { data: schedules } = await supabase
-      .from("contract_schedules").select("room_id").eq("contract_id", rec.contract_id);
-    const uniqueIds = Array.from(new Set((schedules ?? []).map((s) => s.room_id).filter(Boolean) as string[]));
+      .from("contract_schedules")
+      .select("room_id")
+      .eq("contract_id", rec.contract_id);
+    const uniqueIds = Array.from(
+      new Set((schedules ?? []).map((s) => s.room_id).filter(Boolean) as string[]),
+    );
     if (uniqueIds.length === 0) return { room_id: null, room_name: null };
     const { data: rooms } = await supabase.from("rooms").select("id,name").in("id", uniqueIds);
     const names = (rooms ?? []).map((r) => r.name).filter(Boolean);
@@ -130,18 +144,54 @@ async function resolveReceivableRoom(rec: { room_id: string | null; contract_id:
   return { room_id: null, room_name: null };
 }
 
-export async function createReceiptForReceivable(receivableId: string): Promise<ReceiptRow> {
+export async function createReceiptForReceivable(
+  receivableId: string,
+  paymentId?: string,
+): Promise<ReceiptRow> {
   // 1. receivable
   const { data: rec, error: recErr } = await supabase
-    .from("receivables").select("*").eq("id", receivableId).single();
+    .from("receivables")
+    .select("*")
+    .eq("id", receivableId)
+    .single();
   if (recErr || !rec) throw new Error(recErr?.message ?? "Recebível não encontrado");
-  if (rec.status !== "recebido") throw new Error("O recebível precisa estar com status 'recebido'.");
-  if (!rec.amount_paid || Number(rec.amount_paid) <= 0) throw new Error("Valor pago inválido.");
-  if (!rec.paid_at) throw new Error("Data de pagamento ausente.");
 
-  // 1b. block if already an active receipt exists
-  const existing = await getReceiptByReceivableId(receivableId);
-  if (existing) throw new Error("Já existe um recibo emitido para este recebível.");
+  type PaymentSnap = {
+    id: string;
+    amount: number;
+    paid_at: string;
+    payment_method: string | null;
+    status: string;
+  };
+  let paymentRow: PaymentSnap | null = null;
+
+  if (paymentId) {
+    const { data: pay, error: payErr } = await supabase
+      .from("receivable_payments")
+      .select("id, amount, paid_at, payment_method, status")
+      .eq("id", paymentId)
+      .single();
+    if (payErr || !pay) throw new Error(payErr?.message ?? "Pagamento não encontrado");
+    if (pay.status !== "ativo") throw new Error("Pagamento não está ativo.");
+    paymentRow = pay as PaymentSnap;
+
+    // ensure no active receipt already on this payment
+    const { data: dup } = await supabase
+      .from("receivable_receipts")
+      .select("id")
+      .eq("payment_id", paymentId)
+      .eq("status", "emitido")
+      .maybeSingle();
+    if (dup) throw new Error("Este pagamento já possui recibo emitido.");
+  } else {
+    // legacy: usa campos resumo do recebível (precisa estar recebido)
+    if (rec.status !== "recebido")
+      throw new Error("O recebível precisa estar com status 'recebido'.");
+    if (!rec.amount_paid || Number(rec.amount_paid) <= 0) throw new Error("Valor pago inválido.");
+    if (!rec.paid_at) throw new Error("Data de pagamento ausente.");
+    const existing = await getReceiptByReceivableId(receivableId);
+    if (existing) throw new Error("Já existe um recibo emitido para este recebível.");
+  }
 
   // 2. related
   const [{ data: prof }, resolvedRoom, branding, settings, userQ] = await Promise.all([
@@ -157,10 +207,18 @@ export async function createReceiptForReceivable(receivableId: string): Promise<
   const tempId = crypto.randomUUID();
   const authCode = buildReceiptAuthenticationCode(tempId, receiptNumber);
 
-  // 3. insert snapshot
+  const snapshotPaid = paymentRow
+    ? {
+        paid_at: paymentRow.paid_at,
+        payment_method: paymentRow.payment_method,
+        amount_paid: paymentRow.amount,
+      }
+    : { paid_at: rec.paid_at!, payment_method: rec.payment_method, amount_paid: rec.amount_paid! };
+
   const insertPayload = {
     id: tempId,
     receivable_id: rec.id,
+    payment_id: paymentRow?.id ?? null,
     receipt_number: receiptNumber,
     status: "emitido",
     issued_by: userQ.data.user?.id ?? null,
@@ -174,10 +232,10 @@ export async function createReceiptForReceivable(receivableId: string): Promise<
     kind: rec.kind,
     reference_month: rec.reference_month,
     due_date: rec.due_date,
-    paid_at: rec.paid_at,
-    payment_method: rec.payment_method,
+    paid_at: snapshotPaid.paid_at as string,
+    payment_method: snapshotPaid.payment_method,
     amount_due: rec.amount_due,
-    amount_paid: rec.amount_paid,
+    amount_paid: snapshotPaid.amount_paid,
     clinic_name: branding.clinic_name ?? null,
     clinic_cnpj: branding.cnpj ?? null,
     clinic_address: branding.address ?? null,
@@ -188,42 +246,65 @@ export async function createReceiptForReceivable(receivableId: string): Promise<
   };
 
   const { data: inserted, error: insErr } = await supabase
-    .from("receivable_receipts").insert(insertPayload).select("*").single();
+    .from("receivable_receipts")
+    .insert(insertPayload)
+    .select("*")
+    .single();
   if (insErr || !inserted) throw new Error(insErr?.message ?? "Falha ao criar recibo");
   const row = inserted as ReceiptRow;
 
-  // 4. PDF + upload
   try {
     const pdfData: ReceiptPdfData = toPdfData(row);
     const blob = await renderReceiptPdf(pdfData, branding, settings);
     const path = `receipts/${rec.id}/${row.receipt_number}.pdf`;
     const up = await supabase.storage.from(RECEIPTS_BUCKET).upload(path, blob, {
-      cacheControl: "3600", upsert: true, contentType: "application/pdf",
+      cacheControl: "3600",
+      upsert: true,
+      contentType: "application/pdf",
     });
     if (!up.error) {
-      await supabase.from("receivable_receipts")
-        .update({ receipt_path: path }).eq("id", row.id);
+      await supabase.from("receivable_receipts").update({ receipt_path: path }).eq("id", row.id);
       row.receipt_path = path;
     }
   } catch (e) {
-    // PDF/upload failure is non-fatal; row stays so user can re-download
     console.warn("[receiptService] PDF upload falhou", e);
   }
 
   await audit("receivable.receipt_create", rec.id, {
     receipt_id: row.id,
     receipt_number: row.receipt_number,
-    amount_paid: rec.amount_paid,
+    payment_id: paymentRow?.id ?? null,
+    amount_paid: snapshotPaid.amount_paid,
   });
 
   return row;
 }
 
-export async function cancelReceiptForReceivable(receivableId: string, reason: string): Promise<void> {
+export async function getReceiptsByPaymentIds(ids: string[]): Promise<Map<string, ReceiptRow>> {
+  const out = new Map<string, ReceiptRow>();
+  if (ids.length === 0) return out;
+  const { data } = await supabase
+    .from("receivable_receipts")
+    .select("*")
+    .in("payment_id", ids)
+    .eq("status", "emitido");
+  for (const r of (data ?? []) as ReceiptRow[]) {
+    if (r.payment_id) out.set(r.payment_id, r);
+  }
+  return out;
+}
+
+export async function cancelReceiptForReceivable(
+  receivableId: string,
+  reason: string,
+): Promise<void> {
   const existing = await getReceiptByReceivableId(receivableId);
   if (!existing) return;
-  const { data: { user } } = await supabase.auth.getUser();
-  const { error } = await supabase.from("receivable_receipts")
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { error } = await supabase
+    .from("receivable_receipts")
     .update({
       status: "cancelado",
       cancelled_at: new Date().toISOString(),
@@ -241,10 +322,16 @@ export async function cancelReceiptForReceivable(receivableId: string, reason: s
 
 export async function cancelReceiptById(receiptId: string, reason: string): Promise<void> {
   const { data: existing } = await supabase
-    .from("receivable_receipts").select("*").eq("id", receiptId).maybeSingle();
+    .from("receivable_receipts")
+    .select("*")
+    .eq("id", receiptId)
+    .maybeSingle();
   if (!existing) return;
-  const { data: { user } } = await supabase.auth.getUser();
-  const { error } = await supabase.from("receivable_receipts")
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { error } = await supabase
+    .from("receivable_receipts")
     .update({
       status: "cancelado",
       cancelled_at: new Date().toISOString(),
@@ -276,11 +363,13 @@ export async function downloadReceipt(receipt: ReceiptRow): Promise<void> {
   if (receipt.receipt_path) {
     try {
       const { data, error } = await supabase.storage
-        .from(RECEIPTS_BUCKET).download(receipt.receipt_path);
+        .from(RECEIPTS_BUCKET)
+        .download(receipt.receipt_path);
       if (!error && data) {
         triggerBlobDownload(data);
         await audit("receivable.receipt_download", receipt.receivable_id, {
-          receipt_id: receipt.id, receipt_number: receipt.receipt_number,
+          receipt_id: receipt.id,
+          receipt_number: receipt.receipt_number,
         });
         return;
       }
@@ -300,7 +389,8 @@ export async function downloadReceipt(receipt: ReceiptRow): Promise<void> {
   const blob = await renderReceiptPdf(toPdfData(receipt), branding, snapshotSettings);
   triggerBlobDownload(blob);
   await audit("receivable.receipt_download", receipt.receivable_id, {
-    receipt_id: receipt.id, receipt_number: receipt.receipt_number,
+    receipt_id: receipt.id,
+    receipt_number: receipt.receipt_number,
   });
 }
 
