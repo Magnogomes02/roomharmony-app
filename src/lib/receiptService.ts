@@ -236,11 +236,12 @@ export async function createReceiptForReceivable(
   // 2. related
   const [{ data: prof }, resolvedRoom, branding, settings, userQ] = await Promise.all([
     supabase.from("professionals").select("*").eq("id", rec.professional_id).single(),
-    resolveReceivableRoom({ room_id: rec.room_id, contract_id: rec.contract_id }),
+    resolveReceivableRoom({ id: rec.id, room_id: rec.room_id, contract_id: rec.contract_id }),
     getClinicBranding(),
     loadReceiptSettings(),
     supabase.auth.getUser(),
   ]);
+
   if (!prof) throw new Error("Profissional não encontrado");
 
   const receiptNumber = generateReceiptNumber();
