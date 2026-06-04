@@ -688,13 +688,14 @@ function FinanceiroPage() {
       month: now.getMonth(),
       due_date: "",
       amount_due: "",
-      room_id: "",
       notes: "",
     });
+    setNewRoomIds([]);
     setYearReceivables([]);
     setMonthsChecked({});
     setNewOpen(true);
   }
+
 
   const contractsForProf = useMemo(
     () => contracts.filter((c) => c.professional_id === newForm.professional_id),
