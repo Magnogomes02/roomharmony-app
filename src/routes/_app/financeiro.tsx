@@ -542,8 +542,60 @@ function FinanceiroPage() {
     setHistRow(r);
     const all = await getAllPaymentsForReceivable(r.id);
     setHistPayments(all);
+    const recs = await getReceiptsByPaymentIds(all.map((p) => p.id));
+    setHistReceipts(recs);
     setHistOpen(true);
   }
+
+  async function refreshHistoryReceipts(receivableId: string) {
+    const all = await getAllPaymentsForReceivable(receivableId);
+    setHistPayments(all);
+    const recs = await getReceiptsByPaymentIds(all.map((p) => p.id));
+    setHistReceipts(recs);
+  }
+
+  async function generateReceiptForPayment(r: Receivable, paymentId: string) {
+    try {
+      await createReceiptForReceivable(r.id, paymentId);
+      toast.success("Recibo gerado");
+      await refreshHistoryReceipts(r.id);
+      load();
+    } catch (e) {
+      toast.error("Erro ao gerar recibo", {
+        description: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
+
+  async function downloadReceiptForPayment(paymentId: string) {
+    const rc = histReceipts.get(paymentId);
+    if (!rc) return;
+    try {
+      await downloadReceipt(rc);
+    } catch (e) {
+      toast.error("Erro ao baixar recibo", {
+        description: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
+
+  async function cancelReceiptForPayment(r: Receivable, paymentId: string) {
+    const rc = histReceipts.get(paymentId);
+    if (!rc) return;
+    const reason = prompt("Motivo do cancelamento do recibo:");
+    if (!reason || !reason.trim()) return;
+    try {
+      await cancelReceiptById(rc.id, reason.trim());
+      toast.success("Recibo cancelado");
+      await refreshHistoryReceipts(r.id);
+      load();
+    } catch (e) {
+      toast.error("Erro ao cancelar recibo", {
+        description: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
+
 
   function openEdit(r: Receivable) {
     if (receiptsByRec.has(r.id)) {
