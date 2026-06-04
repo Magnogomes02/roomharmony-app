@@ -1630,36 +1630,55 @@ function FinanceiroPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label>Valor (R$)</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={newForm.amount_due}
-                  onChange={(e) => setNewForm({ ...newForm, amount_due: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Sala (opcional)</Label>
-                <Select
-                  value={newForm.room_id || "none"}
-                  onValueChange={(v) => setNewForm({ ...newForm, room_id: v === "none" ? "" : v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sem sala" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Sem sala</SelectItem>
-                    {rooms.map((r) => (
-                      <SelectItem key={r.id} value={r.id}>
-                        {r.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-2">
+              <Label>Valor (R$)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={newForm.amount_due}
+                onChange={(e) => setNewForm({ ...newForm, amount_due: e.target.value })}
+              />
             </div>
+
+            <div className="space-y-2">
+              <Label>
+                {newForm.contract_id
+                  ? "Salas identificadas no contrato"
+                  : "Salas vinculadas ao recebível"}
+              </Label>
+              <div className="grid grid-cols-2 gap-1 rounded-md border p-3 sm:grid-cols-3">
+                {rooms.length === 0 && (
+                  <p className="text-xs text-muted-foreground">Nenhuma sala cadastrada.</p>
+                )}
+                {rooms.map((r) => {
+                  const checked = newRoomIds.includes(r.id);
+                  return (
+                    <Label
+                      key={r.id}
+                      className="flex items-center gap-2 rounded p-2 text-xs cursor-pointer hover:bg-muted/30"
+                    >
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={(v) => {
+                          setNewRoomIds((prev) =>
+                            v === true
+                              ? Array.from(new Set([...prev, r.id]))
+                              : prev.filter((id) => id !== r.id),
+                          );
+                        }}
+                      />
+                      {r.name}
+                    </Label>
+                  );
+                })}
+              </div>
+              {newRoomIds.length > 1 && (
+                <p className="text-xs text-muted-foreground">
+                  {newRoomIds.length} salas selecionadas — todas aparecerão no recibo.
+                </p>
+              )}
+            </div>
+
 
             <div className="space-y-2">
               <Label>Observação / motivo</Label>
