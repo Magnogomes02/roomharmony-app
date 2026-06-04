@@ -799,12 +799,13 @@ function FinanceiroPage() {
       if (dups.length > 0) return { ok: false, reason: "duplicate" };
     }
 
+    const firstRoom = newRoomIds[0] ?? null;
     const insertPayload = {
       kind: (newForm.contract_id ? "contrato" : "avulso") as "contrato" | "avulso",
       contract_id: newForm.contract_id || null,
       booking_id: null,
       professional_id: newForm.professional_id,
-      room_id: newForm.room_id || null,
+      room_id: firstRoom,
       reference_month: referenceMonth,
       due_date: due,
       amount_due: amount,
@@ -817,12 +818,21 @@ function FinanceiroPage() {
       .select("id")
       .single();
     if (error) return { ok: false, reason: error.message };
+    // insert receivable_rooms when we have multiple rooms (or even one — keeps source of truth)
+    if (ins?.id && newRoomIds.length > 0) {
+      const rows = newRoomIds.map((roomId) => ({ receivable_id: ins.id, room_id: roomId }));
+      const { error: rrErr } = await supabase.from("receivable_rooms").insert(rows);
+      if (rrErr) console.warn("[financeiro] receivable_rooms insert", rrErr);
+    }
     await audit("receivable.manual_create", ins?.id ?? null, {
       ...insertPayload,
+      room_ids: newRoomIds,
       duplicated: allowDuplicate,
+      reason: newForm.notes || null,
     });
     return { ok: true };
   }
+
 
   async function saveNewReceivableSingle() {
     if (!newForm.professional_id) return toast.error("Selecione um profissional.");
