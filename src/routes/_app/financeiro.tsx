@@ -1541,24 +1541,61 @@ function FinanceiroPage() {
             {histPayments.length === 0 && (
               <p className="text-sm text-muted-foreground">Nenhum pagamento registrado.</p>
             )}
-            {histPayments.map((p) => (
-              <div
-                key={p.id}
-                className="flex items-center justify-between rounded-md border p-3 text-sm"
-              >
-                <div>
-                  <div className="font-medium">
-                    {brl(Number(p.amount))} · {p.payment_method ?? "—"}
+            {histPayments.map((p) => {
+              const rc = histReceipts.get(p.id);
+              return (
+                <div
+                  key={p.id}
+                  className="flex items-center justify-between gap-3 rounded-md border p-3 text-sm"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium">
+                      {brl(Number(p.amount))} · {p.payment_method ?? "—"}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {format(parseISO(p.paid_at), "dd/MM/yyyy")}
+                      {p.status !== "ativo" && ` · ${p.status}`}
+                      {p.reverse_reason && ` — motivo: ${p.reverse_reason}`}
+                      {rc && ` · Recibo ${rc.receipt_number}`}
+                    </div>
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    {format(parseISO(p.paid_at), "dd/MM/yyyy")}
-                    {p.status !== "ativo" && ` · ${p.status}`}
-                    {p.reverse_reason && ` — motivo: ${p.reverse_reason}`}
+                  <div className="flex items-center gap-1">
+                    <Badge variant={p.status === "ativo" ? "default" : "outline"}>{p.status}</Badge>
+                    {rc && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        title="Baixar recibo"
+                        onClick={() => downloadReceiptForPayment(p.id)}
+                      >
+                        <Download className="h-4 w-4 text-success" />
+                      </Button>
+                    )}
+                    {canEdit && p.status === "ativo" && !rc && histRow && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        title="Gerar recibo deste pagamento"
+                        onClick={() => generateReceiptForPayment(histRow, p.id)}
+                      >
+                        <FileText className="h-4 w-4 text-primary" />
+                      </Button>
+                    )}
+                    {canEdit && rc && histRow && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        title="Cancelar recibo deste pagamento"
+                        onClick={() => cancelReceiptForPayment(histRow, p.id)}
+                      >
+                        <Ban className="h-4 w-4 text-destructive" />
+                      </Button>
+                    )}
                   </div>
                 </div>
-                <Badge variant={p.status === "ativo" ? "default" : "outline"}>{p.status}</Badge>
-              </div>
-            ))}
+              );
+            })}
+
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setHistOpen(false)}>
