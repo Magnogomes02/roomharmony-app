@@ -1106,8 +1106,23 @@ function FinanceiroPage() {
                                   </Badge>
                                 </TableCell>
                                 <TableCell className="text-sm">
-                                  {r.room_id ? (roomMap.get(r.room_id) ?? "—") : "—"}
+                                  {(() => {
+                                    const multi = roomsByRec.get(r.id) ?? [];
+                                    const names = multi
+                                      .map((id) => roomMap.get(id))
+                                      .filter(Boolean) as string[];
+                                    if (names.length > 0) {
+                                      const text = names.join(", ");
+                                      return names.length > 2 ? (
+                                        <span title={text}>{names.length} salas</span>
+                                      ) : (
+                                        text
+                                      );
+                                    }
+                                    return r.room_id ? (roomMap.get(r.room_id) ?? "—") : "—";
+                                  })()}
                                 </TableCell>
+
                                 <TableCell className="text-sm">
                                   {format(parseISO(r.due_date), "dd/MM/yyyy")}
                                 </TableCell>
