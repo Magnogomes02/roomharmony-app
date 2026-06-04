@@ -160,10 +160,12 @@ function FinanceiroPage() {
   const [tab, setTab] = useState<EffectiveStatus | "perda" | "errada" | "todos">("a_receber");
   const [financeView, setFinanceView] = useState<"recebiveis" | "analise">("recebiveis");
 
-  // payments + receipts maps
+  // payments + receipts + rooms maps
   const [paymentsByRec, setPaymentsByRec] = useState<Map<string, ReceivablePayment[]>>(new Map());
   const [receiptsByRec, setReceiptsByRec] = useState<Map<string, ReceiptRow>>(new Map());
   const [receiptsByPayment, setReceiptsByPayment] = useState<Map<string, ReceiptRow>>(new Map());
+  const [roomsByRec, setRoomsByRec] = useState<Map<string, string[]>>(new Map());
+
 
   // pay dialog
   const [payOpen, setPayOpen] = useState(false);
