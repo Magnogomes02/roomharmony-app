@@ -208,10 +208,12 @@ export async function createReceiptForReceivable(
   if (paymentId) {
     const { data: pay, error: payErr } = await supabase
       .from("receivable_payments")
-      .select("id, amount, paid_at, payment_method, status")
+      .select("id, amount, paid_at, payment_method, status, receivable_id")
       .eq("id", paymentId)
-      .single();
-    if (payErr || !pay) throw new Error(payErr?.message ?? "Pagamento não encontrado");
+      .eq("receivable_id", receivableId)
+      .maybeSingle();
+    if (payErr) throw new Error(payErr.message);
+    if (!pay) throw new Error("Pagamento não pertence a este recebível.");
     if (pay.status !== "ativo") throw new Error("Pagamento não está ativo.");
     paymentRow = pay as PaymentSnap;
 
@@ -223,6 +225,7 @@ export async function createReceiptForReceivable(
       .eq("status", "emitido")
       .maybeSingle();
     if (dup) throw new Error("Este pagamento já possui recibo emitido.");
+
   } else {
     // legacy: usa campos resumo do recebível (precisa estar recebido)
     if (rec.status !== "recebido")
