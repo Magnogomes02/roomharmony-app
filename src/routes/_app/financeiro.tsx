@@ -707,7 +707,7 @@ function FinanceiroPage() {
     [contracts, newForm.contract_id],
   );
 
-  // when contract changes, autofill
+  // when contract changes, autofill + load rooms from contract_schedules
   useEffect(() => {
     if (!selectedContract) return;
     const dueDay = selectedContract.due_day || 5;
@@ -717,10 +717,22 @@ function FinanceiroPage() {
       kind: "contrato",
       amount_due: String(selectedContract.monthly_value ?? ""),
       due_date: due,
-      room_id: selectedContract.room_id ?? f.room_id,
     }));
+    (async () => {
+      const ids = new Set<string>();
+      if (selectedContract.room_id) ids.add(selectedContract.room_id);
+      const { data } = await supabase
+        .from("contract_schedules")
+        .select("room_id")
+        .eq("contract_id", selectedContract.id);
+      for (const s of (data ?? []) as { room_id: string | null }[]) {
+        if (s.room_id) ids.add(s.room_id);
+      }
+      setNewRoomIds(Array.from(ids));
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [newForm.contract_id, newForm.year, newForm.month]);
+
 
   // load year receivables for the contract/professional
   useEffect(() => {
