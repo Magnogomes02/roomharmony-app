@@ -119,17 +119,46 @@ export async function getReceiptsByReceivableIds(ids: string[]): Promise<Map<str
 }
 
 async function resolveReceivableRoom(rec: {
+  id: string;
   room_id: string | null;
   contract_id: string | null;
-}): Promise<{ room_id: string | null; room_name: string | null }> {
+}): Promise<{ room_id: string | null; room_name: string | null; room_names_snapshot: string | null }> {
+  // 1. receivable_rooms (multi)
+  const { data: recRooms } = await supabase
+    .from("receivable_rooms")
+    .select("room_id")
+    .eq("receivable_id", rec.id);
+  const multiIds = Array.from(
+    new Set(((recRooms ?? []).map((r) => r.room_id).filter(Boolean) as string[])),
+  );
+  if (multiIds.length > 0) {
+    const { data: rooms } = await supabase.from("rooms").select("id,name").in("id", multiIds);
+    // preserve selection order: rebuild names following multiIds order
+    const nameById = new Map(((rooms ?? []) as { id: string; name: string }[]).map((r) => [r.id, r.name]));
+    const orderedNames = multiIds.map((id) => nameById.get(id)).filter(Boolean) as string[];
+    const joined = orderedNames.join(", ");
+    return {
+      room_id: multiIds[0],
+      room_name: joined,
+      room_names_snapshot: joined,
+    };
+  }
+
+  // 2. legacy receivables.room_id
   if (rec.room_id) {
     const { data } = await supabase
       .from("rooms")
       .select("id,name")
       .eq("id", rec.room_id)
       .maybeSingle();
-    return { room_id: rec.room_id, room_name: data?.name ?? null };
+    return {
+      room_id: rec.room_id,
+      room_name: data?.name ?? null,
+      room_names_snapshot: data?.name ?? null,
+    };
   }
+
+  // 3. fallback: contract_schedules
   if (rec.contract_id) {
     const { data: schedules } = await supabase
       .from("contract_schedules")
@@ -138,16 +167,22 @@ async function resolveReceivableRoom(rec: {
     const uniqueIds = Array.from(
       new Set((schedules ?? []).map((s) => s.room_id).filter(Boolean) as string[]),
     );
-    if (uniqueIds.length === 0) return { room_id: null, room_name: null };
-    const { data: rooms } = await supabase.from("rooms").select("id,name").in("id", uniqueIds);
-    const names = (rooms ?? []).map((r) => r.name).filter(Boolean);
-    if (uniqueIds.length === 1) {
-      return { room_id: uniqueIds[0], room_name: names[0] ?? null };
+    if (uniqueIds.length === 0) {
+      return { room_id: null, room_name: null, room_names_snapshot: null };
     }
-    return { room_id: null, room_name: names.length ? names.join(", ") : null };
+    const { data: rooms } = await supabase.from("rooms").select("id,name").in("id", uniqueIds);
+    const nameById = new Map(((rooms ?? []) as { id: string; name: string }[]).map((r) => [r.id, r.name]));
+    const orderedNames = uniqueIds.map((id) => nameById.get(id)).filter(Boolean) as string[];
+    const joined = orderedNames.join(", ");
+    return {
+      room_id: uniqueIds[0],
+      room_name: joined || null,
+      room_names_snapshot: joined || null,
+    };
   }
-  return { room_id: null, room_name: null };
+  return { room_id: null, room_name: null, room_names_snapshot: null };
 }
+
 
 export async function createReceiptForReceivable(
   receivableId: string,
