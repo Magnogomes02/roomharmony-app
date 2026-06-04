@@ -96,10 +96,11 @@ interface Receivable {
   payment_method: string | null;
   notes: string | null;
   attachment_path: string | null;
-  status: "a_receber" | "recebido" | "atrasado" | "cancelado";
+  status: "a_receber" | "parcial" | "recebido" | "atrasado" | "cancelado";
   cancel_type: string | null;
   cancel_reason: string | null;
 }
+
 
 interface ProfessionalLite {
   id: string;
@@ -159,10 +160,12 @@ function FinanceiroPage() {
   const [tab, setTab] = useState<EffectiveStatus | "perda" | "errada" | "todos">("a_receber");
   const [financeView, setFinanceView] = useState<"recebiveis" | "analise">("recebiveis");
 
-  // payments + receipts maps
+  // payments + receipts + rooms maps
   const [paymentsByRec, setPaymentsByRec] = useState<Map<string, ReceivablePayment[]>>(new Map());
   const [receiptsByRec, setReceiptsByRec] = useState<Map<string, ReceiptRow>>(new Map());
   const [receiptsByPayment, setReceiptsByPayment] = useState<Map<string, ReceiptRow>>(new Map());
+  const [roomsByRec, setRoomsByRec] = useState<Map<string, string[]>>(new Map());
+
 
   // pay dialog
   const [payOpen, setPayOpen] = useState(false);
@@ -201,6 +204,8 @@ function FinanceiroPage() {
   const [histOpen, setHistOpen] = useState(false);
   const [histRow, setHistRow] = useState<Receivable | null>(null);
   const [histPayments, setHistPayments] = useState<ReceivablePayment[]>([]);
+  const [histReceipts, setHistReceipts] = useState<Map<string, ReceiptRow>>(new Map());
+
 
   // novo recebível dialog
   const [newOpen, setNewOpen] = useState(false);
@@ -212,12 +217,13 @@ function FinanceiroPage() {
     month: new Date().getMonth(),
     due_date: "",
     amount_due: "",
-    room_id: "",
     notes: "",
   });
+  const [newRoomIds, setNewRoomIds] = useState<string[]>([]);
   const [yearReceivables, setYearReceivables] = useState<Receivable[]>([]);
   const [monthsChecked, setMonthsChecked] = useState<Record<number, boolean>>({});
   const [savingNew, setSavingNew] = useState(false);
+
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -254,14 +260,25 @@ function FinanceiroPage() {
     const allPaymentIds = Array.from(payments.values())
       .flat()
       .map((x) => x.id);
-    const [recRecs, payRecs] = await Promise.all([
+    const [recRecs, payRecs, rrRes] = await Promise.all([
       getReceiptsByReceivableIds(ids),
       getReceiptsByPaymentIds(allPaymentIds),
+      ids.length > 0
+        ? supabase.from("receivable_rooms").select("receivable_id, room_id").in("receivable_id", ids)
+        : Promise.resolve({ data: [] as { receivable_id: string; room_id: string }[] }),
     ]);
     setReceiptsByRec(recRecs);
     setReceiptsByPayment(payRecs);
+    const rrMap = new Map<string, string[]>();
+    for (const row of (rrRes.data ?? []) as { receivable_id: string; room_id: string }[]) {
+      const arr = rrMap.get(row.receivable_id) ?? [];
+      arr.push(row.room_id);
+      rrMap.set(row.receivable_id, arr);
+    }
+    setRoomsByRec(rrMap);
     setLoading(false);
   }, [monthRef]);
+
 
   useEffect(() => {
     load();
@@ -525,8 +542,60 @@ function FinanceiroPage() {
     setHistRow(r);
     const all = await getAllPaymentsForReceivable(r.id);
     setHistPayments(all);
+    const recs = await getReceiptsByPaymentIds(all.map((p) => p.id));
+    setHistReceipts(recs);
     setHistOpen(true);
   }
+
+  async function refreshHistoryReceipts(receivableId: string) {
+    const all = await getAllPaymentsForReceivable(receivableId);
+    setHistPayments(all);
+    const recs = await getReceiptsByPaymentIds(all.map((p) => p.id));
+    setHistReceipts(recs);
+  }
+
+  async function generateReceiptForPayment(r: Receivable, paymentId: string) {
+    try {
+      await createReceiptForReceivable(r.id, paymentId);
+      toast.success("Recibo gerado");
+      await refreshHistoryReceipts(r.id);
+      load();
+    } catch (e) {
+      toast.error("Erro ao gerar recibo", {
+        description: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
+
+  async function downloadReceiptForPayment(paymentId: string) {
+    const rc = histReceipts.get(paymentId);
+    if (!rc) return;
+    try {
+      await downloadReceipt(rc);
+    } catch (e) {
+      toast.error("Erro ao baixar recibo", {
+        description: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
+
+  async function cancelReceiptForPayment(r: Receivable, paymentId: string) {
+    const rc = histReceipts.get(paymentId);
+    if (!rc) return;
+    const reason = prompt("Motivo do cancelamento do recibo:");
+    if (!reason || !reason.trim()) return;
+    try {
+      await cancelReceiptById(rc.id, reason.trim());
+      toast.success("Recibo cancelado");
+      await refreshHistoryReceipts(r.id);
+      load();
+    } catch (e) {
+      toast.error("Erro ao cancelar recibo", {
+        description: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
+
 
   function openEdit(r: Receivable) {
     if (receiptsByRec.has(r.id)) {
@@ -684,13 +753,14 @@ function FinanceiroPage() {
       month: now.getMonth(),
       due_date: "",
       amount_due: "",
-      room_id: "",
       notes: "",
     });
+    setNewRoomIds([]);
     setYearReceivables([]);
     setMonthsChecked({});
     setNewOpen(true);
   }
+
 
   const contractsForProf = useMemo(
     () => contracts.filter((c) => c.professional_id === newForm.professional_id),
@@ -702,7 +772,7 @@ function FinanceiroPage() {
     [contracts, newForm.contract_id],
   );
 
-  // when contract changes, autofill
+  // when contract changes, autofill + load rooms from contract_schedules
   useEffect(() => {
     if (!selectedContract) return;
     const dueDay = selectedContract.due_day || 5;
@@ -712,10 +782,22 @@ function FinanceiroPage() {
       kind: "contrato",
       amount_due: String(selectedContract.monthly_value ?? ""),
       due_date: due,
-      room_id: selectedContract.room_id ?? f.room_id,
     }));
+    (async () => {
+      const ids = new Set<string>();
+      if (selectedContract.room_id) ids.add(selectedContract.room_id);
+      const { data } = await supabase
+        .from("contract_schedules")
+        .select("room_id")
+        .eq("contract_id", selectedContract.id);
+      for (const s of (data ?? []) as { room_id: string | null }[]) {
+        if (s.room_id) ids.add(s.room_id);
+      }
+      setNewRoomIds(Array.from(ids));
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [newForm.contract_id, newForm.year, newForm.month]);
+
 
   // load year receivables for the contract/professional
   useEffect(() => {
@@ -782,12 +864,13 @@ function FinanceiroPage() {
       if (dups.length > 0) return { ok: false, reason: "duplicate" };
     }
 
+    const firstRoom = newRoomIds[0] ?? null;
     const insertPayload = {
       kind: (newForm.contract_id ? "contrato" : "avulso") as "contrato" | "avulso",
       contract_id: newForm.contract_id || null,
       booking_id: null,
       professional_id: newForm.professional_id,
-      room_id: newForm.room_id || null,
+      room_id: firstRoom,
       reference_month: referenceMonth,
       due_date: due,
       amount_due: amount,
@@ -800,12 +883,21 @@ function FinanceiroPage() {
       .select("id")
       .single();
     if (error) return { ok: false, reason: error.message };
+    // insert receivable_rooms when we have multiple rooms (or even one — keeps source of truth)
+    if (ins?.id && newRoomIds.length > 0) {
+      const rows = newRoomIds.map((roomId) => ({ receivable_id: ins.id, room_id: roomId }));
+      const { error: rrErr } = await supabase.from("receivable_rooms").insert(rows);
+      if (rrErr) console.warn("[financeiro] receivable_rooms insert", rrErr);
+    }
     await audit("receivable.manual_create", ins?.id ?? null, {
       ...insertPayload,
+      room_ids: newRoomIds,
       duplicated: allowDuplicate,
+      reason: newForm.notes || null,
     });
     return { ok: true };
   }
+
 
   async function saveNewReceivableSingle() {
     if (!newForm.professional_id) return toast.error("Selecione um profissional.");
@@ -1068,8 +1160,23 @@ function FinanceiroPage() {
                                   </Badge>
                                 </TableCell>
                                 <TableCell className="text-sm">
-                                  {r.room_id ? (roomMap.get(r.room_id) ?? "—") : "—"}
+                                  {(() => {
+                                    const multi = roomsByRec.get(r.id) ?? [];
+                                    const names = multi
+                                      .map((id) => roomMap.get(id))
+                                      .filter(Boolean) as string[];
+                                    if (names.length > 0) {
+                                      const text = names.join(", ");
+                                      return names.length > 2 ? (
+                                        <span title={text}>{names.length} salas</span>
+                                      ) : (
+                                        text
+                                      );
+                                    }
+                                    return r.room_id ? (roomMap.get(r.room_id) ?? "—") : "—";
+                                  })()}
                                 </TableCell>
+
                                 <TableCell className="text-sm">
                                   {format(parseISO(r.due_date), "dd/MM/yyyy")}
                                 </TableCell>
@@ -1434,24 +1541,61 @@ function FinanceiroPage() {
             {histPayments.length === 0 && (
               <p className="text-sm text-muted-foreground">Nenhum pagamento registrado.</p>
             )}
-            {histPayments.map((p) => (
-              <div
-                key={p.id}
-                className="flex items-center justify-between rounded-md border p-3 text-sm"
-              >
-                <div>
-                  <div className="font-medium">
-                    {brl(Number(p.amount))} · {p.payment_method ?? "—"}
+            {histPayments.map((p) => {
+              const rc = histReceipts.get(p.id);
+              return (
+                <div
+                  key={p.id}
+                  className="flex items-center justify-between gap-3 rounded-md border p-3 text-sm"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium">
+                      {brl(Number(p.amount))} · {p.payment_method ?? "—"}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {format(parseISO(p.paid_at), "dd/MM/yyyy")}
+                      {p.status !== "ativo" && ` · ${p.status}`}
+                      {p.reverse_reason && ` — motivo: ${p.reverse_reason}`}
+                      {rc && ` · Recibo ${rc.receipt_number}`}
+                    </div>
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    {format(parseISO(p.paid_at), "dd/MM/yyyy")}
-                    {p.status !== "ativo" && ` · ${p.status}`}
-                    {p.reverse_reason && ` — motivo: ${p.reverse_reason}`}
+                  <div className="flex items-center gap-1">
+                    <Badge variant={p.status === "ativo" ? "default" : "outline"}>{p.status}</Badge>
+                    {rc && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        title="Baixar recibo"
+                        onClick={() => downloadReceiptForPayment(p.id)}
+                      >
+                        <Download className="h-4 w-4 text-success" />
+                      </Button>
+                    )}
+                    {canEdit && p.status === "ativo" && !rc && histRow && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        title="Gerar recibo deste pagamento"
+                        onClick={() => generateReceiptForPayment(histRow, p.id)}
+                      >
+                        <FileText className="h-4 w-4 text-primary" />
+                      </Button>
+                    )}
+                    {canEdit && rc && histRow && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        title="Cancelar recibo deste pagamento"
+                        onClick={() => cancelReceiptForPayment(histRow, p.id)}
+                      >
+                        <Ban className="h-4 w-4 text-destructive" />
+                      </Button>
+                    )}
                   </div>
                 </div>
-                <Badge variant={p.status === "ativo" ? "default" : "outline"}>{p.status}</Badge>
-              </div>
-            ))}
+              );
+            })}
+
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setHistOpen(false)}>
@@ -1603,36 +1747,55 @@ function FinanceiroPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label>Valor (R$)</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={newForm.amount_due}
-                  onChange={(e) => setNewForm({ ...newForm, amount_due: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Sala (opcional)</Label>
-                <Select
-                  value={newForm.room_id || "none"}
-                  onValueChange={(v) => setNewForm({ ...newForm, room_id: v === "none" ? "" : v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sem sala" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Sem sala</SelectItem>
-                    {rooms.map((r) => (
-                      <SelectItem key={r.id} value={r.id}>
-                        {r.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-2">
+              <Label>Valor (R$)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={newForm.amount_due}
+                onChange={(e) => setNewForm({ ...newForm, amount_due: e.target.value })}
+              />
             </div>
+
+            <div className="space-y-2">
+              <Label>
+                {newForm.contract_id
+                  ? "Salas identificadas no contrato"
+                  : "Salas vinculadas ao recebível"}
+              </Label>
+              <div className="grid grid-cols-2 gap-1 rounded-md border p-3 sm:grid-cols-3">
+                {rooms.length === 0 && (
+                  <p className="text-xs text-muted-foreground">Nenhuma sala cadastrada.</p>
+                )}
+                {rooms.map((r) => {
+                  const checked = newRoomIds.includes(r.id);
+                  return (
+                    <Label
+                      key={r.id}
+                      className="flex items-center gap-2 rounded p-2 text-xs cursor-pointer hover:bg-muted/30"
+                    >
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={(v) => {
+                          setNewRoomIds((prev) =>
+                            v === true
+                              ? Array.from(new Set([...prev, r.id]))
+                              : prev.filter((id) => id !== r.id),
+                          );
+                        }}
+                      />
+                      {r.name}
+                    </Label>
+                  );
+                })}
+              </div>
+              {newRoomIds.length > 1 && (
+                <p className="text-xs text-muted-foreground">
+                  {newRoomIds.length} salas selecionadas — todas aparecerão no recibo.
+                </p>
+              )}
+            </div>
+
 
             <div className="space-y-2">
               <Label>Observação / motivo</Label>

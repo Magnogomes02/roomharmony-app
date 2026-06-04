@@ -123,10 +123,11 @@ export async function recomputeReceivableSummary(receivableId: string): Promise<
       amount_paid: totalPaid > 0 ? totalPaid : null,
       paid_at: last ? new Date(last.paid_at).toISOString() : null,
       payment_method: last?.payment_method ?? null,
-      status: newStatus as "a_receber" | "recebido" | "atrasado" | "cancelado",
+      status: newStatus as "a_receber" | "parcial" | "recebido" | "atrasado" | "cancelado",
     })
     .eq("id", receivableId);
 }
+
 
 export interface CreatePaymentInput {
   receivableId: string;
