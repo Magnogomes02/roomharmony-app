@@ -273,6 +273,8 @@ export async function createReceiptForReceivable(
     professional_phone: prof.phone,
     room_id: resolvedRoom.room_id,
     room_name: resolvedRoom.room_name,
+    room_names_snapshot: resolvedRoom.room_names_snapshot,
+
     kind: rec.kind,
     reference_month: rec.reference_month,
     due_date: rec.due_date,
