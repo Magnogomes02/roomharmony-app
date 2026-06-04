@@ -74,10 +74,13 @@ function toPdfData(row: ReceiptRow, overrides?: { cancelled?: boolean }): Receip
     payment_method: row.payment_method,
     amount_due: Number(row.amount_due),
     amount_paid: Number(row.amount_paid),
-    room_name: row.room_name,
+    // PDF prefers room_names_snapshot (captures all rooms at issue time);
+    // falls back to legacy room_name field for old receipts.
+    room_name: row.room_names_snapshot ?? row.room_name,
     notes: null,
   };
 }
+
 
 async function audit(action: string, entity_id: string, metadata: Record<string, unknown>) {
   const {
