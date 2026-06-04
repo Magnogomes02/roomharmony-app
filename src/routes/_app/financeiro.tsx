@@ -258,14 +258,25 @@ function FinanceiroPage() {
     const allPaymentIds = Array.from(payments.values())
       .flat()
       .map((x) => x.id);
-    const [recRecs, payRecs] = await Promise.all([
+    const [recRecs, payRecs, rrRes] = await Promise.all([
       getReceiptsByReceivableIds(ids),
       getReceiptsByPaymentIds(allPaymentIds),
+      ids.length > 0
+        ? supabase.from("receivable_rooms").select("receivable_id, room_id").in("receivable_id", ids)
+        : Promise.resolve({ data: [] as { receivable_id: string; room_id: string }[] }),
     ]);
     setReceiptsByRec(recRecs);
     setReceiptsByPayment(payRecs);
+    const rrMap = new Map<string, string[]>();
+    for (const row of (rrRes.data ?? []) as { receivable_id: string; room_id: string }[]) {
+      const arr = rrMap.get(row.receivable_id) ?? [];
+      arr.push(row.room_id);
+      rrMap.set(row.receivable_id, arr);
+    }
+    setRoomsByRec(rrMap);
     setLoading(false);
   }, [monthRef]);
+
 
   useEffect(() => {
     load();
