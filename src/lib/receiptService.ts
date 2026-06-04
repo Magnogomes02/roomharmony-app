@@ -41,6 +41,8 @@ export interface ReceiptRow {
   receipt_footer: string | null;
   receipt_path: string | null;
   authentication_code: string | null;
+  room_names_snapshot: string | null;
+
 }
 
 function pad(n: number, w = 2) {
