@@ -215,12 +215,13 @@ function FinanceiroPage() {
     month: new Date().getMonth(),
     due_date: "",
     amount_due: "",
-    room_id: "",
     notes: "",
   });
+  const [newRoomIds, setNewRoomIds] = useState<string[]>([]);
   const [yearReceivables, setYearReceivables] = useState<Receivable[]>([]);
   const [monthsChecked, setMonthsChecked] = useState<Record<number, boolean>>({});
   const [savingNew, setSavingNew] = useState(false);
+
 
   const load = useCallback(async () => {
     setLoading(true);
