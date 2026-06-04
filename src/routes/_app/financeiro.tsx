@@ -96,10 +96,11 @@ interface Receivable {
   payment_method: string | null;
   notes: string | null;
   attachment_path: string | null;
-  status: "a_receber" | "recebido" | "atrasado" | "cancelado";
+  status: "a_receber" | "parcial" | "recebido" | "atrasado" | "cancelado";
   cancel_type: string | null;
   cancel_reason: string | null;
 }
+
 
 interface ProfessionalLite {
   id: string;
