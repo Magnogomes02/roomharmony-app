@@ -615,6 +615,7 @@ export type Database = {
           reference_month: string
           room_id: string | null
           room_name: string | null
+          room_names_snapshot: string | null
           status: string
           updated_at: string
         }
@@ -652,6 +653,7 @@ export type Database = {
           reference_month: string
           room_id?: string | null
           room_name?: string | null
+          room_names_snapshot?: string | null
           status?: string
           updated_at?: string
         }
@@ -689,6 +691,7 @@ export type Database = {
           reference_month?: string
           room_id?: string | null
           room_name?: string | null
+          room_names_snapshot?: string | null
           status?: string
           updated_at?: string
         }
@@ -705,6 +708,42 @@ export type Database = {
             columns: ["receivable_id"]
             isOneToOne: false
             referencedRelation: "receivables"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      receivable_rooms: {
+        Row: {
+          created_at: string
+          id: string
+          receivable_id: string
+          room_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          receivable_id: string
+          room_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          receivable_id?: string
+          room_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "receivable_rooms_receivable_id_fkey"
+            columns: ["receivable_id"]
+            isOneToOne: false
+            referencedRelation: "receivables"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receivable_rooms_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
             referencedColumns: ["id"]
           },
         ]
