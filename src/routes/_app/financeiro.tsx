@@ -204,6 +204,8 @@ function FinanceiroPage() {
   const [histOpen, setHistOpen] = useState(false);
   const [histRow, setHistRow] = useState<Receivable | null>(null);
   const [histPayments, setHistPayments] = useState<ReceivablePayment[]>([]);
+  const [histReceipts, setHistReceipts] = useState<Map<string, ReceiptRow>>(new Map());
+
 
   // novo recebível dialog
   const [newOpen, setNewOpen] = useState(false);
