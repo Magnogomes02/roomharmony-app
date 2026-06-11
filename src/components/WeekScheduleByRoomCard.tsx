@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { entityColor, sortRooms, colorBlockStyle } from "@/lib/entityColors";
+import { loadShiftDefaults, SHIFT_LABELS, type ShiftKey, type ShiftDefaults } from "@/lib/shifts";
 
 interface BookingRow {
   id: string;
@@ -32,6 +33,41 @@ interface ProfRow {
 }
 
 const WEEKDAYS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
+const SHIFT_ORDER: ShiftKey[] = ["manha", "tarde", "noite"];
+
+// minutos desde 00:00 a partir de "HH:MM"
+function hmToMin(hm: string): number {
+  const [h, m] = hm.split(":").map(Number);
+  return (h || 0) * 60 + (m || 0);
+}
+function dateMinOfDay(d: Date): number {
+  return d.getHours() * 60 + d.getMinutes();
+}
+
+// Retorna os turnos que esta reserva sobrepõe naquele dia.
+// Se nenhum, retorna [] (fora dos turnos).
+function shiftsForBooking(
+  start: Date,
+  end: Date,
+  dayKey: string,
+  defs: ShiftDefaults,
+): ShiftKey[] {
+  // Clampa o intervalo ao dia em questão
+  const dayStart = new Date(`${dayKey}T00:00:00`);
+  const dayEnd = new Date(`${dayKey}T23:59:59`);
+  const s = start < dayStart ? dayStart : start;
+  const e = end > dayEnd ? dayEnd : end;
+  const sMin = dateMinOfDay(s);
+  const eMin = dateMinOfDay(e);
+  const result: ShiftKey[] = [];
+  for (const k of SHIFT_ORDER) {
+    const ss = hmToMin(defs[k].start);
+    const se = hmToMin(defs[k].end);
+    // sobreposição estrita: sMin < se && eMin > ss
+    if (sMin < se && eMin > ss) result.push(k);
+  }
+  return result;
+}
 
 export function WeekScheduleByRoomCard() {
   const [offset, setOffset] = useState(0);
@@ -43,6 +79,12 @@ export function WeekScheduleByRoomCard() {
   }, [offset]);
   const weekEnd = useMemo(() => addDays(weekStart, 7), [weekStart]);
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
+
+  const { data: shiftDefs } = useQuery({
+    queryKey: ["shift-defaults"],
+    queryFn: loadShiftDefaults,
+    staleTime: 5 * 60 * 1000,
+  });
 
   const { data, isLoading } = useQuery({
     queryKey: ["week-schedule-by-room", weekStart.toISOString()],
@@ -104,10 +146,77 @@ export function WeekScheduleByRoomCard() {
           <p className="text-sm text-muted-foreground">Nenhuma sala ativa cadastrada.</p>
         )}
 
-        {sortedRooms.map((room) => {
+        {shiftDefs && sortedRooms.map((room) => {
           const roomColor = entityColor(room.color_hex, room.id);
           const roomBookings = (data?.bookings ?? []).filter((b) => b.room_id === room.id);
           const conflictCount = roomBookings.filter((b) => b.status === "conflito").length;
+
+          // Pré-classifica reservas por dia e turno, e detecta "fora dos turnos" no escopo da sala
+          type Classified = {
+            byShift: Record<ShiftKey, BookingRow[]>;
+            outside: BookingRow[];
+          };
+          const perDay: Record<string, Classified> = {};
+          let roomHasOutside = false;
+          for (const d of days) {
+            const dayKey = format(d, "yyyy-MM-dd");
+            const classified: Classified = {
+              byShift: { manha: [], tarde: [], noite: [] },
+              outside: [],
+            };
+            const dayBookings = roomBookings
+              .filter((b) => format(new Date(b.start_at), "yyyy-MM-dd") === dayKey)
+              .sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime());
+            for (const b of dayBookings) {
+              const shifts = shiftsForBooking(new Date(b.start_at), new Date(b.end_at), dayKey, shiftDefs);
+              if (shifts.length === 0) {
+                classified.outside.push(b);
+                roomHasOutside = true;
+              } else {
+                for (const k of shifts) classified.byShift[k].push(b);
+              }
+            }
+            perDay[dayKey] = classified;
+          }
+
+          const rowsToRender: Array<{ key: ShiftKey | "outside"; label: string }> = [
+            { key: "manha", label: SHIFT_LABELS.manha },
+            { key: "tarde", label: SHIFT_LABELS.tarde },
+            { key: "noite", label: SHIFT_LABELS.noite },
+          ];
+          if (roomHasOutside) rowsToRender.push({ key: "outside", label: "Fora dos turnos" });
+
+          const renderBookingCard = (b: BookingRow, spans?: ShiftKey[]) => {
+            const prof = data?.pros[b.professional_id];
+            const profColor = entityColor(prof?.color_hex, b.professional_id);
+            const isConflict = b.status === "conflito";
+            const s = new Date(b.start_at);
+            const e = new Date(b.end_at);
+            const crosses = spans && spans.length > 1;
+            return (
+              <Link
+                key={b.id}
+                to="/calendario"
+                className={`block overflow-hidden rounded border-l-2 px-1.5 py-1 text-[10px] leading-tight transition hover:opacity-90 ${
+                  isConflict ? "ring-1 ring-destructive/60" : ""
+                }`}
+                style={colorBlockStyle(profColor)}
+                title={crosses ? "Atravessa turnos" : undefined}
+              >
+                <div className="truncate font-medium">
+                  {format(s, "HH:mm")}–{format(e, "HH:mm")}
+                  {crosses && <span className="ml-1 opacity-70">↕</span>}
+                </div>
+                <div className="truncate opacity-80">{prof?.full_name ?? "—"}</div>
+                {isConflict && (
+                  <div className="mt-0.5 flex items-center gap-0.5 text-[9px] font-medium text-destructive">
+                    <AlertTriangle className="h-2.5 w-2.5" />
+                    Conflito
+                  </div>
+                )}
+              </Link>
+            );
+          };
 
           return (
             <div
@@ -140,63 +249,72 @@ export function WeekScheduleByRoomCard() {
                   Nenhuma reserva nesta semana.
                 </p>
               ) : (
-                <div className="grid grid-cols-7 gap-1 p-2">
-                  {days.map((d, di) => {
-                    const dayKey = format(d, "yyyy-MM-dd");
-                    const dayBookings = roomBookings
-                      .filter((b) => format(new Date(b.start_at), "yyyy-MM-dd") === dayKey)
-                      .sort(
-                        (a, b) =>
-                          new Date(a.start_at).getTime() - new Date(b.start_at).getTime(),
-                      );
-                    const isToday = dayKey === format(new Date(), "yyyy-MM-dd");
-                    return (
-                      <div key={dayKey} className="min-h-[80px]">
+                <div className="p-2">
+                  {/* Cabeçalho de dias */}
+                  <div className="grid gap-1" style={{ gridTemplateColumns: "70px repeat(7, minmax(0, 1fr))" }}>
+                    <div />
+                    {days.map((d, di) => {
+                      const dayKey = format(d, "yyyy-MM-dd");
+                      const isToday = dayKey === format(new Date(), "yyyy-MM-dd");
+                      return (
                         <div
+                          key={dayKey}
                           className={`mb-1 text-center text-[10px] uppercase ${
                             isToday ? "font-semibold text-primary" : "text-muted-foreground"
                           }`}
                         >
                           {WEEKDAYS[di]} {format(d, "dd/MM")}
                         </div>
-                        <div className="space-y-1">
-                          {dayBookings.length === 0 ? (
-                            <div className="rounded border border-dashed border-border/40 px-1 py-2 text-center text-[10px] text-muted-foreground/60">
-                              —
-                            </div>
-                          ) : (
-                            dayBookings.map((b) => {
-                              const prof = data?.pros[b.professional_id];
-                              const profColor = entityColor(prof?.color_hex, b.professional_id);
-                              const isConflict = b.status === "conflito";
-                              const s = new Date(b.start_at);
-                              const e = new Date(b.end_at);
-                              return (
-                                <Link
-                                  key={b.id}
-                                  to="/calendario"
-                                  className={`block overflow-hidden rounded border-l-2 px-1.5 py-1 text-[10px] leading-tight transition hover:opacity-90 ${
-                                    isConflict ? "ring-1 ring-destructive/60" : ""
-                                  }`}
-                                  style={colorBlockStyle(profColor)}
-                                >
-                                  <div className="truncate font-medium">
-                                    {format(s, "HH:mm")}–{format(e, "HH:mm")}
-                                  </div>
-                                  <div className="truncate opacity-80">
-                                    {prof?.full_name ?? "—"}
-                                  </div>
-                                  {isConflict && (
-                                    <div className="mt-0.5 flex items-center gap-0.5 text-[9px] font-medium text-destructive">
-                                      <AlertTriangle className="h-2.5 w-2.5" />
-                                      Conflito
-                                    </div>
-                                  )}
-                                </Link>
-                              );
-                            })
+                      );
+                    })}
+                  </div>
+
+                  {/* Linhas por turno */}
+                  {rowsToRender.map((row) => {
+                    const isOutside = row.key === "outside";
+                    const shiftRange = !isOutside
+                      ? `${shiftDefs[row.key as ShiftKey].start}–${shiftDefs[row.key as ShiftKey].end}`
+                      : "";
+                    return (
+                      <div
+                        key={row.key}
+                        className="grid gap-1 border-t border-border/30 py-1"
+                        style={{ gridTemplateColumns: "70px repeat(7, minmax(0, 1fr))" }}
+                      >
+                        <div className="flex flex-col justify-center pr-1 text-[10px]">
+                          <span className="font-medium text-foreground/80">{row.label}</span>
+                          {shiftRange && (
+                            <span className="text-[9px] text-muted-foreground">{shiftRange}</span>
                           )}
                         </div>
+                        {days.map((d) => {
+                          const dayKey = format(d, "yyyy-MM-dd");
+                          const cls = perDay[dayKey];
+                          const items = isOutside
+                            ? cls.outside
+                            : cls.byShift[row.key as ShiftKey];
+                          return (
+                            <div key={dayKey} className="min-h-[44px] space-y-1">
+                              {items.length === 0 ? (
+                                <div className="flex h-full min-h-[44px] items-center justify-center rounded border border-dashed border-border/40 text-[10px] text-muted-foreground/60">
+                                  —
+                                </div>
+                              ) : (
+                                items.map((b) => {
+                                  const spans = !isOutside
+                                    ? shiftsForBooking(
+                                        new Date(b.start_at),
+                                        new Date(b.end_at),
+                                        dayKey,
+                                        shiftDefs,
+                                      )
+                                    : undefined;
+                                  return renderBookingCard(b, spans);
+                                })
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     );
                   })}
