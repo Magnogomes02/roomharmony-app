@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,6 +12,7 @@ import { WeekScheduleByRoomCard } from "@/components/WeekScheduleByRoomCard";
 import { startOfMonth, endOfMonth, startOfWeek, addDays } from "date-fns";
 import { parseDateOnlyLocal, formatDateOnlyBR, toDateOnlyString } from "@/lib/dateOnly";
 import { getEffectiveReceivableStatus, type ReceivableStatus } from "@/lib/financeStatus";
+import { createNotification } from "@/lib/notifications";
 
 export const Route = createFileRoute("/_app/dashboard")({
   component: DashboardPage,
@@ -117,6 +119,35 @@ function DashboardPage() {
       };
     },
   });
+
+  // Fire notifications once per day when overdue amounts are found
+  useEffect(() => {
+    if (!stats || !user?.email) return;
+    const today = toDateOnlyString(new Date());
+    const key = `notif_overdue_checked_${today}`;
+    if (localStorage.getItem(key)) return;
+    localStorage.setItem(key, "1");
+
+    const totalOverdue = (stats.fin.atrasadoContrato ?? 0) + (stats.fin.atrasadoAvulso ?? 0);
+    if (totalOverdue > 0) {
+      const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+      createNotification(
+        user.email,
+        "Recebíveis em atraso",
+        `Há ${brl(totalOverdue)} em recebíveis vencidos no mês atual. Acesse Financeiro para mais detalhes.`,
+        { total_overdue: totalOverdue, date: today },
+      );
+    }
+
+    if ((stats.conflicts ?? 0) > 0) {
+      createNotification(
+        user.email,
+        "Conflitos de agenda pendentes",
+        `${stats.conflicts} conflito(s) de reserva aguardam resolução.`,
+        { conflict_count: stats.conflicts, date: today },
+      );
+    }
+  }, [stats, user?.email]);
 
   const cards = [
     { label: "Profissionais ativos", value: stats?.professionals, icon: Users, color: "text-primary" },

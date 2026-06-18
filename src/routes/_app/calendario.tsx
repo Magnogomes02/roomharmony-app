@@ -5,6 +5,7 @@ import { format, addDays, startOfDay, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { createNotification } from "@/lib/notifications";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -272,6 +273,17 @@ function CalendarioPage() {
     }
 
     await audit("booking.create", data?.id ?? null, { source: newForm.is_maintenance ? "manutencao" : "avulsa", is_maintenance: newForm.is_maintenance, forced_conflict: force, amount: amountNum });
+
+    if (force && user?.email) {
+      const roomName = rooms.find((r) => r.id === newForm.room_id)?.name ?? "sala";
+      createNotification(
+        user.email,
+        "Conflito de agenda criado",
+        `Uma reserva em conflito foi criada na ${roomName} em ${format(start, "dd/MM HH:mm")}–${format(end, "HH:mm")}.`,
+        { booking_id: data?.id, room_id: newForm.room_id },
+      );
+    }
+
     toast.success("Reserva criada");
     setNewOpen(false);
     loadBookings();
