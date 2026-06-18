@@ -45,6 +45,7 @@ interface Booking {
   contract_id: string | null;
   reallocated_from: string | null;
   reallocated_to: string | null;
+  is_maintenance: boolean;
 }
 interface ContractSchedule {
   id: string;
@@ -125,8 +126,8 @@ function CalendarioPage() {
 
   // dialogs
   const [newOpen, setNewOpen] = useState(false);
-  const [newForm, setNewForm] = useState<{ room_id: string; professional_id: string; start: string; end: string; notes: string; avulso_amount: string; avulso_paid: boolean }>({
-    room_id: "", professional_id: "", start: "08:00", end: "09:00", notes: "", avulso_amount: "", avulso_paid: false,
+  const [newForm, setNewForm] = useState<{ room_id: string; professional_id: string; start: string; end: string; notes: string; avulso_amount: string; avulso_paid: boolean; is_maintenance: boolean }>({
+    room_id: "", professional_id: "", start: "08:00", end: "09:00", notes: "", avulso_amount: "", avulso_paid: false, is_maintenance: false,
   });
   const [conflictWarn, setConflictWarn] = useState<{ open: boolean; onConfirm: () => void; message: string }>({ open: false, onConfirm: () => {}, message: "" });
   const [detailBooking, setDetailBooking] = useState<Booking | null>(null);
@@ -154,7 +155,7 @@ function CalendarioPage() {
     const dayEnd = addDays(startOfDay(date), 1).toISOString();
     const { data, error } = await supabase
       .from("bookings")
-      .select("id,professional_id,room_id,start_at,end_at,status,source,contract_id,reallocated_from,reallocated_to")
+      .select("id,professional_id,room_id,start_at,end_at,status,source,contract_id,reallocated_from,reallocated_to,is_maintenance")
       .lt("start_at", dayEnd)
       .gt("end_at", dayStart)
       .order("start_at");
@@ -192,7 +193,7 @@ function CalendarioPage() {
   async function checkConflict(roomId: string, start: Date, end: Date, ignoreId?: string): Promise<Booking[]> {
     const { data } = await supabase
       .from("bookings")
-      .select("id,professional_id,room_id,start_at,end_at,status,source,contract_id,reallocated_from,reallocated_to")
+      .select("id,professional_id,room_id,start_at,end_at,status,source,contract_id,reallocated_from,reallocated_to,is_maintenance")
       .eq("room_id", roomId)
       .in("status", ["ativa", "conflito"])
       .lt("start_at", end.toISOString())
@@ -211,7 +212,7 @@ function CalendarioPage() {
     const startMin = HOUR_START * 60 + slotIdx * SLOT_MINUTES;
     const endMin = startMin + 60;
     const fmt = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
-    setNewForm({ room_id: roomId, professional_id: "", start: fmt(startMin), end: fmt(endMin), notes: "", avulso_amount: "", avulso_paid: false });
+    setNewForm({ room_id: roomId, professional_id: "", start: fmt(startMin), end: fmt(endMin), notes: "", avulso_amount: "", avulso_paid: false, is_maintenance: false });
     setNewOpen(true);
   }
 
@@ -236,21 +237,22 @@ function CalendarioPage() {
       }
     }
 
-    const amountNum = newForm.avulso_amount ? Number(newForm.avulso_amount) : null;
+    const amountNum = !newForm.is_maintenance && newForm.avulso_amount ? Number(newForm.avulso_amount) : null;
     const { data, error } = await supabase.from("bookings").insert({
       professional_id: newForm.professional_id,
       room_id: newForm.room_id,
       start_at: start.toISOString(),
       end_at: end.toISOString(),
       status: "ativa",
-      source: "avulsa",
+      source: newForm.is_maintenance ? "manutencao" : "avulsa",
+      is_maintenance: newForm.is_maintenance,
       avulso_amount: amountNum,
       avulso_paid_at: newForm.avulso_paid && amountNum ? new Date().toISOString() : null,
     }).select("id").single();
     if (error) { toast.error("Erro ao criar reserva", { description: error.message }); return; }
 
-    // gera recebível avulso se há valor
-    if (amountNum && amountNum > 0) {
+    // gera recebível avulso se há valor e não é manutenção
+    if (!newForm.is_maintenance && amountNum && amountNum > 0) {
       const today = new Date().toISOString().slice(0, 10);
       const monthRef = new Date(start.getFullYear(), start.getMonth(), 1).toISOString().slice(0, 10);
       const recPayload = {
@@ -269,7 +271,7 @@ function CalendarioPage() {
       await supabase.from("receivables").insert(recPayload);
     }
 
-    await audit("booking.create", data?.id ?? null, { source: "avulsa", forced_conflict: force, amount: amountNum });
+    await audit("booking.create", data?.id ?? null, { source: newForm.is_maintenance ? "manutencao" : "avulsa", is_maintenance: newForm.is_maintenance, forced_conflict: force, amount: amountNum });
     toast.success("Reserva criada");
     setNewOpen(false);
     loadBookings();
@@ -597,17 +599,21 @@ function CalendarioPage() {
                                 key={b.id}
                                 type="button"
                                 onClick={() => setDetailBooking(b)}
-                                style={inlineStyle}
+                                style={b.is_maintenance ? { top, height, left: 2, right: 2 } : inlineStyle}
                                 className={cn(
                                   "absolute overflow-hidden rounded-md border-l-4 px-2 py-1 text-left text-xs shadow-sm transition hover:shadow-md",
-                                  colorClass,
+                                  b.is_maintenance
+                                    ? "border-orange-400 bg-orange-100/60 text-orange-900 dark:bg-orange-900/20 dark:text-orange-200"
+                                    : colorClass,
                                 )}
                               >
-                                <div className="truncate font-medium">{prof?.full_name ?? "—"}</div>
+                                <div className="truncate font-medium">
+                                  {b.is_maintenance ? "🔧 Manutenção" : (prof?.full_name ?? "—")}
+                                </div>
                                 <div className="truncate opacity-70">
                                   {toTimeStr(parseISO(b.start_at))} – {toTimeStr(parseISO(b.end_at))}
                                 </div>
-                                {b.source !== "recorrencia" && (
+                                {!b.is_maintenance && b.source !== "recorrencia" && (
                                   <Badge variant="outline" className="mt-0.5 h-4 px-1 text-[9px]">{b.source}</Badge>
                                 )}
                               </button>
@@ -632,6 +638,14 @@ function CalendarioPage() {
             <DialogDescription>{format(date, "dd/MM/yyyy")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
+            <label className="flex items-center gap-2 rounded-md border border-orange-200 bg-orange-50/50 px-3 py-2 text-sm dark:border-orange-900/40 dark:bg-orange-900/10">
+              <Checkbox
+                checked={newForm.is_maintenance}
+                onCheckedChange={(v) => setNewForm({ ...newForm, is_maintenance: !!v, avulso_amount: "", avulso_paid: false })}
+              />
+              <span className="font-medium">Reserva de manutenção</span>
+              <span className="text-xs text-muted-foreground">(não gera cobrança)</span>
+            </label>
             <div className="space-y-2">
               <Label>Sala</Label>
               <Select value={newForm.room_id} onValueChange={(v) => setNewForm({ ...newForm, room_id: v })}>
@@ -642,7 +656,7 @@ function CalendarioPage() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Profissional</Label>
+              <Label>Responsável</Label>
               <Select value={newForm.professional_id} onValueChange={(v) => setNewForm({ ...newForm, professional_id: v })}>
                 <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                 <SelectContent>
@@ -660,25 +674,29 @@ function CalendarioPage() {
                 <Input type="time" value={newForm.end} onChange={(e) => setNewForm({ ...newForm, end: e.target.value })} />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-2">
-                <Label>Valor avulso (R$)</Label>
-                <Input type="number" step="0.01" min="0" placeholder="0,00"
-                  value={newForm.avulso_amount}
-                  onChange={(e) => setNewForm({ ...newForm, avulso_amount: e.target.value })} />
-              </div>
-              <div className="space-y-2">
-                <Label>Pagamento</Label>
-                <label className="flex h-10 items-center gap-2 rounded-md border px-3 text-sm">
-                  <Checkbox checked={newForm.avulso_paid}
-                    onCheckedChange={(v) => setNewForm({ ...newForm, avulso_paid: !!v })} />
-                  Já pago no ato
-                </label>
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Se informar valor, será criado um recebível avulso no Financeiro. Sem marcar "pago no ato", ele entra como "A receber".
-            </p>
+            {!newForm.is_maintenance && (
+              <>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-2">
+                    <Label>Valor avulso (R$)</Label>
+                    <Input type="number" step="0.01" min="0" placeholder="0,00"
+                      value={newForm.avulso_amount}
+                      onChange={(e) => setNewForm({ ...newForm, avulso_amount: e.target.value })} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Pagamento</Label>
+                    <label className="flex h-10 items-center gap-2 rounded-md border px-3 text-sm">
+                      <Checkbox checked={newForm.avulso_paid}
+                        onCheckedChange={(v) => setNewForm({ ...newForm, avulso_paid: !!v })} />
+                      Já pago no ato
+                    </label>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Se informar valor, será criado um recebível avulso no Financeiro. Sem marcar "pago no ato", ele entra como "A receber".
+                </p>
+              </>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setNewOpen(false)}>Cancelar</Button>
