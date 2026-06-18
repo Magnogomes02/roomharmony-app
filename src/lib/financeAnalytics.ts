@@ -17,6 +17,9 @@ export interface MonthlyFinancialSummary {
   overdueRate: number;
   lossRate: number;
   accumulatedReceived: number;
+  expensesPlanned: number;
+  expensesPaid: number;
+  resultado: number;
 }
 
 export interface AnnualFinancialSummary {
@@ -31,6 +34,9 @@ export interface AnnualFinancialSummary {
   lossRate: number;
   averageMonthlyReceived: number;
   bestMonth: string | null;
+  expensesPlanned: number;
+  expensesPaid: number;
+  resultado: number;
 }
 
 export interface AnnualFinancialResult {
@@ -48,6 +54,14 @@ interface ReceivableRow {
   cancel_type: string | null;
 }
 
+interface PayableRow {
+  reference_month: string | null;
+  due_date: string;
+  amount_due: number | string | null;
+  amount_paid: number | string | null;
+  status: "a_pagar" | "parcial" | "pago" | "atrasado" | "cancelado";
+}
+
 function num(v: number | string | null | undefined): number {
   if (v == null) return 0;
   const n = typeof v === "string" ? Number(v) : v;
@@ -62,14 +76,23 @@ function safeRate(numer: number, denom: number): number {
 export async function loadAnnualFinancialSummary(year: number): Promise<AnnualFinancialResult> {
   const start = `${year}-01-01`;
   const end = `${year}-12-31`;
-  const { data, error } = await supabase
-    .from("receivables")
-    .select("reference_month,due_date,amount_due,amount_paid,status,cancel_type")
-    .gte("reference_month", start)
-    .lte("reference_month", end);
-  if (error) throw error;
+  const [recRes, payRes] = await Promise.all([
+    supabase
+      .from("receivables")
+      .select("reference_month,due_date,amount_due,amount_paid,status,cancel_type")
+      .gte("reference_month", start)
+      .lte("reference_month", end),
+    supabase
+      .from("payables")
+      .select("reference_month,due_date,amount_due,amount_paid,status")
+      .neq("status", "cancelado")
+      .gte("due_date", start)
+      .lte("due_date", end),
+  ]);
+  if (recRes.error) throw recRes.error;
 
-  const rows = (data ?? []) as ReceivableRow[];
+  const rows = (recRes.data ?? []) as ReceivableRow[];
+  const payRows = (payRes.data ?? []) as PayableRow[];
 
   // Initialize 12 months
   const monthly: MonthlyFinancialSummary[] = Array.from({ length: 12 }, (_, i) => {
@@ -87,6 +110,9 @@ export async function loadAnnualFinancialSummary(year: number): Promise<AnnualFi
       overdueRate: 0,
       lossRate: 0,
       accumulatedReceived: 0,
+      expensesPlanned: 0,
+      expensesPaid: 0,
+      resultado: 0,
     };
   });
 
@@ -125,6 +151,19 @@ export async function loadAnnualFinancialSummary(year: number): Promise<AnnualFi
     }
   }
 
+  // Aggregate payables by month (reference_month preferred, fallback to due_date)
+  for (const p of payRows) {
+    const dateStr = p.reference_month ?? p.due_date;
+    if (!dateStr) continue;
+    const refYear = getYearFromDateOnly(dateStr);
+    if (refYear !== year) continue;
+    const idx = getMonthIndexFromDateOnly(dateStr);
+    const bucket = monthly[idx];
+    if (!bucket) continue;
+    bucket.expensesPlanned += num(p.amount_due);
+    bucket.expensesPaid += num(p.amount_paid);
+  }
+
   let acc = 0;
   for (const m of monthly) {
     m.pending = m.receivable + m.overdue;
@@ -133,6 +172,7 @@ export async function loadAnnualFinancialSummary(year: number): Promise<AnnualFi
     m.lossRate = safeRate(m.lost, m.expected);
     acc += m.received;
     m.accumulatedReceived = acc;
+    m.resultado = m.received - m.expensesPaid;
   }
 
   const totals: AnnualFinancialSummary = {
@@ -147,8 +187,12 @@ export async function loadAnnualFinancialSummary(year: number): Promise<AnnualFi
     lossRate: 0,
     averageMonthlyReceived: 0,
     bestMonth: null,
+    expensesPlanned: monthly.reduce((s, m) => s + m.expensesPlanned, 0),
+    expensesPaid: monthly.reduce((s, m) => s + m.expensesPaid, 0),
+    resultado: 0,
   };
   totals.pending = totals.receivable + totals.overdue;
+  totals.resultado = totals.received - totals.expensesPaid;
   totals.receivedRate = safeRate(totals.received, totals.expected);
   totals.overdueRate = safeRate(totals.overdue, totals.expected);
   totals.lossRate = safeRate(totals.lost, totals.expected);
