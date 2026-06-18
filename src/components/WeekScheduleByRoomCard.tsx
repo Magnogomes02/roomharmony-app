@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { entityColor, sortRooms, colorBlockStyle } from "@/lib/entityColors";
-import { loadShiftDefaults, SHIFT_LABELS, type ShiftKey, type ShiftDefaults } from "@/lib/shifts";
+import { loadShiftDefaults, DEFAULT_SHIFTS, SHIFT_LABELS, type ShiftKey, type ShiftDefaults } from "@/lib/shifts";
 
 interface BookingRow {
   id: string;
@@ -80,10 +80,11 @@ export function WeekScheduleByRoomCard() {
   const weekEnd = useMemo(() => addDays(weekStart, 7), [weekStart]);
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
 
-  const { data: shiftDefs } = useQuery({
+  const { data: shiftDefs = DEFAULT_SHIFTS } = useQuery({
     queryKey: ["shift-defaults"],
     queryFn: loadShiftDefaults,
     staleTime: 5 * 60 * 1000,
+    placeholderData: DEFAULT_SHIFTS,
   });
 
   const { data, isLoading } = useQuery({
@@ -173,7 +174,8 @@ export function WeekScheduleByRoomCard() {
                 classified.outside.push(b);
                 roomHasOutside = true;
               } else {
-                for (const k of shifts) classified.byShift[k].push(b);
+                // Add only to the first matching shift to avoid visual duplication
+                classified.byShift[shifts[0]].push(b);
               }
             }
             perDay[dayKey] = classified;

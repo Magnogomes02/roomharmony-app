@@ -1690,9 +1690,10 @@ function FinanceiroPage() {
                 <Label>Profissional *</Label>
                 <Select
                   value={newForm.professional_id}
-                  onValueChange={(v) =>
-                    setNewForm({ ...newForm, professional_id: v, contract_id: "" })
-                  }
+                  onValueChange={(v) => {
+                    setNewForm({ ...newForm, professional_id: v, contract_id: "" });
+                    setNewRoomIds([]);
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione..." />
@@ -1710,13 +1711,14 @@ function FinanceiroPage() {
                 <Label>Contrato (opcional)</Label>
                 <Select
                   value={newForm.contract_id || "none"}
-                  onValueChange={(v) =>
+                  onValueChange={(v) => {
                     setNewForm({
                       ...newForm,
                       contract_id: v === "none" ? "" : v,
                       kind: v === "none" ? "avulso" : "contrato",
-                    })
-                  }
+                    });
+                    if (v === "none") setNewRoomIds([]);
+                  }}
                   disabled={!newForm.professional_id}
                 >
                   <SelectTrigger>

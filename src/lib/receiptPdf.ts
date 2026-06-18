@@ -176,12 +176,8 @@ export async function renderReceiptPdf(
   // Two-column data card
   const colW = (pageW - margin * 2 - 6) / 2;
   const cardY = y;
-  const cardH = 60;
-  doc.setDrawColor(220);
-  doc.setFillColor(250, 250, 248);
-  doc.roundedRect(margin, cardY, pageW - margin * 2, cardH, 2, 2, "FD");
 
-  const rows: Array<[string, string]> = [
+  const dataRows: Array<[string, string]> = [
     ["Pagador", d.professional_name || "—"],
     ["Documento", d.professional_document || "—"],
     ["E-mail", d.professional_email || "—"],
@@ -189,7 +185,7 @@ export async function renderReceiptPdf(
     ["Forma de pagamento", d.payment_method || "—"],
     ["Data do pagamento", fmtDate(d.paid_at)],
     ["Tipo", d.kind === "contrato" ? "Contrato" : "Avulso"],
-    ["Sala", d.room_name || "—"],
+    ["Sala(s)", d.room_name || "—"],
     ["Mês de referência", fmtMonth(d.reference_month)],
     ["Vencimento", fmtDate(d.due_date)],
     ["Valor previsto", brl(d.amount_due)],
@@ -198,18 +194,41 @@ export async function renderReceiptPdf(
 
   doc.setFontSize(8.5);
   const rowH = 9;
-  for (let i = 0; i < rows.length; i++) {
-    const col = i % 2;
-    const r = Math.floor(i / 2);
-    const x = margin + 4 + col * (colW + 6);
-    const ry = cardY + 6 + r * rowH;
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(120);
-    doc.text(rows[i][0].toUpperCase(), x, ry);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(40);
-    const valLines = doc.splitTextToSize(rows[i][1], colW - 6);
-    doc.text(valLines[0] ?? "—", x, ry + 3.5);
+  // Pre-split all values to compute actual card height
+  const splitValues = dataRows.map(([, val]) => doc.splitTextToSize(val, colW - 6) as string[]);
+  const numGridRows = Math.ceil(dataRows.length / 2);
+  // Extra height if any left-column row needs more than 1 line
+  let extraH = 0;
+  for (let r = 0; r < numGridRows; r++) {
+    const leftLines = splitValues[r * 2]?.length ?? 1;
+    const rightLines = splitValues[r * 2 + 1]?.length ?? 1;
+    const maxLines = Math.max(leftLines, rightLines);
+    if (maxLines > 1) extraH += (maxLines - 1) * 3.5;
+  }
+  const cardH = numGridRows * rowH + 6 + extraH;
+
+  doc.setDrawColor(220);
+  doc.setFillColor(250, 250, 248);
+  doc.roundedRect(margin, cardY, pageW - margin * 2, cardH, 2, 2, "FD");
+
+  let gridY = cardY + 6;
+  for (let r = 0; r < numGridRows; r++) {
+    let maxRowH = rowH;
+    for (let col = 0; col < 2; col++) {
+      const i = r * 2 + col;
+      if (i >= dataRows.length) continue;
+      const x = margin + 4 + col * (colW + 6);
+      const lines = splitValues[i];
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(120);
+      doc.text(dataRows[i][0].toUpperCase(), x, gridY);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(40);
+      doc.text(lines, x, gridY + 3.5);
+      const rowUsed = 3.5 + lines.length * 3.5;
+      if (rowUsed > maxRowH) maxRowH = rowUsed;
+    }
+    gridY += maxRowH;
   }
   y = cardY + cardH + 8;
 
