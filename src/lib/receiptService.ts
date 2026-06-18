@@ -113,7 +113,8 @@ export async function getReceiptsByReceivableIds(ids: string[]): Promise<Map<str
     .from("receivable_receipts")
     .select("*")
     .in("receivable_id", ids)
-    .eq("status", "emitido");
+    .eq("status", "emitido")
+    .is("payment_id", null);
   for (const r of (data ?? []) as ReceiptRow[]) out.set(r.receivable_id, r);
   return out;
 }
@@ -344,24 +345,31 @@ export async function cancelReceiptForReceivable(
   receivableId: string,
   reason: string,
 ): Promise<void> {
-  const existing = await getReceiptByReceivableId(receivableId);
-  if (!existing) return;
+  const { data: actives } = await supabase
+    .from("receivable_receipts")
+    .select("id, receipt_number")
+    .eq("receivable_id", receivableId)
+    .eq("status", "emitido");
+  if (!actives || actives.length === 0) return;
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const now = new Date().toISOString();
   const { error } = await supabase
     .from("receivable_receipts")
     .update({
       status: "cancelado",
-      cancelled_at: new Date().toISOString(),
+      cancelled_at: now,
       cancelled_by: user?.id ?? null,
       cancel_reason: reason,
     })
-    .eq("id", existing.id);
+    .eq("receivable_id", receivableId)
+    .eq("status", "emitido");
   if (error) throw error;
   await audit("receivable.receipt_cancel", receivableId, {
-    receipt_id: existing.id,
-    receipt_number: existing.receipt_number,
+    receipt_ids: actives.map((r) => r.id),
+    receipt_numbers: actives.map((r) => r.receipt_number),
+    count: actives.length,
     reason,
   });
 }
