@@ -1183,18 +1183,22 @@ function FinanceiroPage() {
                                 <TableCell className="text-sm">
                                   {(() => {
                                     const multi = roomsByRec.get(r.id) ?? [];
-                                    const names = multi
+                                    let ids: string[] = multi.slice();
+                                    if (ids.length === 0 && r.room_id) ids = [r.room_id];
+                                    if (ids.length === 0 && r.contract_id) {
+                                      ids = contractRoomsMap.get(r.contract_id) ?? [];
+                                    }
+                                    const uniq = Array.from(new Set(ids));
+                                    const names = uniq
                                       .map((id) => roomMap.get(id))
                                       .filter(Boolean) as string[];
-                                    if (names.length > 0) {
-                                      const text = names.join(", ");
-                                      return names.length > 2 ? (
-                                        <span title={text}>{names.length} salas</span>
-                                      ) : (
-                                        text
-                                      );
-                                    }
-                                    return r.room_id ? (roomMap.get(r.room_id) ?? "—") : "—";
+                                    if (names.length === 0) return "—";
+                                    const text = names.join(", ");
+                                    return names.length > 2 ? (
+                                      <span title={text}>{names.length} salas</span>
+                                    ) : (
+                                      text
+                                    );
                                   })()}
                                 </TableCell>
 
