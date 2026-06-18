@@ -165,6 +165,7 @@ function FinanceiroPage() {
   const [receiptsByRec, setReceiptsByRec] = useState<Map<string, ReceiptRow>>(new Map());
   const [receiptsByPayment, setReceiptsByPayment] = useState<Map<string, ReceiptRow>>(new Map());
   const [roomsByRec, setRoomsByRec] = useState<Map<string, string[]>>(new Map());
+  const [contractRoomsMap, setContractRoomsMap] = useState<Map<string, string[]>>(new Map());
 
 
   // pay dialog
@@ -276,6 +277,26 @@ function FinanceiroPage() {
       rrMap.set(row.receivable_id, arr);
     }
     setRoomsByRec(rrMap);
+
+    // Salas vinculadas via contract_schedules (fallback de exibição)
+    const contractIds = Array.from(
+      new Set(list.map((x) => x.contract_id).filter((x): x is string => !!x)),
+    );
+    const crMap = new Map<string, string[]>();
+    if (contractIds.length > 0) {
+      const { data: schedData } = await supabase
+        .from("contract_schedules")
+        .select("contract_id, room_id")
+        .in("contract_id", contractIds);
+      for (const row of (schedData ?? []) as { contract_id: string; room_id: string | null }[]) {
+        if (!row.room_id) continue;
+        const arr = crMap.get(row.contract_id) ?? [];
+        if (!arr.includes(row.room_id)) arr.push(row.room_id);
+        crMap.set(row.contract_id, arr);
+      }
+    }
+    setContractRoomsMap(crMap);
+
     setLoading(false);
   }, [monthRef]);
 
@@ -1162,18 +1183,22 @@ function FinanceiroPage() {
                                 <TableCell className="text-sm">
                                   {(() => {
                                     const multi = roomsByRec.get(r.id) ?? [];
-                                    const names = multi
+                                    let ids: string[] = multi.slice();
+                                    if (ids.length === 0 && r.room_id) ids = [r.room_id];
+                                    if (ids.length === 0 && r.contract_id) {
+                                      ids = contractRoomsMap.get(r.contract_id) ?? [];
+                                    }
+                                    const uniq = Array.from(new Set(ids));
+                                    const names = uniq
                                       .map((id) => roomMap.get(id))
                                       .filter(Boolean) as string[];
-                                    if (names.length > 0) {
-                                      const text = names.join(", ");
-                                      return names.length > 2 ? (
-                                        <span title={text}>{names.length} salas</span>
-                                      ) : (
-                                        text
-                                      );
-                                    }
-                                    return r.room_id ? (roomMap.get(r.room_id) ?? "—") : "—";
+                                    if (names.length === 0) return "—";
+                                    const text = names.join(", ");
+                                    return names.length > 2 ? (
+                                      <span title={text}>{names.length} salas</span>
+                                    ) : (
+                                      text
+                                    );
                                   })()}
                                 </TableCell>
 
