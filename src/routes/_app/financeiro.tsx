@@ -165,6 +165,7 @@ function FinanceiroPage() {
   const [receiptsByRec, setReceiptsByRec] = useState<Map<string, ReceiptRow>>(new Map());
   const [receiptsByPayment, setReceiptsByPayment] = useState<Map<string, ReceiptRow>>(new Map());
   const [roomsByRec, setRoomsByRec] = useState<Map<string, string[]>>(new Map());
+  const [contractRoomsMap, setContractRoomsMap] = useState<Map<string, string[]>>(new Map());
 
 
   // pay dialog
