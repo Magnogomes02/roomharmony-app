@@ -1001,6 +1001,7 @@ export type Database = {
           id: string
           kind: string
           notes: string | null
+          parent_payable_id: string | null
           recurrence_day: number | null
           reference_month: string
           status: string
@@ -1021,6 +1022,7 @@ export type Database = {
           id?: string
           kind: string
           notes?: string | null
+          parent_payable_id?: string | null
           recurrence_day?: number | null
           reference_month: string
           status?: string
@@ -1041,6 +1043,7 @@ export type Database = {
           id?: string
           kind?: string
           notes?: string | null
+          parent_payable_id?: string | null
           recurrence_day?: number | null
           reference_month?: string
           status?: string

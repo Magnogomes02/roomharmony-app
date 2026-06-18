@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { format, startOfMonth, endOfMonth, addMonths } from "date-fns";
+import { format, startOfMonth, endOfMonth, addMonths, getDaysInMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   Plus,
@@ -63,6 +63,7 @@ interface Payable {
   reference_month: string;
   status: PayableStatus;
   recurrence_day: number | null;
+  parent_payable_id: string | null;
   supplier: string | null;
   category: string | null;
   notes: string | null;
@@ -160,8 +161,60 @@ function ContasAPagarPage() {
   const [cancelReason, setCancelReason] = useState("");
   const [savingCancel, setSavingCancel] = useState(false);
 
+  // Auto-generates recurring payable instances for monthRef if they don't exist yet.
+  // Templates are recorrentes with parent_payable_id = null (i.e., the originating entry).
+  // Silently skips on error to avoid blocking the UI.
+  async function generateRecurringForMonth(month: Date) {
+    const monthStart = toDateOnlyString(startOfMonth(month));
+    const monthEnd = toDateOnlyString(endOfMonth(month));
+    const year = month.getFullYear();
+    const monthIdx = month.getMonth(); // 0-based
+
+    // Fetch all active template recorrentes (any month, parent_payable_id is null)
+    const { data: templates } = await supabase
+      .from("payables")
+      .select("id,description,supplier,category,amount_due,recurrence_day,notes,kind,status")
+      .eq("kind", "recorrente")
+      .is("parent_payable_id", null)
+      .neq("status", "cancelado");
+    if (!templates || templates.length === 0) return;
+
+    // Fetch existing instances for this month to avoid duplicates
+    const { data: existing } = await supabase
+      .from("payables")
+      .select("parent_payable_id")
+      .gte("reference_month", monthStart)
+      .lte("reference_month", monthEnd)
+      .not("parent_payable_id", "is", null);
+    const existingParentIds = new Set((existing ?? []).map((e) => e.parent_payable_id));
+
+    const toInsert = templates
+      .filter((t) => !existingParentIds.has(t.id))
+      .map((t) => {
+        const day = Math.min(t.recurrence_day ?? 1, getDaysInMonth(new Date(year, monthIdx)));
+        const due = `${year}-${String(monthIdx + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+        return {
+          kind: "recorrente" as const,
+          description: t.description,
+          supplier: t.supplier,
+          category: t.category,
+          amount_due: t.amount_due,
+          recurrence_day: t.recurrence_day,
+          notes: t.notes,
+          due_date: due,
+          reference_month: monthStart,
+          parent_payable_id: t.id,
+        };
+      });
+
+    if (toInsert.length > 0) {
+      await supabase.from("payables").insert(toInsert);
+    }
+  }
+
   const load = useCallback(async () => {
     setLoading(true);
+    await generateRecurringForMonth(monthRef);
     const monthStart = toDateOnlyString(startOfMonth(monthRef));
     const monthEnd = toDateOnlyString(endOfMonth(monthRef));
     const { data, error } = await supabase
@@ -467,7 +520,10 @@ function ContasAPagarPage() {
                       <TableCell className="font-medium">
                         <div>{p.description}</div>
                         {p.kind === "recorrente" && (
-                          <span className="text-[10px] text-muted-foreground">Recorrente · dia {p.recurrence_day ?? "—"}</span>
+                          <span className="text-[10px] text-muted-foreground">
+                            Recorrente · dia {p.recurrence_day ?? "—"}
+                            {p.parent_payable_id === null && " · modelo"}
+                          </span>
                         )}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">{p.supplier ?? "—"}</TableCell>
@@ -692,6 +748,11 @@ function ContasAPagarPage() {
             <DialogDescription>{cancelTarget?.description}</DialogDescription>
           </DialogHeader>
           <form onSubmit={saveCancel} className="space-y-4">
+            {cancelTarget?.kind === "recorrente" && cancelTarget.parent_payable_id === null && (
+              <p className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning-foreground">
+                Este é o modelo desta recorrência. Cancelar impede a geração automática nos próximos meses. As instâncias já criadas não são afetadas.
+              </p>
+            )}
             <div className="space-y-2">
               <Label>Motivo (opcional)</Label>
               <Textarea rows={3} value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} />
