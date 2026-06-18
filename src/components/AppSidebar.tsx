@@ -10,6 +10,7 @@ import {
   Settings,
   ScrollText,
   DollarSign,
+  TrendingDown,
   LogOut,
   Sparkles,
 } from "lucide-react";
@@ -38,6 +39,7 @@ const navItems = [
   { title: "Conflitos", url: "/conflitos", icon: AlertTriangle, roles: ["gestor"] },
   { title: "Realocação", url: "/realocacao", icon: ArrowRightLeft, roles: ["gestor"] },
   { title: "Financeiro", url: "/financeiro", icon: DollarSign, roles: ["gestor", "visualizador"] },
+  { title: "Contas a Pagar", url: "/contas-a-pagar", icon: TrendingDown, roles: ["gestor", "visualizador"] },
   { title: "Preferências", url: "/preferencias", icon: Settings, roles: ["gestor"] },
   { title: "Auditoria", url: "/auditoria", icon: ScrollText, roles: ["gestor"] },
 ];
