@@ -50,6 +50,8 @@ import {
   loadContractTemplates, getDefaultContractTemplate,
   type ContractTemplate,
 } from "@/lib/contractTemplates";
+import { buildReceiptAuthenticationCode } from "@/lib/receiptPdf";
+import { createNotification } from "@/lib/notifications";
 
 
 
@@ -458,6 +460,25 @@ function ContratosPage() {
     if (error) throw error;
   }
 
+  async function captureSignatureEvidence(contractId: string, signedAt: string, signerName: string): Promise<{
+    signature_hash: string;
+    signed_email: string | null;
+    signed_gps: string | null;
+    signed_user_agent: string;
+  }> {
+    const signature_hash = buildReceiptAuthenticationCode(contractId, `${signedAt}|${signerName}`);
+    const signed_email = user?.email ?? null;
+    const signed_user_agent = navigator.userAgent.slice(0, 500);
+    let signed_gps: string | null = null;
+    try {
+      const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 4000 });
+      });
+      signed_gps = `${pos.coords.latitude.toFixed(6)},${pos.coords.longitude.toFixed(6)}`;
+    } catch { /* geolocation not available or denied */ }
+    return { signature_hash, signed_email, signed_gps, signed_user_agent };
+  }
+
   async function save(e: React.FormEvent) {
     e.preventDefault();
     if (!form.professional_id || !form.start_date) {
@@ -472,6 +493,24 @@ function ContratosPage() {
     if (schedErr) { toast.error(schedErr); return; }
 
     setSaving(true);
+
+    const signedAtIso = form.signed_at ? dateOnlyToLocalNoonISOString(form.signed_at) : null;
+    const signerName = form.signed_by_name.trim();
+    const isFirstSignature = signedAtIso && signerName && !editing?.signature_hash;
+
+    // Capture evidence only on first signing
+    let signatureEvidence: {
+      signature_hash: string | null;
+      signed_email: string | null;
+      signed_gps: string | null;
+      signed_user_agent: string | null;
+    } = { signature_hash: null, signed_email: null, signed_gps: null, signed_user_agent: null };
+
+    if (isFirstSignature) {
+      const tmpId = editing?.id ?? crypto.randomUUID();
+      signatureEvidence = await captureSignatureEvidence(tmpId, signedAtIso, signerName);
+    }
+
     const payload = {
       professional_id: form.professional_id,
       room_id: null,
@@ -483,9 +522,10 @@ function ContratosPage() {
       extra_clauses: form.extra_clauses.trim() || null,
       notes: form.notes.trim() || null,
       locador_name: form.locador_name.trim() || null,
-      signed_by_name: form.signed_by_name.trim() || null,
-      signed_at: form.signed_at ? dateOnlyToLocalNoonISOString(form.signed_at) : null,
+      signed_by_name: signerName || null,
+      signed_at: signedAtIso,
       template_id: form.template_id || null,
+      ...(isFirstSignature ? signatureEvidence : {}),
     };
 
 

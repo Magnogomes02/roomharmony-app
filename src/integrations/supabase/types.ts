@@ -306,6 +306,9 @@ export type Database = {
           signature_hash: string | null
           signed_at: string | null
           signed_by_name: string | null
+          signed_email: string | null
+          signed_gps: string | null
+          signed_user_agent: string | null
           start_date: string
           status: string
           template_id: string | null
@@ -325,6 +328,9 @@ export type Database = {
           signature_hash?: string | null
           signed_at?: string | null
           signed_by_name?: string | null
+          signed_email?: string | null
+          signed_gps?: string | null
+          signed_user_agent?: string | null
           start_date: string
           status?: string
           template_id?: string | null
@@ -344,6 +350,9 @@ export type Database = {
           signature_hash?: string | null
           signed_at?: string | null
           signed_by_name?: string | null
+          signed_email?: string | null
+          signed_gps?: string | null
+          signed_user_agent?: string | null
           start_date?: string
           status?: string
           template_id?: string | null

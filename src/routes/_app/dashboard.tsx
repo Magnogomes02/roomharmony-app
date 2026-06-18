@@ -147,6 +147,17 @@ function DashboardPage() {
         { conflict_count: stats.conflicts, date: today },
       );
     }
+
+    if ((stats.expiring ?? []).length > 0) {
+      const expiring = stats.expiring as { professional_name: string; days_left: number }[];
+      const names = expiring.map((c) => `${c.professional_name} (${c.days_left}d)`).join(", ");
+      createNotification(
+        user.email,
+        "Contratos próximos do vencimento",
+        `${expiring.length} contrato(s) vencem nos próximos 30 dias: ${names}.`,
+        { count: expiring.length, date: today },
+      );
+    }
   }, [stats, user?.email]);
 
   const cards = [

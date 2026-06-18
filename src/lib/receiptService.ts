@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { getClinicBranding } from "@/lib/contractPdf";
 import { loadReceiptSettings, renderReceiptTemplate } from "@/lib/receiptSettings";
+import { createNotification } from "@/lib/notifications";
 import {
   buildReceiptAuthenticationCode,
   renderReceiptPdf,
@@ -323,6 +324,18 @@ export async function createReceiptForReceivable(
     payment_id: paymentRow?.id ?? null,
     amount_paid: snapshotPaid.amount_paid,
   });
+
+  // Notify the gestor who issued the receipt
+  const { data: { user: authUser } } = await supabase.auth.getUser();
+  if (authUser?.email) {
+    const brl = (v: number) => Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+    createNotification(
+      authUser.email,
+      "Recibo emitido",
+      `Recibo nº ${row.receipt_number} emitido — ${row.professional_name ?? "profissional"} · ${brl(snapshotPaid.amount_paid)}.`,
+      { receipt_id: row.id, receipt_number: row.receipt_number },
+    );
+  }
 
   return row;
 }
