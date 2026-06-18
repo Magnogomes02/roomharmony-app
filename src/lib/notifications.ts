@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 
 export interface AppNotification {
   id: string;
@@ -7,7 +8,7 @@ export interface AppNotification {
   subject: string | null;
   message: string;
   status: string;
-  metadata: Record<string, unknown> | null;
+  metadata: Json | null;
   created_at: string;
   sent_at: string | null;
 }
@@ -16,7 +17,7 @@ export async function createNotification(
   recipient: string,
   subject: string,
   message: string,
-  metadata?: Record<string, unknown>,
+  metadata?: Json,
   channel = "sistema",
 ) {
   await supabase.from("notification_queue").insert({
@@ -24,7 +25,7 @@ export async function createNotification(
     recipient,
     subject,
     message,
-    metadata: (metadata ?? null) as never,
+    metadata: metadata ?? null,
     status: "pendente",
   });
 }

@@ -46,6 +46,7 @@ import {
 } from "@/components/ui/table";
 import { toast } from "sonner";
 import { toDateOnlyString } from "@/lib/dateOnly";
+import type { Json } from "@/integrations/supabase/types";
 
 export const Route = createFileRoute("/_app/contas-a-pagar")({
   component: ContasAPagarPage,
@@ -256,12 +257,12 @@ function ContasAPagarPage() {
     return { aPagar, pago, atrasado };
   }, [items]);
 
-  async function logAudit(action: string, entityId: string, metadata?: Record<string, unknown>) {
+  async function logAudit(action: string, entityId: string, metadata?: Json) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     await supabase.from("audit_logs").insert({
       actor_id: user.id, action, entity_type: "payable",
-      entity_id: entityId, metadata: (metadata ?? null) as never,
+      entity_id: entityId, metadata: metadata ?? null,
     });
   }
 

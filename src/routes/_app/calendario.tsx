@@ -6,6 +6,7 @@ import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { createNotification } from "@/lib/notifications";
+import type { Json } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -109,7 +110,7 @@ function fromTimeStr(date: Date, t: string) {
 }
 
 function CalendarioPage() {
-  const { role } = useAuth();
+  const { role, user } = useAuth();
   const canEdit = role === "gestor";
 
   const [date, setDate] = useState<Date>(startOfDay(new Date()));
@@ -202,10 +203,10 @@ function CalendarioPage() {
     return ((data as Booking[]) ?? []).filter((b) => b.id !== ignoreId);
   }
 
-  async function audit(action: string, entity_id: string | null, metadata: Record<string, unknown>) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    await supabase.from("audit_logs").insert({ actor_id: user.id, action, entity_type: "booking", entity_id, metadata: metadata as never });
+  async function audit(action: string, entity_id: string | null, metadata: Json) {
+    const { data: { user: auditUser } } = await supabase.auth.getUser();
+    if (!auditUser) return;
+    await supabase.from("audit_logs").insert({ actor_id: auditUser.id, action, entity_type: "booking", entity_id, metadata });
   }
 
   function openNewAt(roomId: string, slotIdx: number) {
