@@ -50,7 +50,8 @@ function DashboardPage() {
         supabase.from("receivables").select("kind,status,due_date,amount_due,amount_paid")
           .gte("due_date", monthStart).lte("due_date", monthEnd),
         supabase.from("payables").select("kind,status,due_date,amount_due,amount_paid")
-          .gte("reference_month", monthStart).lte("reference_month", monthEnd),
+          .gte("reference_month", monthStart).lte("reference_month", monthEnd)
+          .or("kind.eq.avulso,parent_payable_id.not.is.null"),
         supabase.from("audit_logs").select("id, action, entity_type, created_at, metadata").order("created_at", { ascending: false }).limit(5),
         supabase.from("contracts").select("id,professional_id,end_date,status").eq("status", "ativo").not("end_date", "is", null),
         supabase.from("professionals").select("id,full_name"),

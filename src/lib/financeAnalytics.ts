@@ -87,7 +87,8 @@ export async function loadAnnualFinancialSummary(year: number): Promise<AnnualFi
       .select("reference_month,due_date,amount_due,amount_paid,status")
       .neq("status", "cancelado")
       .gte("due_date", start)
-      .lte("due_date", end),
+      .lte("due_date", end)
+      .or("kind.eq.avulso,parent_payable_id.not.is.null"),
   ]);
   if (recRes.error) throw recRes.error;
 
