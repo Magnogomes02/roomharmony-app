@@ -622,8 +622,17 @@ function FinanceiroPage() {
   }
 
 
+  // Verifica recibos legados (por receivable_id) E recibos novos (por payment_id
+  // de qualquer pagamento deste recebível) — excluir/editar não deve ignorar
+  // recibos vinculados a pagamentos individuais.
+  function hasAnyReceipt(r: Receivable): boolean {
+    if (receiptsByRec.has(r.id)) return true;
+    const payments = paymentsByRec.get(r.id) ?? [];
+    return payments.some((p) => receiptsByPayment.has(p.id));
+  }
+
   function openEdit(r: Receivable) {
-    if (receiptsByRec.has(r.id)) {
+    if (hasAnyReceipt(r)) {
       alert(
         "Este recebível possui recibo emitido. Alterar valor/vencimento não altera o recibo já emitido.",
       );
@@ -656,9 +665,9 @@ function FinanceiroPage() {
   }
 
   async function removeRow(r: Receivable) {
-    if (receiptsByRec.has(r.id)) {
+    if (hasAnyReceipt(r)) {
       toast.error(
-        "Este recebível possui recibo emitido. Cancele o recibo ou estorne o pagamento antes de excluir.",
+        "Este recebível possui recibo emitido (por pagamento ou legado). Cancele o recibo ou estorne o pagamento antes de excluir.",
       );
       return;
     }
@@ -906,7 +915,11 @@ function FinanceiroPage() {
     if (ins?.id && newRoomIds.length > 0) {
       const rows = newRoomIds.map((roomId) => ({ receivable_id: ins.id, room_id: roomId }));
       const { error: rrErr } = await supabase.from("receivable_rooms").insert(rows);
-      if (rrErr) console.warn("[financeiro] receivable_rooms insert", rrErr);
+      if (rrErr) {
+        // Rollback: não deixar recebível "incompleto" sem as salas selecionadas
+        await supabase.from("receivables").delete().eq("id", ins.id);
+        return { ok: false, reason: `Falha ao vincular salas: ${rrErr.message}` };
+      }
     }
     await audit("receivable.manual_create", ins?.id ?? null, {
       ...insertPayload,
@@ -920,6 +933,8 @@ function FinanceiroPage() {
 
   async function saveNewReceivableSingle() {
     if (!newForm.professional_id) return toast.error("Selecione um profissional.");
+    if (!newForm.notes.trim())
+      return toast.error("Informe a observação/motivo para criar o recebível.");
     setSavingNew(true);
     try {
       const res = await insertOneReceivable(newForm.month);
@@ -953,6 +968,8 @@ function FinanceiroPage() {
 
   async function saveNewReceivableBatch() {
     if (!newForm.professional_id) return toast.error("Selecione um profissional.");
+    if (!newForm.notes.trim())
+      return toast.error("Informe a observação/motivo para criar o recebível.");
     const months = Object.entries(monthsChecked)
       .filter(([, v]) => v)
       .map(([k]) => Number(k));
@@ -960,20 +977,25 @@ function FinanceiroPage() {
     setSavingNew(true);
     try {
       const dupMonths: number[] = [];
+      const dupDetails: string[] = [];
       for (const m of months) {
         const dups = await findDuplicateReceivables({
           professional_id: newForm.professional_id,
           contract_id: newForm.contract_id || null,
           reference_month: `${newForm.year}-${String(m + 1).padStart(2, "0")}-01`,
         });
-        if (dups.length > 0) dupMonths.push(m);
+        if (dups.length > 0) {
+          dupMonths.push(m);
+          for (const d of dups) {
+            dupDetails.push(`${MONTHS_PT[m]}: ${brl(d.amount_due)} · venc. ${d.due_date} · ${d.status}`);
+          }
+        }
       }
       let allowDup = false;
       if (dupMonths.length > 0) {
-        const names = dupMonths.map((i) => MONTHS_PT[i]).join(", ");
         if (
           !confirm(
-            `Já existem recebíveis para: ${names}.\n\nGerar mesmo assim para todos os meses marcados?`,
+            `Já existem recebíveis para os meses marcados:\n\n${dupDetails.join("\n")}\n\nGerar mesmo assim para todos os meses marcados?`,
           )
         ) {
           setSavingNew(false);

@@ -11,7 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { WeekScheduleByRoomCard } from "@/components/WeekScheduleByRoomCard";
 import { startOfMonth, endOfMonth, startOfWeek, addDays } from "date-fns";
 import { parseDateOnlyLocal, formatDateOnlyBR, toDateOnlyString } from "@/lib/dateOnly";
-import { getEffectiveReceivableStatus, type ReceivableStatus } from "@/lib/financeStatus";
+import { computeEffectiveStatus as computeReceivableEffectiveStatus } from "@/lib/paymentsService";
 import { computeEffectiveStatus as computePayableEffectiveStatus, generateRecurringForMonth } from "@/lib/payablesStatus";
 import { createNotification } from "@/lib/notifications";
 
@@ -63,14 +63,23 @@ function DashboardPage() {
         recebidoContrato: 0, recebidoAvulso: 0,
         atrasadoContrato: 0, atrasadoAvulso: 0,
       };
-      for (const r of (receivables.data ?? []) as { kind: string; status: ReceivableStatus; due_date: string; amount_due: number; amount_paid: number | null }[]) {
-        const v = Number(r.amount_due);
-        const vPago = Number(r.amount_paid ?? r.amount_due);
+      for (const r of (receivables.data ?? []) as { kind: string; status: string; due_date: string; amount_due: number; amount_paid: number | null }[]) {
+        if (r.status === "cancelado") continue;
+        const due = Number(r.amount_due);
+        const paid = Number(r.amount_paid ?? 0);
+        const saldo = Math.max(due - paid, 0);
         const k = r.kind === "avulso" ? "Avulso" : "Contrato";
-        const effectiveStatus = getEffectiveReceivableStatus({ status: r.status, due_date: r.due_date });
-        if (effectiveStatus === "a_receber") fin[`aReceber${k}` as keyof typeof fin] += v;
-        else if (effectiveStatus === "atrasado") fin[`atrasado${k}` as keyof typeof fin] += v;
-        else if (effectiveStatus === "recebido") fin[`recebido${k}` as keyof typeof fin] += vPago;
+        const effectiveStatus = computeReceivableEffectiveStatus({
+          status: r.status,
+          due_date: r.due_date,
+          amount_due: due,
+          amount_paid: paid,
+        });
+        if (paid > 0) fin[`recebido${k}` as keyof typeof fin] += paid;
+        if (saldo > 0) {
+          if (effectiveStatus === "atrasado") fin[`atrasado${k}` as keyof typeof fin] += saldo;
+          else fin[`aReceber${k}` as keyof typeof fin] += saldo;
+        }
       }
 
       const pag = {

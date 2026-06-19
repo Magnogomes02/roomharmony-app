@@ -97,12 +97,15 @@ async function audit(action: string, entity_id: string, metadata: Record<string,
   });
 }
 
+// Legado: só busca recibos sem payment_id (emitidos antes da introdução de
+// recibo por pagamento). Para recibos novos, use getReceiptsByPaymentIds.
 export async function getReceiptByReceivableId(receivableId: string): Promise<ReceiptRow | null> {
   const { data } = await supabase
     .from("receivable_receipts")
     .select("*")
     .eq("receivable_id", receivableId)
     .eq("status", "emitido")
+    .is("payment_id", null)
     .maybeSingle();
   return (data as ReceiptRow | null) ?? null;
 }
