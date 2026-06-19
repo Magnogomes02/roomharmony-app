@@ -19,6 +19,7 @@ import { Route as AppPreferenciasRouteImport } from './routes/_app/preferencias'
 import { Route as AppFinanceiroRouteImport } from './routes/_app/financeiro'
 import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
 import { Route as AppContratosRouteImport } from './routes/_app/contratos'
+import { Route as AppContasAPagarRouteImport } from './routes/_app/contas-a-pagar'
 import { Route as AppConflitosRouteImport } from './routes/_app/conflitos'
 import { Route as AppCalendarioRouteImport } from './routes/_app/calendario'
 import { Route as AppAuditoriaRouteImport } from './routes/_app/auditoria'
@@ -72,6 +73,11 @@ const AppContratosRoute = AppContratosRouteImport.update({
   path: '/contratos',
   getParentRoute: () => AppRoute,
 } as any)
+const AppContasAPagarRoute = AppContasAPagarRouteImport.update({
+  id: '/contas-a-pagar',
+  path: '/contas-a-pagar',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppConflitosRoute = AppConflitosRouteImport.update({
   id: '/conflitos',
   path: '/conflitos',
@@ -94,6 +100,7 @@ export interface FileRoutesByFullPath {
   '/auditoria': typeof AppAuditoriaRoute
   '/calendario': typeof AppCalendarioRoute
   '/conflitos': typeof AppConflitosRoute
+  '/contas-a-pagar': typeof AppContasAPagarRoute
   '/contratos': typeof AppContratosRoute
   '/dashboard': typeof AppDashboardRoute
   '/financeiro': typeof AppFinanceiroRoute
@@ -108,6 +115,7 @@ export interface FileRoutesByTo {
   '/auditoria': typeof AppAuditoriaRoute
   '/calendario': typeof AppCalendarioRoute
   '/conflitos': typeof AppConflitosRoute
+  '/contas-a-pagar': typeof AppContasAPagarRoute
   '/contratos': typeof AppContratosRoute
   '/dashboard': typeof AppDashboardRoute
   '/financeiro': typeof AppFinanceiroRoute
@@ -124,6 +132,7 @@ export interface FileRoutesById {
   '/_app/auditoria': typeof AppAuditoriaRoute
   '/_app/calendario': typeof AppCalendarioRoute
   '/_app/conflitos': typeof AppConflitosRoute
+  '/_app/contas-a-pagar': typeof AppContasAPagarRoute
   '/_app/contratos': typeof AppContratosRoute
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/financeiro': typeof AppFinanceiroRoute
@@ -140,6 +149,7 @@ export interface FileRouteTypes {
     | '/auditoria'
     | '/calendario'
     | '/conflitos'
+    | '/contas-a-pagar'
     | '/contratos'
     | '/dashboard'
     | '/financeiro'
@@ -154,6 +164,7 @@ export interface FileRouteTypes {
     | '/auditoria'
     | '/calendario'
     | '/conflitos'
+    | '/contas-a-pagar'
     | '/contratos'
     | '/dashboard'
     | '/financeiro'
@@ -169,6 +180,7 @@ export interface FileRouteTypes {
     | '/_app/auditoria'
     | '/_app/calendario'
     | '/_app/conflitos'
+    | '/_app/contas-a-pagar'
     | '/_app/contratos'
     | '/_app/dashboard'
     | '/_app/financeiro'
@@ -256,6 +268,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppContratosRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/contas-a-pagar': {
+      id: '/_app/contas-a-pagar'
+      path: '/contas-a-pagar'
+      fullPath: '/contas-a-pagar'
+      preLoaderRoute: typeof AppContasAPagarRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/conflitos': {
       id: '/_app/conflitos'
       path: '/conflitos'
@@ -284,6 +303,7 @@ interface AppRouteChildren {
   AppAuditoriaRoute: typeof AppAuditoriaRoute
   AppCalendarioRoute: typeof AppCalendarioRoute
   AppConflitosRoute: typeof AppConflitosRoute
+  AppContasAPagarRoute: typeof AppContasAPagarRoute
   AppContratosRoute: typeof AppContratosRoute
   AppDashboardRoute: typeof AppDashboardRoute
   AppFinanceiroRoute: typeof AppFinanceiroRoute
@@ -297,6 +317,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppAuditoriaRoute: AppAuditoriaRoute,
   AppCalendarioRoute: AppCalendarioRoute,
   AppConflitosRoute: AppConflitosRoute,
+  AppContasAPagarRoute: AppContasAPagarRoute,
   AppContratosRoute: AppContratosRoute,
   AppDashboardRoute: AppDashboardRoute,
   AppFinanceiroRoute: AppFinanceiroRoute,
@@ -316,3 +337,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

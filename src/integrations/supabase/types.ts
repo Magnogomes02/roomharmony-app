@@ -411,6 +411,133 @@ export type Database = {
         }
         Relationships: []
       }
+      payable_payments: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          paid_at: string
+          payable_id: string
+          payment_method: string | null
+          reverse_reason: string | null
+          reversed_at: string | null
+          reversed_by: string | null
+          status: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          paid_at?: string
+          payable_id: string
+          payment_method?: string | null
+          reverse_reason?: string | null
+          reversed_at?: string | null
+          reversed_by?: string | null
+          status?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          paid_at?: string
+          payable_id?: string
+          payment_method?: string | null
+          reverse_reason?: string | null
+          reversed_at?: string | null
+          reversed_by?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payable_payments_payable_id_fkey"
+            columns: ["payable_id"]
+            isOneToOne: false
+            referencedRelation: "payables"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payables: {
+        Row: {
+          amount_due: number
+          amount_paid: number
+          cancel_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
+          category: string | null
+          created_at: string
+          created_by: string | null
+          description: string
+          due_date: string
+          id: string
+          kind: string
+          notes: string | null
+          parent_payable_id: string | null
+          recurrence_day: number | null
+          reference_month: string
+          status: string
+          supplier: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount_due: number
+          amount_paid?: number
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          description: string
+          due_date: string
+          id?: string
+          kind: string
+          notes?: string | null
+          parent_payable_id?: string | null
+          recurrence_day?: number | null
+          reference_month: string
+          status?: string
+          supplier?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount_due?: number
+          amount_paid?: number
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          due_date?: string
+          id?: string
+          kind?: string
+          notes?: string | null
+          parent_payable_id?: string | null
+          recurrence_day?: number | null
+          reference_month?: string
+          status?: string
+          supplier?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payables_parent_payable_id_fkey"
+            columns: ["parent_payable_id"]
+            isOneToOne: false
+            referencedRelation: "payables"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       professional_attachments: {
         Row: {
           category: string | null
@@ -939,125 +1066,6 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
-        }
-        Relationships: []
-      }
-      payable_payments: {
-        Row: {
-          amount: number
-          created_at: string
-          created_by: string | null
-          id: string
-          notes: string | null
-          paid_at: string
-          payable_id: string
-          payment_method: string | null
-          reverse_reason: string | null
-          reversed_at: string | null
-          reversed_by: string | null
-          status: string
-        }
-        Insert: {
-          amount: number
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          notes?: string | null
-          paid_at?: string
-          payable_id: string
-          payment_method?: string | null
-          reverse_reason?: string | null
-          reversed_at?: string | null
-          reversed_by?: string | null
-          status?: string
-        }
-        Update: {
-          amount?: number
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          notes?: string | null
-          paid_at?: string
-          payable_id?: string
-          payment_method?: string | null
-          reverse_reason?: string | null
-          reversed_at?: string | null
-          reversed_by?: string | null
-          status?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "payable_payments_payable_id_fkey"
-            columns: ["payable_id"]
-            isOneToOne: false
-            referencedRelation: "payables"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      payables: {
-        Row: {
-          amount_due: number
-          amount_paid: number
-          cancel_reason: string | null
-          cancelled_at: string | null
-          cancelled_by: string | null
-          category: string | null
-          created_at: string
-          created_by: string | null
-          description: string
-          due_date: string
-          id: string
-          kind: string
-          notes: string | null
-          parent_payable_id: string | null
-          recurrence_day: number | null
-          reference_month: string
-          status: string
-          supplier: string | null
-          updated_at: string
-        }
-        Insert: {
-          amount_due: number
-          amount_paid?: number
-          cancel_reason?: string | null
-          cancelled_at?: string | null
-          cancelled_by?: string | null
-          category?: string | null
-          created_at?: string
-          created_by?: string | null
-          description: string
-          due_date: string
-          id?: string
-          kind: string
-          notes?: string | null
-          parent_payable_id?: string | null
-          recurrence_day?: number | null
-          reference_month: string
-          status?: string
-          supplier?: string | null
-          updated_at?: string
-        }
-        Update: {
-          amount_due?: number
-          amount_paid?: number
-          cancel_reason?: string | null
-          cancelled_at?: string | null
-          cancelled_by?: string | null
-          category?: string | null
-          created_at?: string
-          created_by?: string | null
-          description?: string
-          due_date?: string
-          id?: string
-          kind?: string
-          notes?: string | null
-          parent_payable_id?: string | null
-          recurrence_day?: number | null
-          reference_month?: string
-          status?: string
-          supplier?: string | null
-          updated_at?: string
         }
         Relationships: []
       }
