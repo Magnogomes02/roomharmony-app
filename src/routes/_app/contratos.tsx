@@ -183,6 +183,7 @@ function ContratosPage() {
   const [schedules, setSchedules] = useState<LocalSchedule[]>([]);
   const [shiftDefs, setShiftDefs] = useState<ShiftDefaults>(DEFAULT_SHIFTS);
   const [contractTemplates, setContractTemplates] = useState<ContractTemplate[]>([]);
+  const [clinicName, setClinicName] = useState("");
 
 
   
@@ -234,6 +235,18 @@ function ContratosPage() {
   }
 
   useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    supabase
+      .from("settings")
+      .select("value")
+      .eq("key", "clinic_branding")
+      .maybeSingle()
+      .then(({ data }) => {
+        const name = (data?.value as { clinic_name?: string } | null)?.clinic_name;
+        if (name) setClinicName(name);
+      });
+  }, []);
 
   // Load contract templates whenever the dialog opens
   useEffect(() => {
@@ -295,7 +308,7 @@ function ContratosPage() {
 
   function openNew() {
     setEditing(null);
-    setForm(emptyForm);
+    setForm({ ...emptyForm, locador_name: clinicName });
     setSchedules([]);
     setOpen(true);
   }
@@ -347,6 +360,12 @@ function ContratosPage() {
       setForm((f) => ({ ...f, signed_by_name: selectedProfessional.full_name }));
     }
   }, [selectedProfessional, editing]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!editing && clinicName && !form.locador_name) {
+      setForm((f) => ({ ...f, locador_name: clinicName }));
+    }
+  }, [clinicName, editing]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function logAudit(action: string, entityId?: string, metadata?: Record<string, unknown>) {
     const { data: { user } } = await supabase.auth.getUser();
