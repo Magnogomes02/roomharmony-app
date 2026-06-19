@@ -1,4 +1,3 @@
-import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { format, startOfMonth, endOfMonth, addMonths, getDaysInMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -47,10 +46,6 @@ import {
 import { toast } from "sonner";
 import { toDateOnlyString } from "@/lib/dateOnly";
 import type { Json } from "@/integrations/supabase/types";
-
-export const Route = createFileRoute("/_app/contas-a-pagar")({
-  component: ContasAPagarPage,
-});
 
 type PayableStatus = "a_pagar" | "parcial" | "pago" | "atrasado" | "cancelado";
 
@@ -130,7 +125,7 @@ const emptyForm = {
   notes: "",
 };
 
-function ContasAPagarPage() {
+export function PayablesPanel() {
   const { role } = useAuth();
   const canEdit = role === "gestor";
 
@@ -420,7 +415,6 @@ function ContasAPagarPage() {
       {/* Header */}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="font-serif text-3xl">Contas a Pagar</h1>
           <p className="text-muted-foreground">Despesas e obrigações financeiras da clínica.</p>
         </div>
         {canEdit && (

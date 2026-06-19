@@ -62,6 +62,7 @@ import {
   type ReceiptRow,
 } from "@/lib/receiptService";
 import { FinancialAnalysisPanel } from "@/components/finance/FinancialAnalysisPanel";
+import { PayablesPanel } from "@/components/finance/PayablesPanel";
 import {
   computeEffectiveStatus,
   createPayment,
@@ -158,7 +159,9 @@ function FinanceiroPage() {
   const [search, setSearch] = useState("");
   const [kindFilter, setKindFilter] = useState<"all" | "contrato" | "avulso">("all");
   const [tab, setTab] = useState<EffectiveStatus | "perda" | "errada" | "todos">("a_receber");
-  const [financeView, setFinanceView] = useState<"recebiveis" | "analise">("recebiveis");
+  const [financeView, setFinanceView] = useState<"recebiveis" | "analise" | "contas_a_pagar">(
+    "recebiveis",
+  );
 
   // payments + receipts + rooms maps
   const [paymentsByRec, setPaymentsByRec] = useState<Map<string, ReceivablePayment[]>>(new Map());
@@ -1006,6 +1009,7 @@ function FinanceiroPage() {
       <Tabs value={financeView} onValueChange={(v) => setFinanceView(v as typeof financeView)}>
         <TabsList>
           <TabsTrigger value="recebiveis">Recebíveis</TabsTrigger>
+          <TabsTrigger value="contas_a_pagar">Contas a Pagar</TabsTrigger>
           <TabsTrigger value="analise">Análise Financeira</TabsTrigger>
         </TabsList>
 
@@ -1339,6 +1343,10 @@ function FinanceiroPage() {
               </Tabs>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="contas_a_pagar" className="mt-4">
+          <PayablesPanel />
         </TabsContent>
 
         <TabsContent value="analise" className="mt-4">
