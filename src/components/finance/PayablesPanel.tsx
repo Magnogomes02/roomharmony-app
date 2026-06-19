@@ -1,10 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { format, startOfMonth, endOfMonth, addMonths } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { format, startOfMonth, endOfMonth } from "date-fns";
 import {
   Plus,
-  ChevronLeft,
-  ChevronRight,
   Search,
   Check,
   Ban,
@@ -14,6 +11,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { MonthNavigator } from "@/components/period/MonthNavigator";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -344,8 +342,6 @@ export function PayablesPanel() {
     load();
   }
 
-  const monthLabel = format(monthRef, "MMMM 'de' yyyy", { locale: ptBR });
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -361,18 +357,7 @@ export function PayablesPanel() {
       </div>
 
       {/* Month navigator */}
-      <div className="flex items-center gap-2">
-        <Button variant="outline" size="icon" onClick={() => setMonthRef((m) => addMonths(m, -1))}>
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
-        <span className="min-w-[180px] text-center font-medium capitalize">{monthLabel}</span>
-        <Button variant="outline" size="icon" onClick={() => setMonthRef((m) => addMonths(m, 1))}>
-          <ChevronRight className="h-4 w-4" />
-        </Button>
-        <Button variant="ghost" size="sm" onClick={() => setMonthRef(startOfMonth(new Date()))}>
-          Hoje
-        </Button>
-      </div>
+      <MonthNavigator value={monthRef} onChange={setMonthRef} />
 
       {/* Summary cards */}
       <div className="grid gap-4 sm:grid-cols-3">

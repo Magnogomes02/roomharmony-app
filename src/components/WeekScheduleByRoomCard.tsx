@@ -1,15 +1,20 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ChevronLeft, ChevronRight, CalendarDays, AlertTriangle } from "lucide-react";
+import { CalendarDays, AlertTriangle } from "lucide-react";
 import { addDays, format, startOfWeek } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { entityColor, sortRooms, colorBlockStyle } from "@/lib/entityColors";
 import { loadShiftDefaults, DEFAULT_SHIFTS, SHIFT_LABELS, type ShiftKey, type ShiftDefaults } from "@/lib/shifts";
+import { WeekNavigator } from "@/components/period/WeekNavigator";
+
+function startOfWeekMidnight(d: Date): Date {
+  const s = startOfWeek(d, { weekStartsOn: 1 });
+  s.setHours(0, 0, 0, 0);
+  return s;
+}
 
 interface BookingRow {
   id: string;
@@ -70,13 +75,8 @@ function shiftsForBooking(
 }
 
 export function WeekScheduleByRoomCard() {
-  const [offset, setOffset] = useState(0);
+  const [weekStart, setWeekStart] = useState(() => startOfWeekMidnight(new Date()));
 
-  const weekStart = useMemo(() => {
-    const base = startOfWeek(new Date(), { weekStartsOn: 1 });
-    base.setHours(0, 0, 0, 0);
-    return addDays(base, offset * 7);
-  }, [offset]);
   const weekEnd = useMemo(() => addDays(weekStart, 7), [weekStart]);
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
 
@@ -121,26 +121,13 @@ export function WeekScheduleByRoomCard() {
           <CalendarDays className="h-5 w-5 text-primary" /> Reservas da semana
         </CardTitle>
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" onClick={() => setOffset((o) => o - 1)}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => setOffset(0)} disabled={offset === 0}>
-            Hoje
-          </Button>
-          <Button variant="ghost" size="icon" onClick={() => setOffset((o) => o + 1)}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
+          <WeekNavigator value={weekStart} onChange={setWeekStart} buttonVariant="ghost" />
           <Link to="/calendario" className="ml-2 text-xs text-primary hover:underline">
             Ver completo →
           </Link>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <p className="text-xs text-muted-foreground">
-          Semana: {format(weekStart, "dd 'de' MMM", { locale: ptBR })} —{" "}
-          {format(addDays(weekStart, 6), "dd 'de' MMM yyyy", { locale: ptBR })}
-        </p>
-
         {isLoading && <p className="text-xs text-muted-foreground">Carregando…</p>}
 
         {!isLoading && sortedRooms.length === 0 && (

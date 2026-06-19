@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { MonthNavigator } from "@/components/period/MonthNavigator";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -760,12 +761,6 @@ function FinanceiroPage() {
     }
   }
 
-  function shiftMonth(delta: number) {
-    const d = new Date(monthRef);
-    d.setMonth(d.getMonth() + delta);
-    setMonthRef(startOfMonth(d));
-  }
-
   // ============== Novo recebível ==============
   function openNewReceivable() {
     const now = new Date();
@@ -1021,15 +1016,7 @@ function FinanceiroPage() {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" onClick={() => shiftMonth(-1)}>
-                Mês anterior
-              </Button>
-              <Button variant="outline" onClick={() => setMonthRef(startOfMonth(new Date()))}>
-                Mês atual
-              </Button>
-              <Button variant="outline" onClick={() => shiftMonth(1)}>
-                Próximo mês
-              </Button>
+              <MonthNavigator value={monthRef} onChange={setMonthRef} />
               {canEdit && (
                 <Button onClick={openNewReceivable}>
                   <Plus className="mr-2 h-4 w-4" />
