@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { format, startOfMonth, endOfMonth, addMonths, getDaysInMonth } from "date-fns";
+import { format, startOfMonth, endOfMonth, addMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   Plus,
@@ -45,9 +45,8 @@ import {
 } from "@/components/ui/table";
 import { toast } from "sonner";
 import { toDateOnlyString } from "@/lib/dateOnly";
+import { computeEffectiveStatus, generateRecurringForMonth, type PayableStatus } from "@/lib/payablesStatus";
 import type { Json } from "@/integrations/supabase/types";
-
-type PayableStatus = "a_pagar" | "parcial" | "pago" | "atrasado" | "cancelado";
 
 interface Payable {
   id: string;
@@ -82,18 +81,6 @@ interface PayablePayment {
 
 function brl(v: number) {
   return Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-}
-
-function computeEffectiveStatus(p: Payable): PayableStatus {
-  if (p.status === "cancelado") return "cancelado";
-  if (p.status === "pago") return "pago";
-  const paid = Number(p.amount_paid ?? 0);
-  const due = Number(p.amount_due);
-  if (paid >= due) return "pago";
-  if (paid > 0) return "parcial";
-  const today = toDateOnlyString(new Date());
-  if (p.due_date < today) return "atrasado";
-  return "a_pagar";
 }
 
 const STATUS_LABELS: Record<PayableStatus, string> = {
@@ -156,57 +143,6 @@ export function PayablesPanel() {
   const [cancelTarget, setCancelTarget] = useState<Payable | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [savingCancel, setSavingCancel] = useState(false);
-
-  // Auto-generates recurring payable instances for monthRef if they don't exist yet.
-  // Templates are recorrentes with parent_payable_id = null (i.e., the originating entry).
-  // Silently skips on error to avoid blocking the UI.
-  async function generateRecurringForMonth(month: Date) {
-    const monthStart = toDateOnlyString(startOfMonth(month));
-    const monthEnd = toDateOnlyString(endOfMonth(month));
-    const year = month.getFullYear();
-    const monthIdx = month.getMonth(); // 0-based
-
-    // Fetch all active template recorrentes (any month, parent_payable_id is null)
-    const { data: templates } = await supabase
-      .from("payables")
-      .select("id,description,supplier,category,amount_due,recurrence_day,notes,kind,status")
-      .eq("kind", "recorrente")
-      .is("parent_payable_id", null)
-      .neq("status", "cancelado");
-    if (!templates || templates.length === 0) return;
-
-    // Fetch existing instances for this month to avoid duplicates
-    const { data: existing } = await supabase
-      .from("payables")
-      .select("parent_payable_id")
-      .gte("reference_month", monthStart)
-      .lte("reference_month", monthEnd)
-      .not("parent_payable_id", "is", null);
-    const existingParentIds = new Set((existing ?? []).map((e) => e.parent_payable_id));
-
-    const toInsert = templates
-      .filter((t) => !existingParentIds.has(t.id))
-      .map((t) => {
-        const day = Math.min(t.recurrence_day ?? 1, getDaysInMonth(new Date(year, monthIdx)));
-        const due = `${year}-${String(monthIdx + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-        return {
-          kind: "recorrente" as const,
-          description: t.description,
-          supplier: t.supplier,
-          category: t.category,
-          amount_due: t.amount_due,
-          recurrence_day: t.recurrence_day,
-          notes: t.notes,
-          due_date: due,
-          reference_month: monthStart,
-          parent_payable_id: t.id,
-        };
-      });
-
-    if (toInsert.length > 0) {
-      await supabase.from("payables").insert(toInsert);
-    }
-  }
 
   const load = useCallback(async () => {
     setLoading(true);

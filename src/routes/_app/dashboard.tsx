@@ -12,6 +12,7 @@ import { WeekScheduleByRoomCard } from "@/components/WeekScheduleByRoomCard";
 import { startOfMonth, endOfMonth, startOfWeek, addDays } from "date-fns";
 import { parseDateOnlyLocal, formatDateOnlyBR, toDateOnlyString } from "@/lib/dateOnly";
 import { getEffectiveReceivableStatus, type ReceivableStatus } from "@/lib/financeStatus";
+import { computeEffectiveStatus as computePayableEffectiveStatus, generateRecurringForMonth } from "@/lib/payablesStatus";
 import { createNotification } from "@/lib/notifications";
 
 export const Route = createFileRoute("/_app/dashboard")({
@@ -35,7 +36,9 @@ function DashboardPage() {
       const monthStart = toDateOnlyString(startOfMonth(now));
       const monthEnd = toDateOnlyString(endOfMonth(now));
 
-      const [profs, rooms, contracts, weekBookings, conflicts, receivables, audits, expiringContracts, allProfessionals, allSchedules, allRooms] = await Promise.all([
+      await generateRecurringForMonth(now);
+
+      const [profs, rooms, contracts, weekBookings, conflicts, receivables, payables, audits, expiringContracts, allProfessionals, allSchedules, allRooms] = await Promise.all([
         supabase.from("professionals").select("id", { count: "exact", head: true }).eq("active", true),
         supabase.from("rooms").select("id", { count: "exact", head: true }).eq("active", true),
         supabase.from("contracts").select("id", { count: "exact", head: true }).eq("status", "ativo"),
@@ -46,6 +49,8 @@ function DashboardPage() {
         supabase.from("booking_conflicts").select("id", { count: "exact", head: true }).eq("status", "pendente"),
         supabase.from("receivables").select("kind,status,due_date,amount_due,amount_paid")
           .gte("due_date", monthStart).lte("due_date", monthEnd),
+        supabase.from("payables").select("kind,status,due_date,amount_due,amount_paid")
+          .gte("reference_month", monthStart).lte("reference_month", monthEnd),
         supabase.from("audit_logs").select("id, action, entity_type, created_at, metadata").order("created_at", { ascending: false }).limit(5),
         supabase.from("contracts").select("id,professional_id,end_date,status").eq("status", "ativo").not("end_date", "is", null),
         supabase.from("professionals").select("id,full_name"),
@@ -66,6 +71,22 @@ function DashboardPage() {
         if (effectiveStatus === "a_receber") fin[`aReceber${k}` as keyof typeof fin] += v;
         else if (effectiveStatus === "atrasado") fin[`atrasado${k}` as keyof typeof fin] += v;
         else if (effectiveStatus === "recebido") fin[`recebido${k}` as keyof typeof fin] += vPago;
+      }
+
+      const pag = {
+        aPagarRecorrente: 0, aPagarAvulso: 0,
+        pagoRecorrente: 0, pagoAvulso: 0,
+        atrasadoRecorrente: 0, atrasadoAvulso: 0,
+      };
+      for (const p of (payables.data ?? []) as { kind: string; status: string; due_date: string; amount_due: number; amount_paid: number | null }[]) {
+        const due = Number(p.amount_due);
+        const paid = Number(p.amount_paid ?? 0);
+        const saldo = Math.max(due - paid, 0);
+        const k = p.kind === "avulso" ? "Avulso" : "Recorrente";
+        const effectiveStatus = computePayableEffectiveStatus(p);
+        if (effectiveStatus === "a_pagar" || effectiveStatus === "parcial") pag[`aPagar${k}` as keyof typeof pag] += saldo;
+        else if (effectiveStatus === "atrasado") pag[`atrasado${k}` as keyof typeof pag] += saldo;
+        else if (effectiveStatus === "pago") pag[`pago${k}` as keyof typeof pag] += paid;
       }
 
       const weekRows = (weekBookings.data ?? []) as { status: string }[];
@@ -114,6 +135,7 @@ function DashboardPage() {
         weekConflict,
         conflicts: conflicts.count ?? 0,
         fin,
+        pag,
         audits: audits.data ?? [],
         expiring,
       };
@@ -177,6 +199,7 @@ function DashboardPage() {
   ];
 
   const f = stats?.fin;
+  const p = stats?.pag;
 
   return (
     <div className="space-y-8">
@@ -198,11 +221,18 @@ function DashboardPage() {
         <CardContent>
           <div className="grid gap-4 sm:grid-cols-3">
             <FinBlock label="A vencer" total={(f?.aReceberContrato ?? 0) + (f?.aReceberAvulso ?? 0)}
-              contrato={f?.aReceberContrato ?? 0} avulso={f?.aReceberAvulso ?? 0} tone="warning" loading={isLoading} />
+              item1={f?.aReceberContrato ?? 0} item2={f?.aReceberAvulso ?? 0} tone="warning" loading={isLoading} />
             <FinBlock label="Recebido" total={(f?.recebidoContrato ?? 0) + (f?.recebidoAvulso ?? 0)}
-              contrato={f?.recebidoContrato ?? 0} avulso={f?.recebidoAvulso ?? 0} tone="success" loading={isLoading} />
+              item1={f?.recebidoContrato ?? 0} item2={f?.recebidoAvulso ?? 0} tone="success" loading={isLoading} />
             <FinBlock label="Em atraso" total={(f?.atrasadoContrato ?? 0) + (f?.atrasadoAvulso ?? 0)}
-              contrato={f?.atrasadoContrato ?? 0} avulso={f?.atrasadoAvulso ?? 0} tone="destructive" loading={isLoading} />
+              item1={f?.atrasadoContrato ?? 0} item2={f?.atrasadoAvulso ?? 0} tone="destructive" loading={isLoading} />
+
+            <FinBlock label="A pagar" total={(p?.aPagarRecorrente ?? 0) + (p?.aPagarAvulso ?? 0)}
+              item1={p?.aPagarRecorrente ?? 0} item2={p?.aPagarAvulso ?? 0} breakdownLabels={["Recorrente", "Avulso"]} tone="warning" loading={isLoading} />
+            <FinBlock label="Pago" total={(p?.pagoRecorrente ?? 0) + (p?.pagoAvulso ?? 0)}
+              item1={p?.pagoRecorrente ?? 0} item2={p?.pagoAvulso ?? 0} breakdownLabels={["Recorrente", "Avulso"]} tone="success" loading={isLoading} />
+            <FinBlock label="Contas em atraso" total={(p?.atrasadoRecorrente ?? 0) + (p?.atrasadoAvulso ?? 0)}
+              item1={p?.atrasadoRecorrente ?? 0} item2={p?.atrasadoAvulso ?? 0} breakdownLabels={["Recorrente", "Avulso"]} tone="destructive" loading={isLoading} />
           </div>
         </CardContent>
       </Card>
@@ -302,11 +332,13 @@ function DashboardPage() {
   );
 }
 
-function FinBlock({ label, total, contrato, avulso, tone, loading }: {
-  label: string; total: number; contrato: number; avulso: number;
+function FinBlock({ label, total, item1, item2, breakdownLabels = ["Contratos", "Avulsos"], tone, loading }: {
+  label: string; total: number; item1: number; item2: number;
+  breakdownLabels?: [string, string];
   tone: "warning" | "success" | "destructive"; loading: boolean;
 }) {
   const toneClass = tone === "warning" ? "text-warning" : tone === "success" ? "text-success" : "text-destructive";
+  const [label1, label2] = breakdownLabels;
   return (
     <div className="rounded-lg border bg-card/50 p-4">
       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
@@ -314,8 +346,8 @@ function FinBlock({ label, total, contrato, avulso, tone, loading }: {
         {loading ? "—" : brl(total)}
       </p>
       <div className="mt-2 space-y-0.5 text-xs text-muted-foreground">
-        <div className="flex justify-between"><span>Contratos</span><span>{brl(contrato)}</span></div>
-        <div className="flex justify-between"><span>Avulsos</span><span>{brl(avulso)}</span></div>
+        <div className="flex justify-between"><span>{label1}</span><span>{brl(item1)}</span></div>
+        <div className="flex justify-between"><span>{label2}</span><span>{brl(item2)}</span></div>
       </div>
     </div>
   );
