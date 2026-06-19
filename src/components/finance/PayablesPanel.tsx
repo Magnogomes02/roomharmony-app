@@ -144,14 +144,22 @@ export function PayablesPanel() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    await generateRecurringForMonth(monthRef);
+    try {
+      await generateRecurringForMonth(monthRef);
+    } catch (err) {
+      console.warn("generateRecurringForMonth falhou", err);
+      toast.warning("Não foi possível gerar todas as recorrências do mês.");
+    }
     const monthStart = toDateOnlyString(startOfMonth(monthRef));
     const monthEnd = toDateOnlyString(endOfMonth(monthRef));
+    // Oculta o "modelo" da recorrência (kind=recorrente AND parent_payable_id IS NULL).
+    // Mostra: avulsos OU instâncias mensais (parent_payable_id NOT NULL).
     const { data, error } = await supabase
       .from("payables")
       .select("*")
       .gte("reference_month", monthStart)
       .lte("reference_month", monthEnd)
+      .or("kind.eq.avulso,parent_payable_id.not.is.null")
       .order("due_date");
     if (error) toast.error("Erro ao carregar contas", { description: error.message });
     setItems((data ?? []) as Payable[]);
