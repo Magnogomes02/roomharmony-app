@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Pencil, FileText, Paperclip, Download, Trash2, Search, FileDown, X, AlertTriangle } from "lucide-react";
+import { Plus, Pencil, FileText, Paperclip, Download, Trash2, Search, FileDown, X, AlertTriangle, Ban } from "lucide-react";
 import { generateContractPdf } from "@/lib/contractPdf";
 import {
   formatDateOnlyBR,
@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -50,6 +51,7 @@ import {
   loadContractTemplates, getDefaultContractTemplate,
   type ContractTemplate,
 } from "@/lib/contractTemplates";
+import { MONTHS_PT } from "@/lib/paymentsService";
 import { buildReceiptAuthenticationCode } from "@/lib/receiptPdf";
 import { createNotification } from "@/lib/notifications";
 
@@ -75,6 +77,9 @@ interface Contract {
   signed_at: string | null; signed_by_name: string | null; signature_hash: string | null;
   locador_name: string | null; created_at: string;
   template_id: string | null;
+  cancelled_at: string | null; cancel_reason: string | null;
+  cancel_effective_month: string | null;
+  termination_fee_amount: number | null; termination_fee_receivable_id: string | null;
   professional?: Professional;
   schedules?: ScheduleRow[];
 }
@@ -106,6 +111,12 @@ const emptyForm = {
 const statusVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
   rascunho: "secondary", ativo: "default", encerrado: "outline", cancelado: "destructive",
 };
+
+function monthLabel(referenceMonth: string) {
+  const idx = getMonthIndexFromDateOnly(referenceMonth);
+  const year = getYearFromDateOnly(referenceMonth);
+  return `${MONTHS_PT[idx] ?? "—"} de ${year}`;
+}
 
 function ScheduleTimeline({
   weekday, roomId, startMin, endMin, busy, otherRows, hasConflict,
@@ -194,6 +205,14 @@ function ContratosPage() {
   const [deleteTarget, setDeleteTarget] = useState<Contract | null>(null);
   const [deletePassword, setDeletePassword] = useState("");
   const [deleting, setDeleting] = useState(false);
+
+  const [cancelTarget, setCancelTarget] = useState<Contract | null>(null);
+  const [cancelMonths, setCancelMonths] = useState<string[]>([]);
+  const [cancelEffectiveMonth, setCancelEffectiveMonth] = useState("");
+  const [cancelHasFee, setCancelHasFee] = useState(false);
+  const [cancelFeeAmount, setCancelFeeAmount] = useState("");
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelling, setCancelling] = useState(false);
 
   const [attachOpen, setAttachOpen] = useState(false);
   const [attachContract, setAttachContract] = useState<Contract | null>(null);
@@ -410,6 +429,62 @@ function ContratosPage() {
       await load();
     } finally {
       setDeleting(false);
+    }
+  }
+
+  async function openCancelContract(c: Contract) {
+    setCancelTarget(c);
+    setCancelHasFee(false);
+    setCancelFeeAmount("");
+    setCancelReason("");
+    const { data } = await supabase
+      .from("receivables")
+      .select("reference_month")
+      .eq("contract_id", c.id)
+      .not("status", "in", "(recebido,cancelado)")
+      .order("reference_month");
+    const months = Array.from(new Set((data ?? []).map((r) => r.reference_month as string)));
+    const now = new Date();
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+    setCancelMonths(months);
+    setCancelEffectiveMonth(months[0] ?? currentMonth);
+  }
+
+  async function confirmCancelContract() {
+    if (!cancelTarget) return;
+    if (!cancelEffectiveMonth) { toast.error("Selecione o mês a partir do qual o contrato encerra."); return; }
+    if (!cancelReason.trim()) { toast.error("Informe o motivo do cancelamento."); return; }
+    const fee = cancelHasFee ? Number(cancelFeeAmount) : null;
+    if (cancelHasFee && !(fee! > 0)) { toast.error("Informe um valor de multa válido."); return; }
+    setCancelling(true);
+    try {
+      const { data, error } = await supabase.rpc("cancel_contract", {
+        _contract_id: cancelTarget.id,
+        _effective_month: cancelEffectiveMonth,
+        _termination_fee: fee,
+        _reason: cancelReason.trim(),
+      });
+      if (error) throw error;
+      const result = (data ?? {}) as {
+        receivables_cancelled?: number; bookings_cancelled?: number; conflicts_resolved?: number;
+      };
+      await logAudit("contract.cancel", cancelTarget.id, {
+        effective_month: cancelEffectiveMonth,
+        termination_fee: fee,
+        reason: cancelReason.trim(),
+        ...result,
+      });
+      toast.success("Contrato cancelado", {
+        description: `${result.receivables_cancelled ?? 0} recebível(is) lançados como perda · ${result.bookings_cancelled ?? 0} reserva(s) cancelada(s).`,
+      });
+      setCancelTarget(null);
+      await load();
+    } catch (err) {
+      toast.error("Erro ao cancelar contrato", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setCancelling(false);
     }
   }
 
@@ -977,6 +1052,16 @@ function ContratosPage() {
                             <Pencil className="h-4 w-4" />
                           </Button>
                         )}
+                        {canEdit && c.status !== "cancelado" && (
+                          <Button
+                            size="icon" variant="ghost"
+                            onClick={() => openCancelContract(c)}
+                            title="Cancelar contrato"
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Ban className="h-4 w-4" />
+                          </Button>
+                        )}
                         {canEdit && (
                           <Button
                             size="icon" variant="ghost"
@@ -1266,19 +1351,29 @@ function ContratosPage() {
                 </div>
                 <div className="space-y-2 sm:col-span-3">
                   <Label>Status</Label>
-                  <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="rascunho">Rascunho</SelectItem>
-                      <SelectItem value="ativo">Ativo</SelectItem>
-                      <SelectItem value="encerrado">Encerrado</SelectItem>
-                      <SelectItem value="cancelado">Cancelado</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  {editing?.status === "cancelado" ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="destructive">Cancelado</Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {editing.cancelled_at && `em ${formatDateOnlyBR(editing.cancelled_at.slice(0, 10))}`}
+                        {editing.cancel_reason && ` · ${editing.cancel_reason}`}
+                      </span>
+                    </div>
+                  ) : (
+                    <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="rascunho">Rascunho</SelectItem>
+                        <SelectItem value="ativo">Ativo</SelectItem>
+                        <SelectItem value="encerrado">Encerrado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
                   <p className="text-xs text-muted-foreground">
                     Ao salvar como "Ativo": gera recebíveis mensais no Financeiro e materializa as reservas
                     da grade no Calendário até a data de término (ou 12 meses se em aberto). Conflitos serão
-                    notificados antes de prosseguir.
+                    notificados antes de prosseguir. Para cancelar um contrato, use o botão "Cancelar contrato"
+                    na listagem.
                   </p>
                 </div>
               </div>
@@ -1455,6 +1550,86 @@ function ContratosPage() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Cancelar contrato */}
+      <Dialog open={!!cancelTarget} onOpenChange={(o) => { if (!o) setCancelTarget(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="font-serif flex items-center gap-2">
+              <Ban className="h-5 w-5 text-destructive" /> Cancelar contrato
+            </DialogTitle>
+            <DialogDescription>
+              {cancelTarget?.professional?.full_name}. O saldo aberto a partir do mês escolhido
+              vira perda financeira; pagamentos já recebidos continuam como recebidos. Reservas
+              futuras vinculadas ao contrato serão canceladas e conflitos pendentes resolvidos.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>A partir de qual mês o contrato encerra? *</Label>
+              <Select value={cancelEffectiveMonth} onValueChange={setCancelEffectiveMonth}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {cancelMonths.length === 0 ? (
+                    <SelectItem value={cancelEffectiveMonth || "atual"}>
+                      {cancelEffectiveMonth ? monthLabel(cancelEffectiveMonth) : "Mês atual"}
+                    </SelectItem>
+                  ) : (
+                    cancelMonths.map((m) => (
+                      <SelectItem key={m} value={m}>{monthLabel(m)}</SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Recebíveis deste contrato a partir deste mês (ainda não recebidos) serão lançados
+                como perda. Meses anteriores não são afetados.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="cancel-has-fee"
+                checked={cancelHasFee}
+                onCheckedChange={(v) => setCancelHasFee(v === true)}
+              />
+              <Label htmlFor="cancel-has-fee" className="cursor-pointer font-normal">
+                Há multa rescisória?
+              </Label>
+            </div>
+            {cancelHasFee && (
+              <div className="space-y-2">
+                <Label>Valor da multa (R$) *</Label>
+                <Input
+                  type="number" step="0.01" min="0.01"
+                  value={cancelFeeAmount}
+                  onChange={(e) => setCancelFeeAmount(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Será criado um recebível avulso com este valor, vinculado ao contrato e ao profissional.
+                </p>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label>Motivo do cancelamento *</Label>
+              <Textarea
+                rows={3}
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                placeholder="Obrigatório"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCancelTarget(null)} disabled={cancelling}>
+              Voltar
+            </Button>
+            <Button variant="destructive" onClick={confirmCancelContract} disabled={cancelling}>
+              {cancelling ? "Cancelando..." : "Confirmar cancelamento"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Attachments dialog */}
       <Dialog open={attachOpen} onOpenChange={setAttachOpen}>

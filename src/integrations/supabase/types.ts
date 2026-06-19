@@ -293,6 +293,10 @@ export type Database = {
       }
       contracts: {
         Row: {
+          cancel_effective_month: string | null
+          cancel_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
           created_at: string
           due_day: number
           end_date: string | null
@@ -312,9 +316,15 @@ export type Database = {
           start_date: string
           status: string
           template_id: string | null
+          termination_fee_amount: number | null
+          termination_fee_receivable_id: string | null
           updated_at: string
         }
         Insert: {
+          cancel_effective_month?: string | null
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           due_day?: number
           end_date?: string | null
@@ -334,9 +344,15 @@ export type Database = {
           start_date: string
           status?: string
           template_id?: string | null
+          termination_fee_amount?: number | null
+          termination_fee_receivable_id?: string | null
           updated_at?: string
         }
         Update: {
+          cancel_effective_month?: string | null
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           due_day?: number
           end_date?: string | null
@@ -356,6 +372,8 @@ export type Database = {
           start_date?: string
           status?: string
           template_id?: string | null
+          termination_fee_amount?: number | null
+          termination_fee_receivable_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -371,6 +389,13 @@ export type Database = {
             columns: ["room_id"]
             isOneToOne: false
             referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contracts_termination_fee_receivable_id_fkey"
+            columns: ["termination_fee_receivable_id"]
+            isOneToOne: false
+            referencedRelation: "receivables"
             referencedColumns: ["id"]
           },
         ]
@@ -1074,6 +1099,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cancel_contract: {
+        Args: {
+          _contract_id: string
+          _effective_month: string
+          _termination_fee?: number | null
+          _reason?: string | null
+        }
+        Returns: Json
+      }
       ensure_owner_access: { Args: never; Returns: Json }
       generate_contract_receivables: {
         Args: { _contract_id: string }
