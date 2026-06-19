@@ -208,6 +208,15 @@ export function PayablesPanel() {
     if (!newForm.description.trim()) return toast.error("Descrição é obrigatória");
     if (!newForm.amount_due || Number(newForm.amount_due) <= 0) return toast.error("Valor inválido");
     if (!newForm.due_date) return toast.error("Data de vencimento é obrigatória");
+    let recurrenceDay: number | null = newForm.recurrence_day ? Number(newForm.recurrence_day) : null;
+    if (newForm.kind === "recorrente") {
+      if (!recurrenceDay) {
+        // Deriva do dia do due_date (evita cair em dia 01 sem o usuário perceber).
+        const day = Number(newForm.due_date.slice(8, 10));
+        if (!day) return toast.error("Não foi possível determinar o dia de vencimento da recorrência.");
+        recurrenceDay = Math.min(day, 28);
+      }
+    }
     setSavingNew(true);
     const referenceMonth = newForm.due_date.slice(0, 7) + "-01";
     const payload = {
@@ -218,7 +227,7 @@ export function PayablesPanel() {
       amount_due: Number(newForm.amount_due),
       due_date: newForm.due_date,
       reference_month: referenceMonth,
-      recurrence_day: newForm.recurrence_day ? Number(newForm.recurrence_day) : null,
+      recurrence_day: recurrenceDay,
       notes: newForm.notes.trim() || null,
     };
     const { data, error } = await supabase.from("payables").insert(payload).select("id").single();
