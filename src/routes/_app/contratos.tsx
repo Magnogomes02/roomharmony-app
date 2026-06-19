@@ -461,7 +461,7 @@ function ContratosPage() {
       const { data, error } = await supabase.rpc("cancel_contract", {
         _contract_id: cancelTarget.id,
         _effective_month: cancelEffectiveMonth,
-        _termination_fee: fee,
+        _termination_fee: fee ?? undefined,
         _reason: cancelReason.trim(),
       });
       if (error) throw error;

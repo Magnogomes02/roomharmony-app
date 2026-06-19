@@ -25,26 +25,30 @@ export function computeEffectiveStatus(p: PayableStatusInput): PayableStatus {
 
 // Auto-generates recurring payable instances for `month` if they don't exist yet.
 // Templates are recorrentes with parent_payable_id = null (the originating entry).
+// Only generates from the template's own reference_month forward (never backfills earlier months).
 export async function generateRecurringForMonth(month: Date): Promise<void> {
   const monthStart = toDateOnlyString(startOfMonth(month));
   const monthEnd = toDateOnlyString(endOfMonth(month));
   const year = month.getFullYear();
   const monthIdx = month.getMonth();
 
-  const { data: templates } = await supabase
+  const { data: templates, error: tplErr } = await supabase
     .from("payables")
-    .select("id,description,supplier,category,amount_due,recurrence_day,notes,kind,status")
+    .select("id,description,supplier,category,amount_due,recurrence_day,notes,kind,status,reference_month")
     .eq("kind", "recorrente")
     .is("parent_payable_id", null)
-    .neq("status", "cancelado");
+    .neq("status", "cancelado")
+    .lte("reference_month", monthStart);
+  if (tplErr) throw tplErr;
   if (!templates || templates.length === 0) return;
 
-  const { data: existing } = await supabase
+  const { data: existing, error: exErr } = await supabase
     .from("payables")
     .select("parent_payable_id")
     .gte("reference_month", monthStart)
     .lte("reference_month", monthEnd)
     .not("parent_payable_id", "is", null);
+  if (exErr) throw exErr;
   const existingParentIds = new Set((existing ?? []).map((e) => e.parent_payable_id));
 
   const toInsert = templates
@@ -67,6 +71,12 @@ export async function generateRecurringForMonth(month: Date): Promise<void> {
     });
 
   if (toInsert.length > 0) {
-    await supabase.from("payables").insert(toInsert);
+    // Insere uma a uma para não abortar tudo caso o índice único parcial dispare por concorrência.
+    for (const row of toInsert) {
+      const { error } = await supabase.from("payables").insert(row);
+      if (error && !/duplicate key|unique constraint/i.test(error.message)) {
+        throw error;
+      }
+    }
   }
 }

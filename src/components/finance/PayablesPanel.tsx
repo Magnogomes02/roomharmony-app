@@ -144,14 +144,22 @@ export function PayablesPanel() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    await generateRecurringForMonth(monthRef);
+    try {
+      await generateRecurringForMonth(monthRef);
+    } catch (err) {
+      console.warn("generateRecurringForMonth falhou", err);
+      toast.warning("Não foi possível gerar todas as recorrências do mês.");
+    }
     const monthStart = toDateOnlyString(startOfMonth(monthRef));
     const monthEnd = toDateOnlyString(endOfMonth(monthRef));
+    // Oculta o "modelo" da recorrência (kind=recorrente AND parent_payable_id IS NULL).
+    // Mostra: avulsos OU instâncias mensais (parent_payable_id NOT NULL).
     const { data, error } = await supabase
       .from("payables")
       .select("*")
       .gte("reference_month", monthStart)
       .lte("reference_month", monthEnd)
+      .or("kind.eq.avulso,parent_payable_id.not.is.null")
       .order("due_date");
     if (error) toast.error("Erro ao carregar contas", { description: error.message });
     setItems((data ?? []) as Payable[]);
@@ -200,6 +208,15 @@ export function PayablesPanel() {
     if (!newForm.description.trim()) return toast.error("Descrição é obrigatória");
     if (!newForm.amount_due || Number(newForm.amount_due) <= 0) return toast.error("Valor inválido");
     if (!newForm.due_date) return toast.error("Data de vencimento é obrigatória");
+    let recurrenceDay: number | null = newForm.recurrence_day ? Number(newForm.recurrence_day) : null;
+    if (newForm.kind === "recorrente") {
+      if (!recurrenceDay) {
+        // Deriva do dia do due_date (evita cair em dia 01 sem o usuário perceber).
+        const day = Number(newForm.due_date.slice(8, 10));
+        if (!day) return toast.error("Não foi possível determinar o dia de vencimento da recorrência.");
+        recurrenceDay = Math.min(day, 28);
+      }
+    }
     setSavingNew(true);
     const referenceMonth = newForm.due_date.slice(0, 7) + "-01";
     const payload = {
@@ -210,7 +227,7 @@ export function PayablesPanel() {
       amount_due: Number(newForm.amount_due),
       due_date: newForm.due_date,
       reference_month: referenceMonth,
-      recurrence_day: newForm.recurrence_day ? Number(newForm.recurrence_day) : null,
+      recurrence_day: recurrenceDay,
       notes: newForm.notes.trim() || null,
     };
     const { data, error } = await supabase.from("payables").insert(payload).select("id").single();
