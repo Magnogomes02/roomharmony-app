@@ -1103,8 +1103,8 @@ export type Database = {
         Args: {
           _contract_id: string
           _effective_month: string
-          _termination_fee?: number | null
-          _reason?: string | null
+          _reason?: string
+          _termination_fee?: number
         }
         Returns: Json
       }
