@@ -49,7 +49,7 @@ import { toast } from "sonner";
 import { toDateOnlyString } from "@/lib/dateOnly";
 import {
   computeEffectiveStatus,
-  generateRecurringForMonth,
+  generateRecurringForYear,
   buildDueDateForMonth,
   type PayableStatus,
 } from "@/lib/payablesStatus";
@@ -169,10 +169,10 @@ export function PayablesPanel() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      await generateRecurringForMonth(monthRef);
+      await generateRecurringForYear(monthRef.getFullYear());
     } catch (err) {
-      console.warn("generateRecurringForMonth falhou", err);
-      toast.warning("Não foi possível gerar todas as recorrências do mês.");
+      console.warn("generateRecurringForYear falhou", err);
+      toast.warning("Não foi possível gerar todas as recorrências do ano.");
     }
     const monthStart = toDateOnlyString(startOfMonth(monthRef));
     const monthEnd = toDateOnlyString(endOfMonth(monthRef));
