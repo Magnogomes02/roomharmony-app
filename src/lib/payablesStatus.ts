@@ -4,6 +4,16 @@ import { toDateOnlyString } from "@/lib/dateOnly";
 
 export type PayableStatus = "a_pagar" | "parcial" | "pago" | "atrasado" | "cancelado";
 
+// Recalcula due_date para um reference_month (YYYY-MM-01) dado um novo dia de
+// recorrência, espelhando o mesmo clamp usado em generateRecurringForMonth.
+export function buildDueDateForMonth(referenceMonth: string, day: number): string {
+  const [yearStr, monthStr] = referenceMonth.slice(0, 7).split("-");
+  const year = Number(yearStr);
+  const monthIdx = Number(monthStr) - 1;
+  const clampedDay = Math.min(day, getDaysInMonth(new Date(year, monthIdx)));
+  return `${yearStr}-${monthStr}-${String(clampedDay).padStart(2, "0")}`;
+}
+
 interface PayableStatusInput {
   status: string;
   amount_due: number;

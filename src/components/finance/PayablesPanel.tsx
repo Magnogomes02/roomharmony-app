@@ -8,6 +8,8 @@ import {
   Undo2,
   History,
   TrendingDown,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -17,6 +19,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
@@ -43,7 +47,12 @@ import {
 } from "@/components/ui/table";
 import { toast } from "sonner";
 import { toDateOnlyString } from "@/lib/dateOnly";
-import { computeEffectiveStatus, generateRecurringForMonth, type PayableStatus } from "@/lib/payablesStatus";
+import {
+  computeEffectiveStatus,
+  generateRecurringForMonth,
+  buildDueDateForMonth,
+  type PayableStatus,
+} from "@/lib/payablesStatus";
 import type { Json } from "@/integrations/supabase/types";
 
 interface Payable {
@@ -140,7 +149,22 @@ export function PayablesPanel() {
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<Payable | null>(null);
   const [cancelReason, setCancelReason] = useState("");
+  const [cancelScope, setCancelScope] = useState<"current" | "future">("current");
   const [savingCancel, setSavingCancel] = useState(false);
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<Payable | null>(null);
+  const [editScope, setEditScope] = useState<"current" | "future">("current");
+  const [editForm, setEditForm] = useState({
+    description: "", supplier: "", category: "", amount_due: "", due_date: "", recurrence_day: "", notes: "",
+  });
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Payable | null>(null);
+  const [deleteScope, setDeleteScope] = useState<"current" | "future">("current");
+  const [deleteConfirmChecked, setDeleteConfirmChecked] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -331,31 +355,318 @@ export function PayablesPanel() {
     load();
   }
 
+  function hasPaymentRisk(p: Payable): boolean {
+    return p.status === "pago" || p.status === "parcial" || Number(p.amount_paid) > 0;
+  }
+
+  function monthYearLabel(referenceMonth: string): string {
+    return `${referenceMonth.slice(5, 7)}/${referenceMonth.slice(0, 4)}`;
+  }
+
   function openCancel(p: Payable) {
     setCancelTarget(p);
     setCancelReason("");
+    setCancelScope("current");
     setCancelOpen(true);
   }
 
   async function saveCancel(e: React.FormEvent) {
     e.preventDefault();
     if (!cancelTarget) return;
+    const isRecurring = cancelTarget.kind === "recorrente";
+    if (isRecurring && !cancelReason.trim()) {
+      return toast.error("Informe o motivo do cancelamento.");
+    }
     setSavingCancel(true);
     const { data: { user } } = await supabase.auth.getUser();
-    const { error } = await supabase
+
+    if (!isRecurring || cancelScope === "current") {
+      const { error } = await supabase
+        .from("payables")
+        .update({
+          status: "cancelado",
+          cancel_reason: cancelReason.trim() || null,
+          cancelled_at: new Date().toISOString(),
+          cancelled_by: user?.id ?? null,
+        })
+        .eq("id", cancelTarget.id);
+      setSavingCancel(false);
+      if (error) return toast.error("Erro ao cancelar", { description: error.message });
+      toast.success("Conta cancelada");
+      setCancelOpen(false);
+      await logAudit(isRecurring ? "payable.recurring_cancel_current" : "payable.cancel", cancelTarget.id, {
+        selected_payable_id: cancelTarget.id,
+        model_payable_id: cancelTarget.parent_payable_id,
+        scope: "current",
+        reference_month: cancelTarget.reference_month,
+        reason: cancelReason.trim() || null,
+      });
+      load();
+      return;
+    }
+
+    // scope === "future": cancela instâncias futuras sem pagamento + o modelo
+    const modelId = cancelTarget.parent_payable_id ?? cancelTarget.id;
+    const { data: candidates, error: candErr } = await supabase
+      .from("payables")
+      .select("id,status,amount_paid")
+      .eq("parent_payable_id", modelId)
+      .gte("reference_month", cancelTarget.reference_month);
+    if (candErr) {
+      setSavingCancel(false);
+      return toast.error("Erro ao buscar recorrência", { description: candErr.message });
+    }
+    const rows = candidates ?? [];
+    const toCancel = rows.filter((c) => (c.status === "a_pagar" || c.status === "atrasado") && Number(c.amount_paid) === 0);
+    const skippedPaid = rows.filter((c) => c.status === "pago").length;
+    const skippedPartial = rows.filter((c) => c.status === "parcial").length;
+
+    if (toCancel.length > 0) {
+      const { error: updErr } = await supabase
+        .from("payables")
+        .update({
+          status: "cancelado",
+          cancel_reason: cancelReason.trim(),
+          cancelled_at: new Date().toISOString(),
+          cancelled_by: user?.id ?? null,
+        })
+        .in("id", toCancel.map((c) => c.id));
+      if (updErr) {
+        setSavingCancel(false);
+        return toast.error("Erro ao cancelar recorrência", { description: updErr.message });
+      }
+    }
+
+    await supabase
       .from("payables")
       .update({
         status: "cancelado",
-        cancel_reason: cancelReason.trim() || null,
+        cancel_reason: `Recorrência cancelada a partir de ${monthYearLabel(cancelTarget.reference_month)}: ${cancelReason.trim()}`,
         cancelled_at: new Date().toISOString(),
         cancelled_by: user?.id ?? null,
       })
-      .eq("id", cancelTarget.id);
+      .eq("id", modelId);
+
     setSavingCancel(false);
-    if (error) return toast.error("Erro ao cancelar", { description: error.message });
-    toast.success("Conta cancelada");
+    toast.success("Recorrência cancelada", {
+      description: `${toCancel.length} conta(s) futuras foram canceladas. ${skippedPaid + skippedPartial} conta(s) pagas/parciais foram preservadas e devem ser tratadas manualmente, se necessário.`,
+    });
     setCancelOpen(false);
-    await logAudit("payable.cancel", cancelTarget.id, { reason: cancelReason });
+    await logAudit("payable.recurring_cancel_future", cancelTarget.id, {
+      selected_payable_id: cancelTarget.id,
+      model_payable_id: modelId,
+      scope: "future",
+      reference_month: cancelTarget.reference_month,
+      affected_count: toCancel.length,
+      skipped_paid_count: skippedPaid,
+      skipped_partial_count: skippedPartial,
+      reason: cancelReason.trim(),
+    });
+    load();
+  }
+
+  function openEdit(p: Payable) {
+    if (hasPaymentRisk(p)) {
+      toast.error(
+        "Esta conta já possui pagamento registrado. Para preservar o histórico financeiro, edite manualmente apenas campos não financeiros ou estorne o pagamento antes de alterar valor/vencimento.",
+      );
+      return;
+    }
+    setEditTarget(p);
+    setEditScope("current");
+    setEditForm({
+      description: p.description,
+      supplier: p.supplier ?? "",
+      category: p.category ?? "",
+      amount_due: String(p.amount_due),
+      due_date: p.due_date,
+      recurrence_day: p.recurrence_day ? String(p.recurrence_day) : "",
+      notes: p.notes ?? "",
+    });
+    setEditOpen(true);
+  }
+
+  async function saveEdit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editTarget) return;
+    if (!editForm.description.trim()) return toast.error("Descrição é obrigatória");
+    if (!editForm.amount_due || Number(editForm.amount_due) <= 0) return toast.error("Valor inválido");
+    if (!editForm.due_date) return toast.error("Vencimento é obrigatório");
+    if (hasPaymentRisk(editTarget)) {
+      return toast.error("Esta conta já possui pagamento registrado. Edição bloqueada.");
+    }
+
+    setSavingEdit(true);
+    const isRecurring = editTarget.kind === "recorrente";
+    const recurrenceDay = editForm.recurrence_day ? Math.min(Number(editForm.recurrence_day), 28) : null;
+    const baseFields = {
+      description: editForm.description.trim(),
+      supplier: editForm.supplier.trim() || null,
+      category: editForm.category.trim() || null,
+      notes: editForm.notes.trim() || null,
+    };
+    const changedFields = ["description", "supplier", "category", "notes", "amount_due", "due_date", "recurrence_day"];
+
+    if (!isRecurring || editScope === "current") {
+      const { error } = await supabase
+        .from("payables")
+        .update({
+          ...baseFields,
+          amount_due: Number(editForm.amount_due),
+          due_date: editForm.due_date,
+          recurrence_day: recurrenceDay,
+        })
+        .eq("id", editTarget.id);
+      setSavingEdit(false);
+      if (error) return toast.error("Erro ao salvar", { description: error.message });
+      toast.success("Conta atualizada");
+      setEditOpen(false);
+      await logAudit(isRecurring ? "payable.recurring_edit_current" : "payable.edit", editTarget.id, {
+        selected_payable_id: editTarget.id,
+        model_payable_id: editTarget.parent_payable_id,
+        scope: "current",
+        reference_month: editTarget.reference_month,
+        changed_fields: changedFields,
+      });
+      load();
+      return;
+    }
+
+    // scope === "future": atualiza o modelo + instâncias futuras sem pagamento
+    const modelId = editTarget.parent_payable_id ?? editTarget.id;
+    const { error: modelErr } = await supabase
+      .from("payables")
+      .update({ ...baseFields, amount_due: Number(editForm.amount_due), recurrence_day: recurrenceDay })
+      .eq("id", modelId);
+    if (modelErr) {
+      setSavingEdit(false);
+      return toast.error("Erro ao atualizar modelo da recorrência", { description: modelErr.message });
+    }
+
+    const { data: candidates, error: candErr } = await supabase
+      .from("payables")
+      .select("id,status,amount_paid,reference_month")
+      .eq("parent_payable_id", modelId)
+      .gte("reference_month", editTarget.reference_month);
+    if (candErr) {
+      setSavingEdit(false);
+      return toast.error("Erro ao buscar recorrência", { description: candErr.message });
+    }
+    const rows = candidates ?? [];
+    const editable = rows.filter((c) => (c.status === "a_pagar" || c.status === "atrasado") && Number(c.amount_paid) === 0);
+    const skippedPaid = rows.filter((c) => c.status === "pago").length;
+    const skippedPartial = rows.filter((c) => c.status === "parcial").length;
+
+    for (const inst of editable) {
+      const newDue = recurrenceDay ? buildDueDateForMonth(inst.reference_month, recurrenceDay) : editForm.due_date;
+      const { error: instErr } = await supabase
+        .from("payables")
+        .update({ ...baseFields, amount_due: Number(editForm.amount_due), due_date: newDue, recurrence_day: recurrenceDay })
+        .eq("id", inst.id);
+      if (instErr) console.warn("[PayablesPanel] falha ao atualizar instância", inst.id, instErr);
+    }
+
+    setSavingEdit(false);
+    toast.success("Recorrência atualizada", {
+      description: `${editable.length} conta(s) futuras foram alteradas. ${skippedPaid + skippedPartial} conta(s) paga(s)/parcial(is) foram preservadas.`,
+    });
+    setEditOpen(false);
+    await logAudit("payable.recurring_edit_future", editTarget.id, {
+      selected_payable_id: editTarget.id,
+      model_payable_id: modelId,
+      scope: "future",
+      reference_month: editTarget.reference_month,
+      changed_fields: changedFields,
+      affected_count: editable.length,
+      skipped_paid_count: skippedPaid,
+      skipped_partial_count: skippedPartial,
+    });
+    load();
+  }
+
+  function openDelete(p: Payable) {
+    setDeleteTarget(p);
+    setDeleteScope("current");
+    setDeleteConfirmChecked(false);
+    setDeleteOpen(true);
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    const isRecurring = deleteTarget.kind === "recorrente";
+
+    if (!isRecurring || deleteScope === "current") {
+      if (hasPaymentRisk(deleteTarget) && !deleteConfirmChecked) {
+        toast.error("Confirme que entende que o histórico de pagamento será apagado.");
+        return;
+      }
+      setDeleting(true);
+      const { error } = await supabase.from("payables").delete().eq("id", deleteTarget.id);
+      setDeleting(false);
+      if (error) return toast.error("Erro ao excluir", { description: error.message });
+      toast.success("Conta excluída");
+      setDeleteOpen(false);
+      await logAudit(isRecurring ? "payable.recurring_delete_current" : "payable.delete_current", deleteTarget.id, {
+        selected_payable_id: deleteTarget.id,
+        model_payable_id: deleteTarget.parent_payable_id,
+        scope: "current",
+        had_payment: hasPaymentRisk(deleteTarget),
+      });
+      load();
+      return;
+    }
+
+    // scope === "future": exclui instâncias futuras sem pagamento + cancela o modelo
+    setDeleting(true);
+    const modelId = deleteTarget.parent_payable_id ?? deleteTarget.id;
+    const { data: candidates, error: candErr } = await supabase
+      .from("payables")
+      .select("id,status,amount_paid")
+      .eq("parent_payable_id", modelId)
+      .gte("reference_month", deleteTarget.reference_month);
+    if (candErr) {
+      setDeleting(false);
+      return toast.error("Erro ao buscar recorrência", { description: candErr.message });
+    }
+    const rows = candidates ?? [];
+    const deletable = rows.filter(
+      (c) => Number(c.amount_paid) === 0 && (c.status === "a_pagar" || c.status === "atrasado" || c.status === "cancelado"),
+    );
+    const skippedPaid = rows.filter((c) => c.status === "pago").length;
+    const skippedPartial = rows.filter((c) => c.status === "parcial").length;
+
+    if (deletable.length > 0) {
+      const { error: delErr } = await supabase.from("payables").delete().in("id", deletable.map((c) => c.id));
+      if (delErr) {
+        setDeleting(false);
+        return toast.error("Erro ao excluir recorrência", { description: delErr.message });
+      }
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    await supabase
+      .from("payables")
+      .update({
+        status: "cancelado",
+        cancel_reason: "Recorrência excluída (instâncias futuras sem pagamento removidas)",
+        cancelled_at: new Date().toISOString(),
+        cancelled_by: user?.id ?? null,
+      })
+      .eq("id", modelId);
+
+    setDeleting(false);
+    toast.success("Exclusão concluída", {
+      description: `${deletable.length} conta(s) sem pagamento foram excluídas. ${skippedPaid + skippedPartial} conta(s) pagas/parciais foram preservadas e só podem ser excluídas manualmente.`,
+    });
+    setDeleteOpen(false);
+    await logAudit("payable.recurring_delete_future", deleteTarget.id, {
+      selected_payable_id: deleteTarget.id,
+      model_payable_id: modelId,
+      scope: "future",
+      affected_count: deletable.length,
+      skipped_paid_count: skippedPaid,
+      skipped_partial_count: skippedPartial,
+    });
     load();
   }
 
@@ -489,12 +800,28 @@ export function PayablesPanel() {
                             {eff !== "cancelado" && (
                               <Button
                                 size="icon" variant="ghost"
+                                title="Editar conta"
+                                onClick={() => openEdit(p)}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {eff !== "cancelado" && (
+                              <Button
+                                size="icon" variant="ghost"
                                 title="Cancelar conta"
                                 onClick={() => openCancel(p)}
                               >
                                 <Ban className="h-4 w-4 text-destructive" />
                               </Button>
                             )}
+                            <Button
+                              size="icon" variant="ghost"
+                              title="Excluir conta"
+                              onClick={() => openDelete(p)}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
                           </div>
                         </TableCell>
                       )}
@@ -677,8 +1004,14 @@ export function PayablesPanel() {
       <Dialog open={cancelOpen} onOpenChange={setCancelOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle className="font-serif text-xl">Cancelar conta</DialogTitle>
-            <DialogDescription>{cancelTarget?.description}</DialogDescription>
+            <DialogTitle className="font-serif text-xl">
+              {cancelTarget?.kind === "recorrente" ? "Cancelar conta recorrente" : "Cancelar conta"}
+            </DialogTitle>
+            <DialogDescription>
+              {cancelTarget?.kind === "recorrente"
+                ? "Esta conta pertence a uma recorrência. Escolha se deseja cancelar apenas esta conta ou esta e as próximas recorrências."
+                : cancelTarget?.description}
+            </DialogDescription>
           </DialogHeader>
           <form onSubmit={saveCancel} className="space-y-4">
             {cancelTarget?.kind === "recorrente" && cancelTarget.parent_payable_id === null && (
@@ -686,8 +1019,23 @@ export function PayablesPanel() {
                 Este é o modelo desta recorrência. Cancelar impede a geração automática nos próximos meses. As instâncias já criadas não são afetadas.
               </p>
             )}
+            {cancelTarget?.kind === "recorrente" && (
+              <RadioGroup value={cancelScope} onValueChange={(v) => setCancelScope(v as "current" | "future")}>
+                <Label className="flex items-center gap-2 rounded-md border p-2 cursor-pointer">
+                  <RadioGroupItem value="current" /> Cancelar apenas esta conta
+                </Label>
+                <Label className="flex items-center gap-2 rounded-md border p-2 cursor-pointer">
+                  <RadioGroupItem value="future" /> Cancelar esta e as próximas recorrências
+                </Label>
+              </RadioGroup>
+            )}
+            {cancelTarget?.kind === "recorrente" && cancelScope === "future" && (
+              <p className="text-xs text-muted-foreground">
+                Contas pagas ou parcialmente pagas não serão alteradas em lote.
+              </p>
+            )}
             <div className="space-y-2">
-              <Label>Motivo (opcional)</Label>
+              <Label>Motivo {cancelTarget?.kind === "recorrente" ? "*" : "(opcional)"}</Label>
               <Textarea rows={3} value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} />
             </div>
             <DialogFooter>
@@ -697,6 +1045,149 @@ export function PayablesPanel() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal: editar conta */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-xl">
+              {editTarget?.kind === "recorrente" ? "Editar conta recorrente" : "Editar conta"}
+            </DialogTitle>
+            <DialogDescription>
+              {editTarget?.kind === "recorrente"
+                ? "Esta conta pertence a uma recorrência. Escolha se deseja editar apenas esta conta ou esta e as próximas recorrências."
+                : editTarget?.description}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={saveEdit} className="space-y-4">
+            {editTarget?.kind === "recorrente" && (
+              <RadioGroup value={editScope} onValueChange={(v) => setEditScope(v as "current" | "future")}>
+                <Label className="flex items-center gap-2 rounded-md border p-2 cursor-pointer">
+                  <RadioGroupItem value="current" /> Editar apenas esta conta
+                </Label>
+                <Label className="flex items-center gap-2 rounded-md border p-2 cursor-pointer">
+                  <RadioGroupItem value="future" /> Editar esta e as próximas recorrências
+                </Label>
+              </RadioGroup>
+            )}
+            {editTarget?.kind === "recorrente" && editScope === "future" && (
+              <p className="text-xs text-muted-foreground">
+                Contas pagas ou parcialmente pagas não serão alteradas em lote.
+              </p>
+            )}
+            <div className="space-y-2">
+              <Label>Descrição *</Label>
+              <Input required maxLength={200} value={editForm.description}
+                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Fornecedor</Label>
+                <Input maxLength={100} value={editForm.supplier}
+                  onChange={(e) => setEditForm({ ...editForm, supplier: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Categoria</Label>
+                <Input maxLength={80} value={editForm.category}
+                  onChange={(e) => setEditForm({ ...editForm, category: e.target.value })} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Valor (R$) *</Label>
+                <Input type="number" min={0.01} step={0.01} required value={editForm.amount_due}
+                  onChange={(e) => setEditForm({ ...editForm, amount_due: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Vencimento *</Label>
+                <Input type="date" required value={editForm.due_date}
+                  onChange={(e) => setEditForm({ ...editForm, due_date: e.target.value })} />
+              </div>
+            </div>
+            {editTarget?.kind === "recorrente" && (
+              <div className="space-y-2">
+                <Label>Dia de recorrência</Label>
+                <Input type="number" min={1} max={28} placeholder="ex: 10" value={editForm.recurrence_day}
+                  onChange={(e) => setEditForm({ ...editForm, recurrence_day: e.target.value })} />
+                {editScope === "future" && (
+                  <p className="text-xs text-muted-foreground">
+                    Se alterado, o vencimento das próximas instâncias é recalculado automaticamente para este dia.
+                  </p>
+                )}
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label>Observações</Label>
+              <Textarea rows={2} maxLength={500} value={editForm.notes}
+                onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditOpen(false)}>Cancelar</Button>
+              <Button type="submit" disabled={savingEdit}>{savingEdit ? "Salvando…" : "Salvar"}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal: excluir conta */}
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-xl">
+              {deleteTarget?.kind === "recorrente" ? "Excluir conta recorrente" : "Excluir conta"}
+            </DialogTitle>
+            <DialogDescription>{deleteTarget?.description}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {deleteTarget?.kind === "recorrente" && (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Esta conta pertence a uma recorrência. Escolha se deseja excluir apenas esta conta ou esta e as próximas recorrências.
+                </p>
+                <RadioGroup value={deleteScope} onValueChange={(v) => setDeleteScope(v as "current" | "future")}>
+                  <Label className="flex items-center gap-2 rounded-md border p-2 cursor-pointer">
+                    <RadioGroupItem value="current" /> Excluir apenas esta conta
+                  </Label>
+                  <Label className="flex items-center gap-2 rounded-md border p-2 cursor-pointer">
+                    <RadioGroupItem value="future" /> Excluir esta e as próximas recorrências
+                  </Label>
+                </RadioGroup>
+                {deleteScope === "future" && (
+                  <p className="text-xs text-muted-foreground">
+                    Contas pagas ou parcialmente pagas não serão alteradas em lote — só podem ser excluídas manualmente.
+                  </p>
+                )}
+              </>
+            )}
+            {(deleteScope === "current" || deleteTarget?.kind !== "recorrente") && deleteTarget && hasPaymentRisk(deleteTarget) && (
+              <div className="space-y-2 rounded-md border border-destructive/40 bg-destructive/10 p-3">
+                <p className="text-sm text-destructive-foreground">
+                  Esta conta possui pagamento registrado. Excluir apagará o histórico desta conta e seus pagamentos. Deseja continuar?
+                </p>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="delete-confirm-checked"
+                    checked={deleteConfirmChecked}
+                    onCheckedChange={(v) => setDeleteConfirmChecked(v === true)}
+                  />
+                  <Label htmlFor="delete-confirm-checked" className="cursor-pointer text-sm font-normal">
+                    Entendo que isso vai apagar o histórico de pagamento
+                  </Label>
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setDeleteOpen(false)}>Cancelar</Button>
+            <Button
+              type="button" variant="destructive" disabled={deleting}
+              onClick={confirmDelete}
+            >
+              {deleting ? "Excluindo…" : "Confirmar exclusão"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
