@@ -842,24 +842,19 @@ export function PayablesPanel() {
             <DialogDescription>Registre uma despesa avulsa ou recorrente.</DialogDescription>
           </DialogHeader>
           <form onSubmit={saveNew} className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label>Tipo *</Label>
-                <Select value={newForm.kind} onValueChange={(v) => setNewForm({ ...newForm, kind: v as "avulso" | "recorrente" })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="avulso">Avulso</SelectItem>
-                    <SelectItem value="recorrente">Recorrente</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-2">
+              <Label>Tipo *</Label>
+              <Select value={newForm.kind} onValueChange={(v) => setNewForm({ ...newForm, kind: v as "avulso" | "recorrente" })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="avulso">Avulso</SelectItem>
+                  <SelectItem value="recorrente">Recorrente</SelectItem>
+                </SelectContent>
+              </Select>
               {newForm.kind === "recorrente" && (
-                <div className="space-y-2">
-                  <Label>Dia de vencimento</Label>
-                  <Input type="number" min={1} max={28} placeholder="ex: 10"
-                    value={newForm.recurrence_day}
-                    onChange={(e) => setNewForm({ ...newForm, recurrence_day: e.target.value })} />
-                </div>
+                <p className="text-xs text-muted-foreground">
+                  O dia de recorrência será o mesmo dia do vencimento informado abaixo.
+                </p>
               )}
             </div>
             <div className="space-y-2">
