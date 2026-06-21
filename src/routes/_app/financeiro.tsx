@@ -101,6 +101,8 @@ interface Receivable {
   status: "a_receber" | "parcial" | "recebido" | "atrasado" | "cancelado";
   cancel_type: string | null;
   cancel_reason: string | null;
+  credit_applied_amount: number | null;
+  remaining_due_date: string | null;
 }
 
 
@@ -319,6 +321,8 @@ function FinanceiroPage() {
       amount_due: r.amount_due,
       amount_paid: r.amount_paid,
       cancel_type: r.cancel_type,
+      credit_applied_amount: r.credit_applied_amount,
+      remaining_due_date: r.remaining_due_date,
     });
   }
 

@@ -72,6 +72,8 @@ interface Payable {
   cancel_reason: string | null;
   cancelled_at: string | null;
   created_at: string;
+  credit_applied_amount: number | null;
+  remaining_due_date: string | null;
 }
 
 interface PayablePayment {

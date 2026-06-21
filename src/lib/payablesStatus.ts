@@ -19,16 +19,24 @@ interface PayableStatusInput {
   amount_due: number;
   amount_paid: number | null;
   due_date: string;
+  credit_applied_amount?: number | null;
+  remaining_due_date?: string | null;
 }
 
 export function computeEffectiveStatus(p: PayableStatusInput): PayableStatus {
   if (p.status === "cancelado") return "cancelado";
-  if (p.status === "pago") return "pago";
   const paid = Number(p.amount_paid ?? 0);
+  const credit = Number(p.credit_applied_amount ?? 0);
   const due = Number(p.amount_due);
-  if (paid >= due) return "pago";
-  if (paid > 0) return "parcial";
+  const effectivePaid = paid + credit;
+  if (effectivePaid >= due) return "pago";
   const today = toDateOnlyString(new Date());
+  if (effectivePaid > 0) {
+    const refDate = p.remaining_due_date || p.due_date;
+    if (refDate < today) return "atrasado";
+    return "parcial";
+  }
+  // sem pagamento/crédito
   if (p.due_date < today) return "atrasado";
   return "a_pagar";
 }
@@ -175,7 +183,7 @@ export async function generateRecurringForYear(year: number): Promise<void> {
         supplier: t.supplier,
         category: t.category,
         amount_due: t.amount_due,
-        recurrence_day: t.recurrence_day,
+        recurrence_day: day,
         notes: t.notes,
         due_date: dueDate,
         reference_month: referenceMonth,

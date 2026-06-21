@@ -52,6 +52,8 @@ interface ReceivableRow {
   amount_paid: number | string | null;
   status: "a_receber" | "recebido" | "atrasado" | "cancelado";
   cancel_type: string | null;
+  credit_applied_amount: number | string | null;
+  remaining_due_date: string | null;
 }
 
 interface PayableRow {
@@ -79,7 +81,7 @@ export async function loadAnnualFinancialSummary(year: number): Promise<AnnualFi
   const [recRes, payRes] = await Promise.all([
     supabase
       .from("receivables")
-      .select("reference_month,due_date,amount_due,amount_paid,status,cancel_type")
+      .select("reference_month,due_date,amount_due,amount_paid,status,cancel_type,credit_applied_amount,remaining_due_date")
       .gte("reference_month", start)
       .lte("reference_month", end),
     supabase
@@ -132,21 +134,24 @@ export async function loadAnnualFinancialSummary(year: number): Promise<AnnualFi
 
     const due = num(r.amount_due);
     const paid = num(r.amount_paid);
+    const credit = num(r.credit_applied_amount);
     bucket.expected += due;
 
-    // pagamento parcial conta como recebido
+    // pagamento parcial conta como recebido (crédito aplicado não é dinheiro novo)
     if (paid > 0) bucket.received += Math.min(paid, due);
 
     if (r.status === "cancelado") {
       // perda = saldo aberto (perda_contrato é o único cenário restante)
-      const saldo = Math.max(due - paid, 0);
+      const saldo = Math.max(due - paid - credit, 0);
       bucket.lost += saldo;
       continue;
     }
 
-    const saldo = Math.max(due - paid, 0);
+    const saldo = Math.max(due - paid - credit, 0);
     if (saldo > 0) {
-      const dueDate = new Date(r.due_date + "T12:00:00");
+      const effectivePaid = paid + credit;
+      const refDateStr = effectivePaid > 0 && r.remaining_due_date ? r.remaining_due_date : r.due_date;
+      const dueDate = new Date(refDateStr + "T12:00:00");
       if (dueDate < today) bucket.overdue += saldo;
       else bucket.receivable += saldo;
     }

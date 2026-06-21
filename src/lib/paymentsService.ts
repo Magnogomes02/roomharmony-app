@@ -25,6 +25,8 @@ export interface ReceivableLikeFull {
   amount_due: number | string;
   amount_paid: number | string | null;
   cancel_type?: string | null;
+  credit_applied_amount?: number | string | null;
+  remaining_due_date?: string | null;
 }
 
 export type EffectiveStatus = "a_receber" | "parcial" | "recebido" | "atrasado" | "cancelado";
@@ -33,16 +35,20 @@ export function computeEffectiveStatus(r: ReceivableLikeFull): EffectiveStatus {
   if (r.status === "cancelado") return "cancelado";
   const due = Number(r.amount_due) || 0;
   const paid = Number(r.amount_paid) || 0;
-  if (paid >= due && due > 0) return "recebido";
+  const credit = Number(r.credit_applied_amount) || 0;
+  const effectivePaid = paid + credit;
+  if (effectivePaid >= due && due > 0) return "recebido";
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const dueDate = parseDateOnlyLocal(r.due_date);
-  dueDate.setHours(0, 0, 0, 0);
-  if (paid > 0 && paid < due) {
-    if (dueDate < today) return "atrasado";
+  if (effectivePaid > 0 && effectivePaid < due) {
+    const refDate = parseDateOnlyLocal(r.remaining_due_date || r.due_date);
+    refDate.setHours(0, 0, 0, 0);
+    if (refDate < today) return "atrasado";
     return "parcial";
   }
-  // no payment
+  // sem pagamento/crédito
+  const dueDate = parseDateOnlyLocal(r.due_date);
+  dueDate.setHours(0, 0, 0, 0);
   if (dueDate < today) return "atrasado";
   return "a_receber";
 }
@@ -85,7 +91,7 @@ export async function getAllPaymentsForReceivable(
 export async function recomputeReceivableSummary(receivableId: string): Promise<void> {
   const { data: rec, error: recErr } = await supabase
     .from("receivables")
-    .select("amount_due, status, due_date, cancel_type")
+    .select("amount_due, status, due_date, cancel_type, credit_applied_amount, remaining_due_date")
     .eq("id", receivableId)
     .single();
   if (recErr || !rec) throw recErr ?? new Error("Recebível não encontrado");
@@ -114,6 +120,8 @@ export async function recomputeReceivableSummary(receivableId: string): Promise<
       amount_due: rec.amount_due,
       amount_paid: totalPaid,
       cancel_type: rec.cancel_type,
+      credit_applied_amount: rec.credit_applied_amount,
+      remaining_due_date: rec.remaining_due_date,
     });
   }
 

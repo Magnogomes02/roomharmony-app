@@ -12,7 +12,7 @@ import { WeekScheduleByRoomCard } from "@/components/WeekScheduleByRoomCard";
 import { startOfMonth, endOfMonth, startOfWeek, addDays } from "date-fns";
 import { parseDateOnlyLocal, formatDateOnlyBR, toDateOnlyString } from "@/lib/dateOnly";
 import { computeEffectiveStatus as computeReceivableEffectiveStatus } from "@/lib/paymentsService";
-import { computeEffectiveStatus as computePayableEffectiveStatus, generateRecurringForMonth } from "@/lib/payablesStatus";
+import { computeEffectiveStatus as computePayableEffectiveStatus, generateRecurringForYear } from "@/lib/payablesStatus";
 import { createNotification } from "@/lib/notifications";
 
 export const Route = createFileRoute("/_app/dashboard")({
@@ -36,7 +36,7 @@ function DashboardPage() {
       const monthStart = toDateOnlyString(startOfMonth(now));
       const monthEnd = toDateOnlyString(endOfMonth(now));
 
-      await generateRecurringForMonth(now);
+      await generateRecurringForYear(now.getFullYear());
 
       const [profs, rooms, contracts, weekBookings, conflicts, receivables, payables, audits, expiringContracts, allProfessionals, allSchedules, allRooms] = await Promise.all([
         supabase.from("professionals").select("id", { count: "exact", head: true }).eq("active", true),
@@ -47,9 +47,9 @@ function DashboardPage() {
           .gt("end_at", weekStart.toISOString())
           .in("status", ["ativa", "conflito"]),
         supabase.from("booking_conflicts").select("id", { count: "exact", head: true }).eq("status", "pendente"),
-        supabase.from("receivables").select("kind,status,due_date,amount_due,amount_paid")
+        supabase.from("receivables").select("kind,status,due_date,amount_due,amount_paid,credit_applied_amount,remaining_due_date")
           .gte("due_date", monthStart).lte("due_date", monthEnd),
-        supabase.from("payables").select("kind,status,due_date,amount_due,amount_paid")
+        supabase.from("payables").select("kind,status,due_date,amount_due,amount_paid,credit_applied_amount,remaining_due_date")
           .gte("reference_month", monthStart).lte("reference_month", monthEnd)
           .or("kind.eq.avulso,parent_payable_id.not.is.null"),
         supabase.from("audit_logs").select("id, action, entity_type, created_at, metadata").order("created_at", { ascending: false }).limit(5),
@@ -64,17 +64,20 @@ function DashboardPage() {
         recebidoContrato: 0, recebidoAvulso: 0,
         atrasadoContrato: 0, atrasadoAvulso: 0,
       };
-      for (const r of (receivables.data ?? []) as { kind: string; status: string; due_date: string; amount_due: number; amount_paid: number | null }[]) {
+      for (const r of (receivables.data ?? []) as { kind: string; status: string; due_date: string; amount_due: number; amount_paid: number | null; credit_applied_amount: number | null; remaining_due_date: string | null }[]) {
         if (r.status === "cancelado") continue;
         const due = Number(r.amount_due);
         const paid = Number(r.amount_paid ?? 0);
-        const saldo = Math.max(due - paid, 0);
+        const credit = Number(r.credit_applied_amount ?? 0);
+        const saldo = Math.max(due - paid - credit, 0);
         const k = r.kind === "avulso" ? "Avulso" : "Contrato";
         const effectiveStatus = computeReceivableEffectiveStatus({
           status: r.status,
           due_date: r.due_date,
           amount_due: due,
           amount_paid: paid,
+          credit_applied_amount: credit,
+          remaining_due_date: r.remaining_due_date,
         });
         if (paid > 0) fin[`recebido${k}` as keyof typeof fin] += paid;
         if (saldo > 0) {
@@ -88,10 +91,11 @@ function DashboardPage() {
         pagoRecorrente: 0, pagoAvulso: 0,
         atrasadoRecorrente: 0, atrasadoAvulso: 0,
       };
-      for (const p of (payables.data ?? []) as { kind: string; status: string; due_date: string; amount_due: number; amount_paid: number | null }[]) {
+      for (const p of (payables.data ?? []) as { kind: string; status: string; due_date: string; amount_due: number; amount_paid: number | null; credit_applied_amount: number | null; remaining_due_date: string | null }[]) {
         const due = Number(p.amount_due);
         const paid = Number(p.amount_paid ?? 0);
-        const saldo = Math.max(due - paid, 0);
+        const credit = Number(p.credit_applied_amount ?? 0);
+        const saldo = Math.max(due - paid - credit, 0);
         const k = p.kind === "avulso" ? "Avulso" : "Recorrente";
         const effectiveStatus = computePayableEffectiveStatus(p);
         if (effectiveStatus === "a_pagar" || effectiveStatus === "parcial") pag[`aPagar${k}` as keyof typeof pag] += saldo;
