@@ -67,6 +67,7 @@ import { PayablesPanel } from "@/components/finance/PayablesPanel";
 import {
   computeEffectiveStatus,
   createPayment,
+  setRemainingDue,
   reversePayment,
   recomputeReceivableSummary,
   getActivePaymentsForReceivables,
@@ -182,6 +183,8 @@ function FinanceiroPage() {
     paid_at: toDateOnlyString(new Date()),
     payment_method: "PIX",
     notes: "",
+    remaining_due_date: "",
+    remaining_due_reason: "",
   });
   const [payFile, setPayFile] = useState<File | null>(null);
   const [paying, setPaying] = useState(false);
@@ -399,6 +402,8 @@ function FinanceiroPage() {
       paid_at: toDateOnlyString(new Date()),
       payment_method: "PIX",
       notes: "",
+      remaining_due_date: "",
+      remaining_due_reason: "",
     });
     setPayFile(null);
     setPayOpen(true);
@@ -409,6 +414,14 @@ function FinanceiroPage() {
     const amount = Number(payForm.amount_paid);
     if (!(amount > 0)) {
       toast.error("Valor pago deve ser maior que zero.");
+      return;
+    }
+    const due = Number(payRow.amount_due);
+    const alreadyPaid = Number(payRow.amount_paid ?? 0);
+    const newPaid = alreadyPaid + amount;
+    const isPartial = newPaid < due - 0.001;
+    if (isPartial && !payForm.remaining_due_date) {
+      toast.error("Informe a nova data de vencimento do saldo restante.");
       return;
     }
     setPaying(true);
@@ -437,6 +450,19 @@ function FinanceiroPage() {
         amount,
         method: payForm.payment_method,
       });
+      if (isPartial) {
+        await setRemainingDue(payRow.id, {
+          remainingDueDate: payForm.remaining_due_date,
+          reason: payForm.remaining_due_reason || null,
+        });
+        await audit("receivable.partial_remaining_due_set", payRow.id, {
+          payment_id: payment.id,
+          remaining_due_date: payForm.remaining_due_date,
+          reason: payForm.remaining_due_reason || null,
+        });
+      } else {
+        await setRemainingDue(payRow.id, { remainingDueDate: null, reason: null });
+      }
       if (generateReceiptAfterPay) {
         try {
           await createReceiptForReceivable(payRow.id, payment.id);
@@ -1402,6 +1428,30 @@ function FinanceiroPage() {
                 />
               </div>
             </div>
+            {payRow &&
+              Number(payForm.amount_paid || 0) + Number(payRow.amount_paid ?? 0) <
+                Number(payRow.amount_due) - 0.001 && (
+                <div className="space-y-3 rounded-md border bg-muted/30 p-3">
+                  <p className="text-sm font-medium">
+                    Pagamento parcial — informe a nova data de vencimento do saldo restante.
+                  </p>
+                  <div className="space-y-2">
+                    <Label>Nova data de vencimento do saldo *</Label>
+                    <Input
+                      type="date"
+                      value={payForm.remaining_due_date}
+                      onChange={(e) => setPayForm({ ...payForm, remaining_due_date: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Motivo (opcional)</Label>
+                    <Input
+                      value={payForm.remaining_due_reason}
+                      onChange={(e) => setPayForm({ ...payForm, remaining_due_reason: e.target.value })}
+                    />
+                  </div>
+                </div>
+              )}
             <div className="space-y-2">
               <Label>Forma de pagamento</Label>
               <Select

@@ -141,6 +141,8 @@ export function PayablesPanel() {
   const [payAmount, setPayAmount] = useState("");
   const [payMethod, setPayMethod] = useState("");
   const [payNotes, setPayNotes] = useState("");
+  const [payRemainingDueDate, setPayRemainingDueDate] = useState("");
+  const [payRemainingDueReason, setPayRemainingDueReason] = useState("");
   const [savingPay, setSavingPay] = useState(false);
 
   const [histOpen, setHistOpen] = useState(false);
@@ -272,6 +274,8 @@ export function PayablesPanel() {
     setPayAmount(String(remaining.toFixed(2)));
     setPayMethod("");
     setPayNotes("");
+    setPayRemainingDueDate("");
+    setPayRemainingDueReason("");
     setPayOpen(true);
   }
 
@@ -282,6 +286,11 @@ export function PayablesPanel() {
     if (!amount || amount <= 0) return toast.error("Valor inválido");
     const remaining = Number(payTarget.amount_due) - Number(payTarget.amount_paid ?? 0);
     if (amount > remaining + 0.001) return toast.error("Valor maior que o saldo devedor");
+    const newPaidCheck = Number(payTarget.amount_paid ?? 0) + amount;
+    const isPartial = newPaidCheck < Number(payTarget.amount_due) - 0.001;
+    if (isPartial && !payRemainingDueDate) {
+      return toast.error("Informe a nova data de vencimento do saldo restante.");
+    }
     setSavingPay(true);
     const { data: { user } } = await supabase.auth.getUser();
     const { data: pay, error: payErr } = await supabase
@@ -301,13 +310,27 @@ export function PayablesPanel() {
     const newStatus: PayableStatus = newPaid >= Number(payTarget.amount_due) - 0.001 ? "pago" : "parcial";
     const { error: updErr } = await supabase
       .from("payables")
-      .update({ amount_paid: newPaid, status: newStatus })
+      .update({
+        amount_paid: newPaid,
+        status: newStatus,
+        remaining_due_date: isPartial ? payRemainingDueDate : null,
+        remaining_due_updated_at: new Date().toISOString(),
+        remaining_due_updated_by: user?.id ?? null,
+        remaining_due_reason: isPartial ? (payRemainingDueReason || null) : null,
+      })
       .eq("id", payTarget.id);
     setSavingPay(false);
     if (updErr) return toast.error("Pagamento registrado mas falhou ao atualizar conta", { description: updErr.message });
     toast.success("Pagamento registrado");
     setPayOpen(false);
     await logAudit("payable.payment_create", payTarget.id, { payment_id: pay.id, amount, payment_method: payMethod });
+    if (isPartial) {
+      await logAudit("payable.partial_remaining_due_set", payTarget.id, {
+        payment_id: pay.id,
+        remaining_due_date: payRemainingDueDate,
+        reason: payRemainingDueReason || null,
+      });
+    }
     load();
   }
 
@@ -921,6 +944,25 @@ export function PayablesPanel() {
               <Input type="number" min={0.01} step={0.01} required value={payAmount}
                 onChange={(e) => setPayAmount(e.target.value)} />
             </div>
+            {payTarget &&
+              Number(payAmount || 0) + Number(payTarget.amount_paid ?? 0) <
+                Number(payTarget.amount_due) - 0.001 && (
+                <div className="space-y-3 rounded-md border bg-muted/30 p-3">
+                  <p className="text-sm font-medium">
+                    Pagamento parcial — informe a nova data de vencimento do saldo restante.
+                  </p>
+                  <div className="space-y-2">
+                    <Label>Nova data de vencimento do saldo *</Label>
+                    <Input type="date" value={payRemainingDueDate}
+                      onChange={(e) => setPayRemainingDueDate(e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Motivo (opcional)</Label>
+                    <Input value={payRemainingDueReason}
+                      onChange={(e) => setPayRemainingDueReason(e.target.value)} />
+                  </div>
+                </div>
+              )}
             <div className="space-y-2">
               <Label>Forma de pagamento</Label>
               <Select value={payMethod} onValueChange={setPayMethod}>

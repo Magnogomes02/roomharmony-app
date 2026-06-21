@@ -41,6 +41,29 @@ export function computeEffectiveStatus(p: PayableStatusInput): PayableStatus {
   return "a_pagar";
 }
 
+/**
+ * Define (ou limpa) a nova data de vencimento do saldo restante de uma
+ * conta a pagar após um pagamento parcial. due_date original nunca é alterado.
+ */
+export async function setRemainingDue(
+  payableId: string,
+  params: { remainingDueDate: string | null; reason: string | null },
+): Promise<void> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { error } = await supabase
+    .from("payables")
+    .update({
+      remaining_due_date: params.remainingDueDate,
+      remaining_due_updated_at: new Date().toISOString(),
+      remaining_due_updated_by: user?.id ?? null,
+      remaining_due_reason: params.reason,
+    })
+    .eq("id", payableId);
+  if (error) throw error;
+}
+
 // Auto-generates recurring payable instances for `month` if they don't exist yet.
 // Templates are recorrentes with parent_payable_id = null (the originating entry).
 // Only generates from the template's own reference_month forward (never backfills earlier months).

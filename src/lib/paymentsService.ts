@@ -146,6 +146,29 @@ export interface CreatePaymentInput {
   notes?: string | null;
 }
 
+/**
+ * Define (ou limpa) a nova data de vencimento do saldo restante de um
+ * recebível após um pagamento parcial. due_date original nunca é alterado.
+ */
+export async function setRemainingDue(
+  receivableId: string,
+  params: { remainingDueDate: string | null; reason: string | null },
+): Promise<void> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { error } = await supabase
+    .from("receivables")
+    .update({
+      remaining_due_date: params.remainingDueDate,
+      remaining_due_updated_at: new Date().toISOString(),
+      remaining_due_updated_by: user?.id ?? null,
+      remaining_due_reason: params.reason,
+    })
+    .eq("id", receivableId);
+  if (error) throw error;
+}
+
 export async function createPayment(input: CreatePaymentInput): Promise<ReceivablePayment> {
   const {
     data: { user },
