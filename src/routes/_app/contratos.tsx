@@ -554,23 +554,15 @@ function ContratosPage() {
     if (error) throw error;
   }
 
-  async function captureSignatureEvidence(contractId: string, signedAt: string, signerName: string): Promise<{
+  function captureSignatureEvidence(contractId: string, signedAt: string, signerName: string): {
     signature_hash: string;
     signed_email: string | null;
-    signed_gps: string | null;
     signed_user_agent: string;
-  }> {
+  } {
     const signature_hash = buildReceiptAuthenticationCode(contractId, `${signedAt}|${signerName}`);
     const signed_email = user?.email ?? null;
     const signed_user_agent = navigator.userAgent.slice(0, 500);
-    let signed_gps: string | null = null;
-    try {
-      const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 4000 });
-      });
-      signed_gps = `${pos.coords.latitude.toFixed(6)},${pos.coords.longitude.toFixed(6)}`;
-    } catch { /* geolocation not available or denied */ }
-    return { signature_hash, signed_email, signed_gps, signed_user_agent };
+    return { signature_hash, signed_email, signed_user_agent };
   }
 
   async function save(e: React.FormEvent) {
@@ -596,13 +588,12 @@ function ContratosPage() {
     let signatureEvidence: {
       signature_hash: string | null;
       signed_email: string | null;
-      signed_gps: string | null;
       signed_user_agent: string | null;
-    } = { signature_hash: null, signed_email: null, signed_gps: null, signed_user_agent: null };
+    } = { signature_hash: null, signed_email: null, signed_user_agent: null };
 
     if (isFirstSignature) {
       const tmpId = editing?.id ?? crypto.randomUUID();
-      signatureEvidence = await captureSignatureEvidence(tmpId, signedAtIso, signerName);
+      signatureEvidence = captureSignatureEvidence(tmpId, signedAtIso, signerName);
     }
 
     const payload = {
@@ -631,11 +622,28 @@ function ContratosPage() {
         if (error) throw error;
         contractId = editing.id;
       } else {
-        const { data, error } = await supabase.from("contracts").insert(payload).select("id").single();
+        // Contratos multi-sala não têm room_id direto: a vinculação de salas do
+        // recebível depende de contract_schedules, que só é gravada a seguir
+        // (persistSchedules). Por isso o INSERT sempre entra como "rascunho" —
+        // se o status pedido for "ativo", a ativação real (e o trigger que gera
+        // os recebíveis) só dispara depois que a grade já existe no banco.
+        const { data, error } = await supabase
+          .from("contracts")
+          .insert({ ...payload, status: "rascunho" })
+          .select("id")
+          .single();
         if (error) throw error;
         contractId = data!.id;
       }
       await persistSchedules(contractId);
+
+      if (!editing && form.status === "ativo") {
+        const { error: activErr } = await supabase
+          .from("contracts")
+          .update({ status: "ativo" })
+          .eq("id", contractId);
+        if (activErr) throw activErr;
+      }
 
       // Se ativo, prepara geração de bookings com prévia de conflitos
       if (form.status === "ativo") {
@@ -674,7 +682,11 @@ function ContratosPage() {
         load();
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = err instanceof Error
+        ? err.message
+        : typeof err === "object" && err && "message" in err
+          ? String((err as { message: unknown }).message)
+          : String(err);
       toast.error("Erro ao salvar", { description: msg });
     } finally {
       setSaving(false);
