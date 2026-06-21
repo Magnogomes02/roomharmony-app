@@ -51,8 +51,14 @@ import {
   computeEffectiveStatus,
   generateRecurringForYear,
   buildDueDateForMonth,
+  increaseRecurringAmount,
   type PayableStatus,
 } from "@/lib/payablesStatus";
+import {
+  createCreditApplication,
+  applyPendingCredits,
+  paymentHasOverpaymentTreatment,
+} from "@/lib/creditApplications";
 import type { Json } from "@/integrations/supabase/types";
 
 interface Payable {
@@ -143,6 +149,7 @@ export function PayablesPanel() {
   const [payNotes, setPayNotes] = useState("");
   const [payRemainingDueDate, setPayRemainingDueDate] = useState("");
   const [payRemainingDueReason, setPayRemainingDueReason] = useState("");
+  const [payOverpaymentAction, setPayOverpaymentAction] = useState<"credit" | "increase" | "fee" | "">("");
   const [savingPay, setSavingPay] = useState(false);
 
   const [histOpen, setHistOpen] = useState(false);
@@ -177,6 +184,11 @@ export function PayablesPanel() {
     } catch (err) {
       console.warn("generateRecurringForYear falhou", err);
       toast.warning("Não foi possível gerar todas as recorrências do ano.");
+    }
+    try {
+      await applyPendingCredits("payable");
+    } catch (err) {
+      console.warn("applyPendingCredits(payable) falhou", err);
     }
     const monthStart = toDateOnlyString(startOfMonth(monthRef));
     const monthEnd = toDateOnlyString(endOfMonth(monthRef));
@@ -214,7 +226,10 @@ export function PayablesPanel() {
     let aPagar = 0, pago = 0, atrasado = 0;
     for (const p of items) {
       const eff = computeEffectiveStatus(p);
-      const remaining = Number(p.amount_due) - Number(p.amount_paid ?? 0);
+      const remaining = Math.max(
+        Number(p.amount_due) - Number(p.amount_paid ?? 0) - Number(p.credit_applied_amount ?? 0),
+        0,
+      );
       if (eff === "a_pagar" || eff === "parcial") aPagar += remaining;
       else if (eff === "pago") pago += Number(p.amount_paid ?? p.amount_due);
       else if (eff === "atrasado") atrasado += remaining;
@@ -270,12 +285,16 @@ export function PayablesPanel() {
 
   function openPay(p: Payable) {
     setPayTarget(p);
-    const remaining = Number(p.amount_due) - Number(p.amount_paid ?? 0);
+    const remaining = Math.max(
+      Number(p.amount_due) - Number(p.amount_paid ?? 0) - Number(p.credit_applied_amount ?? 0),
+      0,
+    );
     setPayAmount(String(remaining.toFixed(2)));
     setPayMethod("");
     setPayNotes("");
     setPayRemainingDueDate("");
     setPayRemainingDueReason("");
+    setPayOverpaymentAction("");
     setPayOpen(true);
   }
 
@@ -284,12 +303,20 @@ export function PayablesPanel() {
     if (!payTarget) return;
     const amount = Number(payAmount);
     if (!amount || amount <= 0) return toast.error("Valor inválido");
-    const remaining = Number(payTarget.amount_due) - Number(payTarget.amount_paid ?? 0);
-    if (amount > remaining + 0.001) return toast.error("Valor maior que o saldo devedor");
-    const newPaidCheck = Number(payTarget.amount_paid ?? 0) + amount;
-    const isPartial = newPaidCheck < Number(payTarget.amount_due) - 0.001;
+    const due = Number(payTarget.amount_due);
+    const credit = Number(payTarget.credit_applied_amount ?? 0);
+    const alreadyPaid = Number(payTarget.amount_paid ?? 0);
+    const newPaid = alreadyPaid + amount;
+    const newEffectivePaid = newPaid + credit;
+    const isPartial = newEffectivePaid < due - 0.001;
+    const overpaidAmount = Math.max(newEffectivePaid - due, 0);
     if (isPartial && !payRemainingDueDate) {
       return toast.error("Informe a nova data de vencimento do saldo restante.");
+    }
+    const overpaymentAction: "credit" | "increase" | "fee" | "" =
+      overpaidAmount > 0.001 ? (payTarget.kind === "avulso" ? "fee" : payOverpaymentAction) : "";
+    if (overpaidAmount > 0.001 && !overpaymentAction) {
+      return toast.error("Selecione o destino do excedente.");
     }
     setSavingPay(true);
     const { data: { user } } = await supabase.auth.getUser();
@@ -306,11 +333,89 @@ export function PayablesPanel() {
       .single();
     if (payErr) { setSavingPay(false); return toast.error("Erro ao registrar pagamento", { description: payErr.message }); }
 
-    const newPaid = Number(payTarget.amount_paid ?? 0) + amount;
-    const newStatus: PayableStatus = newPaid >= Number(payTarget.amount_due) - 0.001 ? "pago" : "parcial";
+    if (overpaymentAction === "credit") {
+      const { error: updErr } = await supabase
+        .from("payables")
+        .update({
+          amount_paid: newPaid,
+          status: "pago",
+          remaining_due_date: null,
+          remaining_due_updated_at: new Date().toISOString(),
+          remaining_due_updated_by: user?.id ?? null,
+          remaining_due_reason: null,
+        })
+        .eq("id", payTarget.id);
+      setSavingPay(false);
+      if (updErr) return toast.error("Pagamento registrado mas falhou ao atualizar conta", { description: updErr.message });
+      await createCreditApplication({
+        module: "payable",
+        sourceItemId: payTarget.id,
+        sourcePaymentId: pay.id,
+        amount: overpaidAmount,
+        reason: payNotes.trim() || null,
+        createdBy: user?.id ?? null,
+      });
+      try {
+        await applyPendingCredits("payable");
+      } catch (err) {
+        console.warn("applyPendingCredits(payable) falhou", err);
+      }
+      toast.success("Pagamento registrado. Excedente reservado como crédito para a próxima conta.");
+      setPayOpen(false);
+      await logAudit("payable.payment_create", payTarget.id, { payment_id: pay.id, amount, payment_method: payMethod });
+      await logAudit("payable.overpayment_credit_next", payTarget.id, {
+        payment_id: pay.id, amount_due_before: due, payment_amount: amount, amount_paid_after: newPaid,
+        overpaid_amount: overpaidAmount, overpayment_action: "credit",
+      });
+      load();
+      return;
+    }
+
+    if (overpaymentAction === "increase") {
+      const { error: updErr } = await supabase
+        .from("payables")
+        .update({
+          amount_due: newEffectivePaid,
+          amount_paid: newPaid,
+          status: "pago",
+          remaining_due_date: null,
+          remaining_due_updated_at: new Date().toISOString(),
+          remaining_due_updated_by: user?.id ?? null,
+          remaining_due_reason: null,
+        })
+        .eq("id", payTarget.id);
+      if (updErr) { setSavingPay(false); return toast.error("Pagamento registrado mas falhou ao atualizar conta", { description: updErr.message }); }
+      let affectedFutureCount = 0;
+      try {
+        const res = await increaseRecurringAmount(
+          { id: payTarget.id, parent_payable_id: payTarget.parent_payable_id, reference_month: payTarget.reference_month },
+          newEffectivePaid,
+        );
+        affectedFutureCount = res.affectedFutureCount;
+      } catch (err) {
+        toast.warning("Pagamento registrado, mas falhou ao atualizar o modelo/próximas contas.", {
+          description: err instanceof Error ? err.message : String(err),
+        });
+      }
+      setSavingPay(false);
+      toast.success("Pagamento registrado. Valor da recorrência atualizado.");
+      setPayOpen(false);
+      await logAudit("payable.payment_create", payTarget.id, { payment_id: pay.id, amount, payment_method: payMethod });
+      await logAudit("payable.overpayment_recurring_amount_increase", payTarget.id, {
+        payment_id: pay.id, amount_due_before: due, amount_due_after: newEffectivePaid, payment_amount: amount,
+        amount_paid_after: newPaid, overpaid_amount: overpaidAmount, overpayment_action: "increase",
+        affected_future_count: affectedFutureCount,
+      });
+      load();
+      return;
+    }
+
+    const newAmountDue = overpaymentAction === "fee" ? due + overpaidAmount : due;
+    const newStatus: PayableStatus = newEffectivePaid >= newAmountDue - 0.001 ? "pago" : "parcial";
     const { error: updErr } = await supabase
       .from("payables")
       .update({
+        amount_due: newAmountDue,
         amount_paid: newPaid,
         status: newStatus,
         remaining_due_date: isPartial ? payRemainingDueDate : null,
@@ -324,6 +429,12 @@ export function PayablesPanel() {
     toast.success("Pagamento registrado");
     setPayOpen(false);
     await logAudit("payable.payment_create", payTarget.id, { payment_id: pay.id, amount, payment_method: payMethod });
+    if (overpaymentAction === "fee") {
+      await logAudit("payable.overpayment_current_fee", payTarget.id, {
+        payment_id: pay.id, amount_due_before: due, amount_due_after: newAmountDue, payment_amount: amount,
+        amount_paid_after: newPaid, overpaid_amount: overpaidAmount, overpayment_action: "fee",
+      });
+    }
     if (isPartial) {
       await logAudit("payable.partial_remaining_due_set", payTarget.id, {
         payment_id: pay.id,
@@ -350,6 +461,12 @@ export function PayablesPanel() {
 
   async function reversePayment(payment: PayablePayment) {
     if (!histTarget) return;
+    if (await paymentHasOverpaymentTreatment("payable", payment.id)) {
+      toast.error(
+        "Este pagamento possui tratamento de excedente. Estorne manualmente o crédito/ajuste antes de estornar o pagamento.",
+      );
+      return;
+    }
     const reason = window.prompt("Motivo do estorno:");
     if (reason === null) return;
     const { data: { user } } = await supabase.auth.getUser();
@@ -936,7 +1053,10 @@ export function PayablesPanel() {
               <div className="rounded-lg border bg-card/50 p-3 text-sm space-y-1">
                 <div className="flex justify-between"><span className="text-muted-foreground">Total:</span><span>{brl(payTarget.amount_due)}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Já pago:</span><span>{brl(payTarget.amount_paid)}</span></div>
-                <div className="flex justify-between font-medium"><span>Saldo:</span><span>{brl(Number(payTarget.amount_due) - Number(payTarget.amount_paid))}</span></div>
+                {Number(payTarget.credit_applied_amount ?? 0) > 0 && (
+                  <div className="flex justify-between"><span className="text-muted-foreground">Crédito aplicado:</span><span>{brl(payTarget.credit_applied_amount ?? 0)}</span></div>
+                )}
+                <div className="flex justify-between font-medium"><span>Saldo:</span><span>{brl(Math.max(Number(payTarget.amount_due) - Number(payTarget.amount_paid) - Number(payTarget.credit_applied_amount ?? 0), 0))}</span></div>
               </div>
             )}
             <div className="space-y-2">
@@ -945,7 +1065,7 @@ export function PayablesPanel() {
                 onChange={(e) => setPayAmount(e.target.value)} />
             </div>
             {payTarget &&
-              Number(payAmount || 0) + Number(payTarget.amount_paid ?? 0) <
+              Number(payAmount || 0) + Number(payTarget.amount_paid ?? 0) + Number(payTarget.credit_applied_amount ?? 0) <
                 Number(payTarget.amount_due) - 0.001 && (
                 <div className="space-y-3 rounded-md border bg-muted/30 p-3">
                   <p className="text-sm font-medium">
@@ -961,6 +1081,36 @@ export function PayablesPanel() {
                     <Input value={payRemainingDueReason}
                       onChange={(e) => setPayRemainingDueReason(e.target.value)} />
                   </div>
+                </div>
+              )}
+            {payTarget &&
+              Number(payAmount || 0) + Number(payTarget.amount_paid ?? 0) + Number(payTarget.credit_applied_amount ?? 0) >
+                Number(payTarget.amount_due) + 0.001 && (
+                <div className="space-y-3 rounded-md border bg-muted/30 p-3">
+                  <p className="text-sm font-medium">Pagamento maior que o valor da conta</p>
+                  <p className="text-sm text-muted-foreground">
+                    Foi identificado um pagamento maior que o saldo da conta. Como deseja tratar o excedente?
+                  </p>
+                  {payTarget.kind === "avulso" ? (
+                    <p className="text-sm">
+                      O excedente será adicionado como taxa adicional apenas para esta conta.
+                    </p>
+                  ) : (
+                    <RadioGroup value={payOverpaymentAction} onValueChange={(v) => setPayOverpaymentAction(v as typeof payOverpaymentAction)}>
+                      <div className="flex items-center gap-2">
+                        <RadioGroupItem value="credit" id="po-credit" />
+                        <Label htmlFor="po-credit" className="font-normal cursor-pointer">Crédito para a próxima conta</Label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <RadioGroupItem value="increase" id="po-increase" />
+                        <Label htmlFor="po-increase" className="font-normal cursor-pointer">Aumento do valor real da recorrência</Label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <RadioGroupItem value="fee" id="po-fee" />
+                        <Label htmlFor="po-fee" className="font-normal cursor-pointer">Taxa adicional apenas para esta conta</Label>
+                      </div>
+                    </RadioGroup>
+                  )}
                 </div>
               )}
             <div className="space-y-2">

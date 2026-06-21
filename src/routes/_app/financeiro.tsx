@@ -78,6 +78,11 @@ import {
   type ReceivablePayment,
   type EffectiveStatus,
 } from "@/lib/paymentsService";
+import {
+  createCreditApplication,
+  applyPendingCredits,
+  paymentHasOverpaymentTreatment,
+} from "@/lib/creditApplications";
 import { toDateOnlyString } from "@/lib/dateOnly";
 
 export const Route = createFileRoute("/_app/financeiro")({
@@ -186,6 +191,7 @@ function FinanceiroPage() {
     remaining_due_date: "",
     remaining_due_reason: "",
   });
+  const [payOverpaymentAction, setPayOverpaymentAction] = useState<"credit" | "fee" | "">("");
   const [payFile, setPayFile] = useState<File | null>(null);
   const [paying, setPaying] = useState(false);
   const [generateReceiptAfterPay, setGenerateReceiptAfterPay] = useState(true);
@@ -241,6 +247,11 @@ function FinanceiroPage() {
       await supabase.rpc("mark_overdue_receivables");
     } catch (e) {
       console.warn("[financeiro] mark_overdue_receivables falhou", e);
+    }
+    try {
+      await applyPendingCredits("receivable");
+    } catch (e) {
+      console.warn("[financeiro] applyPendingCredits(receivable) falhou", e);
     }
     const monthStart = startOfMonth(monthRef);
     const monthEnd = endOfMonth(monthRef);
@@ -356,16 +367,20 @@ function FinanceiroPage() {
     for (const r of rows) {
       if (r.status === "cancelado") {
         if (r.cancel_type === "perda_contrato") {
-          const saldo = Math.max(Number(r.amount_due) - Number(r.amount_paid ?? 0), 0);
+          const saldo = Math.max(
+            Number(r.amount_due) - Number(r.amount_paid ?? 0) - Number(r.credit_applied_amount ?? 0),
+            0,
+          );
           sum.lost += saldo;
         }
         continue;
       }
       const due = Number(r.amount_due);
       const paid = Number(r.amount_paid ?? 0);
+      const credit = Number(r.credit_applied_amount ?? 0);
       const eff = effectiveOf(r);
       if (paid > 0) sum.recebido += Math.min(paid, due);
-      const saldo = Math.max(due - paid, 0);
+      const saldo = Math.max(due - paid - credit, 0);
       if (saldo > 0) {
         if (eff === "atrasado") sum.atrasado += saldo;
         else sum.a_receber += saldo;
@@ -396,7 +411,10 @@ function FinanceiroPage() {
   function openPay(r: Receivable) {
     setGenerateReceiptAfterPay(true);
     setPayRow(r);
-    const saldo = Math.max(Number(r.amount_due) - Number(r.amount_paid ?? 0), 0);
+    const saldo = Math.max(
+      Number(r.amount_due) - Number(r.amount_paid ?? 0) - Number(r.credit_applied_amount ?? 0),
+      0,
+    );
     setPayForm({
       amount_paid: String(saldo > 0 ? saldo : r.amount_due),
       paid_at: toDateOnlyString(new Date()),
@@ -405,6 +423,7 @@ function FinanceiroPage() {
       remaining_due_date: "",
       remaining_due_reason: "",
     });
+    setPayOverpaymentAction("");
     setPayFile(null);
     setPayOpen(true);
   }
@@ -417,11 +436,20 @@ function FinanceiroPage() {
       return;
     }
     const due = Number(payRow.amount_due);
+    const credit = Number(payRow.credit_applied_amount ?? 0);
     const alreadyPaid = Number(payRow.amount_paid ?? 0);
     const newPaid = alreadyPaid + amount;
-    const isPartial = newPaid < due - 0.001;
+    const newEffectivePaid = newPaid + credit;
+    const isPartial = newEffectivePaid < due - 0.001;
     if (isPartial && !payForm.remaining_due_date) {
       toast.error("Informe a nova data de vencimento do saldo restante.");
+      return;
+    }
+    const overpaidAmount = Math.max(newEffectivePaid - due, 0);
+    const overpaymentAction: "credit" | "fee" | "" =
+      overpaidAmount > 0.001 ? (payRow.kind === "avulso" ? "fee" : payOverpaymentAction) : "";
+    if (overpaidAmount > 0.001 && !overpaymentAction) {
+      toast.error("Selecione o destino do excedente.");
       return;
     }
     setPaying(true);
@@ -450,7 +478,39 @@ function FinanceiroPage() {
         amount,
         method: payForm.payment_method,
       });
-      if (isPartial) {
+      if (overpaymentAction === "credit") {
+        await setRemainingDue(payRow.id, { remainingDueDate: null, reason: null });
+        const { data: { user } } = await supabase.auth.getUser();
+        await createCreditApplication({
+          module: "receivable",
+          sourceItemId: payRow.id,
+          sourcePaymentId: payment.id,
+          amount: overpaidAmount,
+          reason: payForm.notes || null,
+          createdBy: user?.id ?? null,
+        });
+        try {
+          await applyPendingCredits("receivable");
+        } catch (e) {
+          console.warn("applyPendingCredits(receivable) falhou", e);
+        }
+        await audit("receivable.overpayment_credit_next", payRow.id, {
+          payment_id: payment.id, amount_due_before: due, payment_amount: amount,
+          amount_paid_after: newPaid, overpaid_amount: overpaidAmount, overpayment_action: "credit",
+        });
+      } else if (overpaymentAction === "fee") {
+        const newAmountDue = due + overpaidAmount;
+        const { error: feeErr } = await supabase
+          .from("receivables")
+          .update({ amount_due: newAmountDue, status: "recebido" })
+          .eq("id", payRow.id);
+        if (feeErr) throw feeErr;
+        await setRemainingDue(payRow.id, { remainingDueDate: null, reason: null });
+        await audit("receivable.overpayment_current_fee", payRow.id, {
+          payment_id: payment.id, amount_due_before: due, amount_due_after: newAmountDue, payment_amount: amount,
+          amount_paid_after: newPaid, overpaid_amount: overpaidAmount, overpayment_action: "fee",
+        });
+      } else if (isPartial) {
         await setRemainingDue(payRow.id, {
           remainingDueDate: payForm.remaining_due_date,
           reason: payForm.remaining_due_reason || null,
@@ -516,6 +576,12 @@ function FinanceiroPage() {
   async function confirmRevert() {
     if (!revRow || !revSelected || !revReason.trim()) {
       toast.error("Selecione um pagamento e informe o motivo.");
+      return;
+    }
+    if (await paymentHasOverpaymentTreatment("receivable", revSelected)) {
+      toast.error(
+        "Este pagamento possui tratamento de excedente. Estorne manualmente o crédito/ajuste antes de estornar o pagamento.",
+      );
       return;
     }
     try {
@@ -1402,8 +1468,15 @@ function FinanceiroPage() {
               {payRow && (
                 <>
                   {profMap.get(payRow.professional_id)} · previsto {brl(payRow.amount_due)} · saldo{" "}
-                  {brl(Math.max(Number(payRow.amount_due) - Number(payRow.amount_paid ?? 0), 0))} ·
-                  venc. {format(parseISO(payRow.due_date), "dd/MM/yyyy")}
+                  {brl(
+                    Math.max(
+                      Number(payRow.amount_due) -
+                        Number(payRow.amount_paid ?? 0) -
+                        Number(payRow.credit_applied_amount ?? 0),
+                      0,
+                    ),
+                  )}{" "}
+                  · venc. {format(parseISO(payRow.due_date), "dd/MM/yyyy")}
                 </>
               )}
             </DialogDescription>
@@ -1429,7 +1502,7 @@ function FinanceiroPage() {
               </div>
             </div>
             {payRow &&
-              Number(payForm.amount_paid || 0) + Number(payRow.amount_paid ?? 0) <
+              Number(payForm.amount_paid || 0) + Number(payRow.amount_paid ?? 0) + Number(payRow.credit_applied_amount ?? 0) <
                 Number(payRow.amount_due) - 0.001 && (
                 <div className="space-y-3 rounded-md border bg-muted/30 p-3">
                   <p className="text-sm font-medium">
@@ -1450,6 +1523,39 @@ function FinanceiroPage() {
                       onChange={(e) => setPayForm({ ...payForm, remaining_due_reason: e.target.value })}
                     />
                   </div>
+                </div>
+              )}
+            {payRow &&
+              Number(payForm.amount_paid || 0) + Number(payRow.amount_paid ?? 0) + Number(payRow.credit_applied_amount ?? 0) >
+                Number(payRow.amount_due) + 0.001 && (
+                <div className="space-y-3 rounded-md border bg-muted/30 p-3">
+                  <p className="text-sm font-medium">Pagamento maior que o valor da cobrança</p>
+                  <p className="text-sm text-muted-foreground">
+                    Foi identificado um pagamento maior que o saldo da cobrança. Como deseja tratar o excedente?
+                  </p>
+                  {payRow.kind === "avulso" ? (
+                    <p className="text-sm">
+                      O excedente será adicionado como taxa adicional apenas para este recebível.
+                    </p>
+                  ) : (
+                    <RadioGroup
+                      value={payOverpaymentAction}
+                      onValueChange={(v) => setPayOverpaymentAction(v as typeof payOverpaymentAction)}
+                    >
+                      <div className="flex items-center gap-2">
+                        <RadioGroupItem value="credit" id="ro-credit" />
+                        <Label htmlFor="ro-credit" className="font-normal cursor-pointer">
+                          Crédito para abater na próxima cobrança
+                        </Label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <RadioGroupItem value="fee" id="ro-fee" />
+                        <Label htmlFor="ro-fee" className="font-normal cursor-pointer">
+                          Taxa adicional apenas para esta cobrança
+                        </Label>
+                      </div>
+                    </RadioGroup>
+                  )}
                 </div>
               )}
             <div className="space-y-2">

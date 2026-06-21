@@ -64,6 +64,49 @@ export async function setRemainingDue(
   if (error) throw error;
 }
 
+/**
+ * Trata pagamento excedente de conta a pagar recorrente como aumento real
+ * do valor da recorrência: atualiza o modelo e as instâncias futuras já
+ * geradas que ainda estejam abertas (a_pagar/atrasado), sem pagamento nem
+ * crédito aplicado. Não toca contas pagas, parciais, canceladas ou com
+ * crédito já aplicado.
+ */
+export async function increaseRecurringAmount(
+  payable: { id: string; parent_payable_id: string | null; reference_month: string },
+  newAmount: number,
+): Promise<{ affectedFutureCount: number }> {
+  const modelId = payable.parent_payable_id ?? payable.id;
+
+  const { error: modelErr } = await supabase
+    .from("payables")
+    .update({ amount_due: newAmount })
+    .eq("id", modelId);
+  if (modelErr) throw modelErr;
+
+  const { data: futureRows, error: selErr } = await supabase
+    .from("payables")
+    .select("id, status, amount_paid, credit_applied_amount")
+    .eq("parent_payable_id", modelId)
+    .gt("reference_month", payable.reference_month);
+  if (selErr) throw selErr;
+
+  const ids = (futureRows ?? [])
+    .filter(
+      (r) =>
+        (r.status === "a_pagar" || r.status === "atrasado") &&
+        Number(r.amount_paid ?? 0) === 0 &&
+        Number(r.credit_applied_amount ?? 0) === 0,
+    )
+    .map((r) => r.id);
+
+  if (ids.length > 0) {
+    const { error: updErr } = await supabase.from("payables").update({ amount_due: newAmount }).in("id", ids);
+    if (updErr) throw updErr;
+  }
+
+  return { affectedFutureCount: ids.length };
+}
+
 // Auto-generates recurring payable instances for `month` if they don't exist yet.
 // Templates are recorrentes with parent_payable_id = null (the originating entry).
 // Only generates from the template's own reference_month forward (never backfills earlier months).

@@ -14,6 +14,7 @@ import { parseDateOnlyLocal, formatDateOnlyBR, toDateOnlyString } from "@/lib/da
 import { computeEffectiveStatus as computeReceivableEffectiveStatus } from "@/lib/paymentsService";
 import { computeEffectiveStatus as computePayableEffectiveStatus, generateRecurringForYear } from "@/lib/payablesStatus";
 import { createNotification } from "@/lib/notifications";
+import { applyPendingCredits } from "@/lib/creditApplications";
 
 export const Route = createFileRoute("/_app/dashboard")({
   component: DashboardPage,
@@ -37,6 +38,11 @@ function DashboardPage() {
       const monthEnd = toDateOnlyString(endOfMonth(now));
 
       await generateRecurringForYear(now.getFullYear());
+      try {
+        await Promise.all([applyPendingCredits("payable"), applyPendingCredits("receivable")]);
+      } catch (err) {
+        console.warn("applyPendingCredits falhou", err);
+      }
 
       const [profs, rooms, contracts, weekBookings, conflicts, receivables, payables, audits, expiringContracts, allProfessionals, allSchedules, allRooms] = await Promise.all([
         supabase.from("professionals").select("id", { count: "exact", head: true }).eq("active", true),
