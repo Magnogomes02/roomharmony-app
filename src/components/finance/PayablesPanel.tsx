@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { format, startOfMonth, endOfMonth } from "date-fns";
+import { format, startOfMonth, endOfMonth, addMonths, setDate, getDaysInMonth } from "date-fns";
 import {
   Plus,
   Search,
@@ -46,7 +46,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
-import { toDateOnlyString } from "@/lib/dateOnly";
+import { toDateOnlyString, parseDateOnlyLocal } from "@/lib/dateOnly";
 import {
   computeEffectiveStatus,
   generateRecurringForYear,
@@ -59,6 +59,10 @@ import {
   applyPendingCredits,
   paymentHasOverpaymentTreatment,
 } from "@/lib/creditApplications";
+import {
+  applyPayableInstallmentCreditFromLastInstallment,
+  type ApplyInstallmentCreditResult,
+} from "@/lib/installmentCredits";
 import type { Json } from "@/integrations/supabase/types";
 
 interface Payable {
@@ -80,6 +84,33 @@ interface Payable {
   created_at: string;
   credit_applied_amount: number | null;
   remaining_due_date: string | null;
+  installment_group_id: string | null;
+  installment_number: number | null;
+  installment_total: number | null;
+}
+
+// Divide um valor total em N parcelas usando centavos para evitar erro de
+// arredondamento; a última parcela recebe o resto da divisão inteira.
+function computeInstallmentAmounts(totalAmount: number, count: number): number[] {
+  const totalCents = Math.round(totalAmount * 100);
+  const baseCents = Math.floor(totalCents / count);
+  const remainder = totalCents - baseCents * count;
+  const amounts: number[] = [];
+  for (let i = 0; i < count; i++) {
+    const cents = i < count - 1 ? baseCents : baseCents + remainder;
+    amounts.push(cents / 100);
+  }
+  return amounts;
+}
+
+// Calcula o vencimento da parcela `installmentIndex` (0-based) a partir da
+// primeira parcela, preservando o dia original e usando o último dia válido
+// do mês quando o dia não existir (ex.: dia 31 em mês com 30 dias).
+function computeInstallmentDueDate(firstDueDate: string, installmentIndex: number): string {
+  const first = parseDateOnlyLocal(firstDueDate);
+  const targetMonth = addMonths(first, installmentIndex);
+  const day = Math.min(first.getDate(), getDaysInMonth(targetMonth));
+  return toDateOnlyString(setDate(targetMonth, day));
 }
 
 interface PayablePayment {
@@ -125,6 +156,8 @@ const emptyForm = {
   due_date: "",
   recurrence_day: "",
   notes: "",
+  parcelado: false,
+  installments_count: "",
 };
 
 export function PayablesPanel() {
@@ -149,7 +182,9 @@ export function PayablesPanel() {
   const [payNotes, setPayNotes] = useState("");
   const [payRemainingDueDate, setPayRemainingDueDate] = useState("");
   const [payRemainingDueReason, setPayRemainingDueReason] = useState("");
-  const [payOverpaymentAction, setPayOverpaymentAction] = useState<"credit" | "increase" | "fee" | "">("");
+  const [payOverpaymentAction, setPayOverpaymentAction] = useState<
+    "credit" | "increase" | "fee" | "installment_credit_last" | ""
+  >("");
   const [savingPay, setSavingPay] = useState(false);
 
   const [histOpen, setHistOpen] = useState(false);
@@ -260,6 +295,84 @@ export function PayablesPanel() {
     if (!newForm.description.trim()) return toast.error("Descrição é obrigatória");
     if (!newForm.amount_due || Number(newForm.amount_due) <= 0) return toast.error("Valor inválido");
     if (!newForm.due_date) return toast.error("Data de vencimento é obrigatória");
+
+    const isInstallmentNew = newForm.kind === "avulso" && newForm.parcelado;
+    if (isInstallmentNew) {
+      const count = Number(newForm.installments_count);
+      if (!count || count <= 1) return toast.error("Quantidade de parcelas deve ser maior que 1");
+      setSavingNew(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      const totalAmount = Number(newForm.amount_due);
+      const firstDueDate = newForm.due_date;
+      const amounts = computeInstallmentAmounts(totalAmount, count);
+
+      const { data: group, error: groupErr } = await supabase
+        .from("payable_installment_groups")
+        .insert({
+          description: newForm.description.trim(),
+          supplier: newForm.supplier.trim() || null,
+          category: newForm.category.trim() || null,
+          total_amount: totalAmount,
+          installments_count: count,
+          first_due_date: firstDueDate,
+          notes: newForm.notes.trim() || null,
+          created_by: user?.id ?? null,
+        })
+        .select("id")
+        .single();
+      if (groupErr || !group) {
+        setSavingNew(false);
+        return toast.error("Erro ao criar parcelamento", { description: groupErr?.message });
+      }
+
+      const rows = amounts.map((amt, idx) => {
+        const dueDate = computeInstallmentDueDate(firstDueDate, idx);
+        return {
+          kind: "avulso" as const,
+          description: newForm.description.trim(),
+          supplier: newForm.supplier.trim() || null,
+          category: newForm.category.trim() || null,
+          amount_due: amt,
+          due_date: dueDate,
+          reference_month: dueDate.slice(0, 7) + "-01",
+          notes: newForm.notes.trim() || null,
+          installment_group_id: group.id,
+          installment_number: idx + 1,
+          installment_total: count,
+          parent_payable_id: null,
+          recurrence_day: null,
+        };
+      });
+
+      const { data: inserted, error: insErr } = await supabase.from("payables").insert(rows).select("id");
+      setSavingNew(false);
+      if (insErr) {
+        return toast.error("Erro ao criar parcelas", { description: insErr.message });
+      }
+      toast.success(`Parcelamento criado: ${count} parcela(s)`);
+      setNewOpen(false);
+      setNewForm(emptyForm);
+      await logAudit("payable.installment_group_create", group.id, {
+        description: newForm.description.trim(),
+        total_amount: totalAmount,
+        installments_count: count,
+        first_due_date: firstDueDate,
+      });
+      const createdIds = (inserted ?? []).map((r) => r.id);
+      await Promise.all(
+        createdIds.map((id, idx) =>
+          logAudit("payable.installment_create", id, {
+            installment_group_id: group.id,
+            installment_number: idx + 1,
+            installment_total: count,
+            amount_due: amounts[idx],
+          }),
+        ),
+      );
+      load();
+      return;
+    }
+
     let recurrenceDay: number | null = newForm.recurrence_day ? Number(newForm.recurrence_day) : null;
     if (newForm.kind === "recorrente") {
       if (!recurrenceDay) {
@@ -322,8 +435,13 @@ export function PayablesPanel() {
     if (isPartial && !payRemainingDueDate) {
       return toast.error("Informe a nova data de vencimento do saldo restante.");
     }
-    const overpaymentAction: "credit" | "increase" | "fee" | "" =
-      overpaidAmount > 0.001 ? (payTarget.kind === "avulso" ? "fee" : payOverpaymentAction) : "";
+    const isInstallment = payTarget.kind === "avulso" && !!payTarget.installment_group_id;
+    const overpaymentAction: "credit" | "increase" | "fee" | "installment_credit_last" | "" =
+      overpaidAmount > 0.001
+        ? payTarget.kind === "avulso"
+          ? (isInstallment ? payOverpaymentAction : "fee")
+          : payOverpaymentAction
+        : "";
     if (overpaidAmount > 0.001 && !overpaymentAction) {
       return toast.error("Selecione o destino do excedente.");
     }
@@ -341,6 +459,80 @@ export function PayablesPanel() {
       .select("id")
       .single();
     if (payErr) { setSavingPay(false); return toast.error("Erro ao registrar pagamento", { description: payErr.message }); }
+
+    if (overpaymentAction === "installment_credit_last") {
+      if (!payTarget.installment_group_id || payTarget.installment_number == null) {
+        setSavingPay(false);
+        return toast.error("Esta conta não pertence a um parcelamento válido.");
+      }
+      const { error: updErr } = await supabase
+        .from("payables")
+        .update({
+          amount_paid: newPaid,
+          status: "pago",
+          remaining_due_date: null,
+          remaining_due_updated_at: new Date().toISOString(),
+          remaining_due_updated_by: user?.id ?? null,
+          remaining_due_reason: null,
+        })
+        .eq("id", payTarget.id);
+      if (updErr) {
+        setSavingPay(false);
+        return toast.error("Pagamento registrado mas falhou ao atualizar conta", { description: updErr.message });
+      }
+
+      let creditResult: ApplyInstallmentCreditResult | null = null;
+      let creditOk = true;
+      try {
+        creditResult = await applyPayableInstallmentCreditFromLastInstallment({
+          sourcePayableId: payTarget.id,
+          sourcePaymentId: pay.id,
+          installmentGroupId: payTarget.installment_group_id,
+          sourceInstallmentNumber: payTarget.installment_number,
+          amount: overpaidAmount,
+          reason: payNotes.trim() || null,
+          createdBy: user?.id ?? null,
+        });
+      } catch (err) {
+        creditOk = false;
+        console.error("applyPayableInstallmentCreditFromLastInstallment falhou", err);
+      }
+      setSavingPay(false);
+
+      const auditOk1 = await logAudit("payable.payment_create", payTarget.id, { payment_id: pay.id, amount, payment_method: payMethod });
+      const auditOk2 = await logAudit("payable.installment_overpayment_credit_last", payTarget.id, {
+        installment_group_id: payTarget.installment_group_id,
+        source_payable_id: payTarget.id,
+        source_payment_id: pay.id,
+        source_installment_number: payTarget.installment_number,
+        overpaid_amount: overpaidAmount,
+        applied_targets: creditResult?.appliedTargets.map((t) => ({
+          payable_id: t.payableId,
+          installment_number: t.installmentNumber,
+          amount_applied: t.amountApplied,
+        })) ?? [],
+        remaining_unapplied_amount: creditResult?.remainingUnapplied ?? overpaidAmount,
+      });
+
+      if (!creditOk) {
+        toast.error(
+          "Pagamento registrado, mas falhou ao abater o excedente das últimas parcelas. Verifique manualmente e ajuste o saldo das parcelas finais.",
+        );
+      } else if (creditResult && creditResult.remainingUnapplied > 0.001) {
+        toast.warning(
+          `Pagamento registrado. Apenas ${brl(creditResult.appliedTotal)} do excedente pôde ser abatido nas parcelas futuras (saldo insuficiente nas parcelas restantes). Ajuste manualmente os ${brl(creditResult.remainingUnapplied)} restantes ou aplique taxa adicional.`,
+        );
+      } else if (!auditOk1 || !auditOk2) {
+        toast.warning(
+          "Pagamento e crédito registrados, mas a auditoria deste excedente falhou. O crédito já protege este pagamento contra estorno automático, mas registre o ocorrido manualmente se necessário.",
+        );
+      } else {
+        toast.success("Pagamento registrado. Excedente abatido das últimas parcelas do parcelamento.");
+      }
+      setPayOpen(false);
+      load();
+      return;
+    }
 
     if (overpaymentAction === "credit") {
       const { error: updErr } = await supabase
@@ -464,10 +656,15 @@ export function PayablesPanel() {
     const auditOkCreate = await logAudit("payable.payment_create", payTarget.id, { payment_id: pay.id, amount, payment_method: payMethod });
     let auditOkFee = true;
     if (overpaymentAction === "fee") {
-      auditOkFee = await logAudit("payable.overpayment_current_fee", payTarget.id, {
-        payment_id: pay.id, amount_due_before: due, amount_due_after: newAmountDue, payment_amount: amount,
-        amount_paid_after: newPaid, overpaid_amount: overpaidAmount, overpayment_action: "fee",
-      });
+      auditOkFee = await logAudit(
+        isInstallment ? "payable.installment_overpayment_current_fee" : "payable.overpayment_current_fee",
+        payTarget.id,
+        {
+          payment_id: pay.id, amount_due_before: due, amount_due_after: newAmountDue, payment_amount: amount,
+          amount_paid_after: newPaid, overpaid_amount: overpaidAmount, overpayment_action: "fee",
+          installment_group_id: payTarget.installment_group_id,
+        },
+      );
     }
     if (isPartial) {
       await logAudit("payable.partial_remaining_due_set", payTarget.id, {
@@ -543,6 +740,13 @@ export function PayablesPanel() {
     return p.status === "pago" || p.status === "parcial" || Number(p.amount_paid) > 0;
   }
 
+  // Para parcelas avulsas, bloqueia edição/cancelamento/exclusão também quando
+  // já recebeu crédito de outra parcela (mesmo sem pagamento próprio nem
+  // mudança de status), conforme regra exigida só para parcelamento.
+  function hasInstallmentRisk(p: Payable): boolean {
+    return hasPaymentRisk(p) || Number(p.credit_applied_amount ?? 0) > 0;
+  }
+
   function monthYearLabel(referenceMonth: string): string {
     return `${referenceMonth.slice(5, 7)}/${referenceMonth.slice(0, 4)}`;
   }
@@ -558,13 +762,19 @@ export function PayablesPanel() {
     e.preventDefault();
     if (!cancelTarget) return;
     const isRecurring = cancelTarget.kind === "recorrente";
+    const isInstallment = cancelTarget.kind === "avulso" && !!cancelTarget.installment_group_id;
+    if (isInstallment && hasInstallmentRisk(cancelTarget)) {
+      return toast.error(
+        "Esta parcela já possui pagamento ou crédito aplicado. Cancelamento bloqueado para preservar o histórico financeiro.",
+      );
+    }
     if (isRecurring && !cancelReason.trim()) {
       return toast.error("Informe o motivo do cancelamento.");
     }
     setSavingCancel(true);
     const { data: { user } } = await supabase.auth.getUser();
 
-    if (!isRecurring || cancelScope === "current") {
+    if ((!isRecurring && !isInstallment) || cancelScope === "current") {
       const { error } = await supabase
         .from("payables")
         .update({
@@ -578,11 +788,65 @@ export function PayablesPanel() {
       if (error) return toast.error("Erro ao cancelar", { description: error.message });
       toast.success("Conta cancelada");
       setCancelOpen(false);
-      await logAudit(isRecurring ? "payable.recurring_cancel_current" : "payable.cancel", cancelTarget.id, {
+      await logAudit(
+        isRecurring ? "payable.recurring_cancel_current" : isInstallment ? "payable.installment_cancel_current" : "payable.cancel",
+        cancelTarget.id,
+        {
+          selected_payable_id: cancelTarget.id,
+          model_payable_id: cancelTarget.parent_payable_id,
+          installment_group_id: cancelTarget.installment_group_id,
+          scope: "current",
+          reference_month: cancelTarget.reference_month,
+          reason: cancelReason.trim() || null,
+        },
+      );
+      load();
+      return;
+    }
+
+    if (isInstallment && cancelTarget.installment_group_id) {
+      // scope === "future": cancela parcelas em aberto (sem pagamento/crédito) a partir desta
+      const { data: candidates, error: candErr } = await supabase
+        .from("payables")
+        .select("id,status,amount_paid,credit_applied_amount")
+        .eq("installment_group_id", cancelTarget.installment_group_id)
+        .gte("installment_number", cancelTarget.installment_number ?? 0);
+      if (candErr) {
+        setSavingCancel(false);
+        return toast.error("Erro ao buscar parcelamento", { description: candErr.message });
+      }
+      const rows = candidates ?? [];
+      const toCancel = rows.filter(
+        (c) => (c.status === "a_pagar" || c.status === "atrasado") && Number(c.amount_paid) === 0 && Number(c.credit_applied_amount ?? 0) === 0,
+      );
+      const preserved = rows.length - toCancel.length;
+
+      if (toCancel.length > 0) {
+        const { error: updErr } = await supabase
+          .from("payables")
+          .update({
+            status: "cancelado",
+            cancel_reason: cancelReason.trim() || null,
+            cancelled_at: new Date().toISOString(),
+            cancelled_by: user?.id ?? null,
+          })
+          .in("id", toCancel.map((c) => c.id));
+        if (updErr) {
+          setSavingCancel(false);
+          return toast.error("Erro ao cancelar parcelas", { description: updErr.message });
+        }
+      }
+      setSavingCancel(false);
+      toast.success("Parcelas canceladas", {
+        description: `${toCancel.length} parcela(s) em aberto foram canceladas. ${preserved} parcela(s) paga(s)/parcial(is)/com crédito foram preservadas.`,
+      });
+      setCancelOpen(false);
+      await logAudit("payable.installment_cancel_future", cancelTarget.id, {
         selected_payable_id: cancelTarget.id,
-        model_payable_id: cancelTarget.parent_payable_id,
-        scope: "current",
-        reference_month: cancelTarget.reference_month,
+        installment_group_id: cancelTarget.installment_group_id,
+        scope: "future",
+        affected_count: toCancel.length,
+        preserved_count: preserved,
         reason: cancelReason.trim() || null,
       });
       load();
@@ -650,9 +914,13 @@ export function PayablesPanel() {
   }
 
   function openEdit(p: Payable) {
-    if (hasPaymentRisk(p)) {
+    const isInstallment = p.kind === "avulso" && !!p.installment_group_id;
+    const risky = isInstallment ? hasInstallmentRisk(p) : hasPaymentRisk(p);
+    if (risky) {
       toast.error(
-        "Esta conta já possui pagamento registrado. Para preservar o histórico financeiro, edite manualmente apenas campos não financeiros ou estorne o pagamento antes de alterar valor/vencimento.",
+        isInstallment
+          ? "Esta parcela já possui pagamento ou crédito aplicado. Edição de valor/vencimento bloqueada para preservar o histórico financeiro."
+          : "Esta conta já possui pagamento registrado. Para preservar o histórico financeiro, edite manualmente apenas campos não financeiros ou estorne o pagamento antes de alterar valor/vencimento.",
       );
       return;
     }
@@ -676,8 +944,14 @@ export function PayablesPanel() {
     if (!editForm.description.trim()) return toast.error("Descrição é obrigatória");
     if (!editForm.amount_due || Number(editForm.amount_due) <= 0) return toast.error("Valor inválido");
     if (!editForm.due_date) return toast.error("Vencimento é obrigatório");
-    if (hasPaymentRisk(editTarget)) {
-      return toast.error("Esta conta já possui pagamento registrado. Edição bloqueada.");
+    const isInstallment = editTarget.kind === "avulso" && !!editTarget.installment_group_id;
+    const riskyEdit = isInstallment ? hasInstallmentRisk(editTarget) : hasPaymentRisk(editTarget);
+    if (riskyEdit) {
+      return toast.error(
+        isInstallment
+          ? "Esta parcela já possui pagamento ou crédito aplicado. Edição bloqueada."
+          : "Esta conta já possui pagamento registrado. Edição bloqueada.",
+      );
     }
 
     setSavingEdit(true);
@@ -690,6 +964,52 @@ export function PayablesPanel() {
       notes: editForm.notes.trim() || null,
     };
     const changedFields = ["description", "supplier", "category", "notes", "amount_due", "due_date", "recurrence_day"];
+
+    if (isInstallment && editScope === "future" && editTarget.installment_group_id) {
+      const { data: candidates, error: candErr } = await supabase
+        .from("payables")
+        .select("id,status,amount_paid,credit_applied_amount")
+        .eq("installment_group_id", editTarget.installment_group_id)
+        .gte("installment_number", editTarget.installment_number ?? 0);
+      if (candErr) {
+        setSavingEdit(false);
+        return toast.error("Erro ao buscar parcelamento", { description: candErr.message });
+      }
+      const rows = candidates ?? [];
+      const editable = rows.filter(
+        (c) => (c.status === "a_pagar" || c.status === "atrasado") && Number(c.amount_paid) === 0 && Number(c.credit_applied_amount ?? 0) === 0,
+      );
+      const preserved = rows.length - editable.length;
+
+      for (const inst of editable) {
+        const isCurrent = inst.id === editTarget.id;
+        const { error: instErr } = await supabase
+          .from("payables")
+          .update({
+            ...baseFields,
+            amount_due: Number(editForm.amount_due),
+            ...(isCurrent ? { due_date: editForm.due_date } : {}),
+          })
+          .eq("id", inst.id);
+        if (instErr) console.warn("[PayablesPanel] falha ao atualizar parcela", inst.id, instErr);
+      }
+
+      setSavingEdit(false);
+      toast.success("Parcelas atualizadas", {
+        description: `${editable.length} parcela(s) em aberto foram alteradas. ${preserved} parcela(s) paga(s)/parcial(is)/com crédito foram preservadas.`,
+      });
+      setEditOpen(false);
+      await logAudit("payable.installment_edit_future", editTarget.id, {
+        selected_payable_id: editTarget.id,
+        installment_group_id: editTarget.installment_group_id,
+        scope: "future",
+        changed_fields: changedFields,
+        affected_count: editable.length,
+        preserved_count: preserved,
+      });
+      load();
+      return;
+    }
 
     if (!isRecurring || editScope === "current") {
       const { error } = await supabase
@@ -705,13 +1025,18 @@ export function PayablesPanel() {
       if (error) return toast.error("Erro ao salvar", { description: error.message });
       toast.success("Conta atualizada");
       setEditOpen(false);
-      await logAudit(isRecurring ? "payable.recurring_edit_current" : "payable.edit", editTarget.id, {
-        selected_payable_id: editTarget.id,
-        model_payable_id: editTarget.parent_payable_id,
-        scope: "current",
-        reference_month: editTarget.reference_month,
-        changed_fields: changedFields,
-      });
+      await logAudit(
+        isRecurring ? "payable.recurring_edit_current" : isInstallment ? "payable.installment_edit_current" : "payable.edit",
+        editTarget.id,
+        {
+          selected_payable_id: editTarget.id,
+          model_payable_id: editTarget.parent_payable_id,
+          installment_group_id: editTarget.installment_group_id,
+          scope: "current",
+          reference_month: editTarget.reference_month,
+          changed_fields: changedFields,
+        },
+      );
       load();
       return;
     }
@@ -778,9 +1103,17 @@ export function PayablesPanel() {
   async function confirmDelete() {
     if (!deleteTarget) return;
     const isRecurring = deleteTarget.kind === "recorrente";
+    const isInstallment = deleteTarget.kind === "avulso" && !!deleteTarget.installment_group_id;
 
-    if (!isRecurring || deleteScope === "current") {
-      if (hasPaymentRisk(deleteTarget) && !deleteConfirmChecked) {
+    if ((!isRecurring && !isInstallment) || deleteScope === "current") {
+      if (isInstallment) {
+        if (hasInstallmentRisk(deleteTarget)) {
+          toast.error(
+            "Esta parcela já possui pagamento ou crédito aplicado. Exclusão bloqueada para preservar o histórico financeiro.",
+          );
+          return;
+        }
+      } else if (hasPaymentRisk(deleteTarget) && !deleteConfirmChecked) {
         toast.error("Confirme que entende que o histórico de pagamento será apagado.");
         return;
       }
@@ -790,11 +1123,59 @@ export function PayablesPanel() {
       if (error) return toast.error("Erro ao excluir", { description: error.message });
       toast.success("Conta excluída");
       setDeleteOpen(false);
-      await logAudit(isRecurring ? "payable.recurring_delete_current" : "payable.delete_current", deleteTarget.id, {
+      await logAudit(
+        isRecurring ? "payable.recurring_delete_current" : isInstallment ? "payable.installment_delete_current" : "payable.delete_current",
+        deleteTarget.id,
+        {
+          selected_payable_id: deleteTarget.id,
+          model_payable_id: deleteTarget.parent_payable_id,
+          installment_group_id: deleteTarget.installment_group_id,
+          scope: "current",
+          had_payment: hasPaymentRisk(deleteTarget),
+        },
+      );
+      load();
+      return;
+    }
+
+    if (isInstallment && deleteTarget.installment_group_id) {
+      setDeleting(true);
+      const { data: candidates, error: candErr } = await supabase
+        .from("payables")
+        .select("id,status,amount_paid,credit_applied_amount")
+        .eq("installment_group_id", deleteTarget.installment_group_id)
+        .gte("installment_number", deleteTarget.installment_number ?? 0);
+      if (candErr) {
+        setDeleting(false);
+        return toast.error("Erro ao buscar parcelamento", { description: candErr.message });
+      }
+      const rows = candidates ?? [];
+      const deletable = rows.filter(
+        (c) =>
+          Number(c.amount_paid) === 0 &&
+          Number(c.credit_applied_amount ?? 0) === 0 &&
+          (c.status === "a_pagar" || c.status === "atrasado" || c.status === "cancelado"),
+      );
+      const preserved = rows.length - deletable.length;
+
+      if (deletable.length > 0) {
+        const { error: delErr } = await supabase.from("payables").delete().in("id", deletable.map((c) => c.id));
+        if (delErr) {
+          setDeleting(false);
+          return toast.error("Erro ao excluir parcelas", { description: delErr.message });
+        }
+      }
+      setDeleting(false);
+      toast.success("Exclusão concluída", {
+        description: `${deletable.length} parcela(s) sem pagamento/crédito foram excluídas. ${preserved} parcela(s) paga(s)/parcial(is)/com crédito foram preservadas.`,
+      });
+      setDeleteOpen(false);
+      await logAudit("payable.installment_delete_future", deleteTarget.id, {
         selected_payable_id: deleteTarget.id,
-        model_payable_id: deleteTarget.parent_payable_id,
-        scope: "current",
-        had_payment: hasPaymentRisk(deleteTarget),
+        installment_group_id: deleteTarget.installment_group_id,
+        scope: "future",
+        affected_count: deletable.length,
+        preserved_count: preserved,
       });
       load();
       return;
@@ -953,6 +1334,11 @@ export function PayablesPanel() {
                             {p.parent_payable_id === null && " · modelo"}
                           </span>
                         )}
+                        {p.installment_group_id && (
+                          <span className="block text-[10px] text-muted-foreground">
+                            Parcela {p.installment_number}/{p.installment_total}
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">{p.supplier ?? "—"}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{p.category ?? "—"}</TableCell>
@@ -1041,6 +1427,16 @@ export function PayablesPanel() {
                 </p>
               )}
             </div>
+            {newForm.kind === "avulso" && (
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="new-parcelado"
+                  checked={newForm.parcelado}
+                  onCheckedChange={(v) => setNewForm({ ...newForm, parcelado: v === true })}
+                />
+                <Label htmlFor="new-parcelado" className="cursor-pointer font-normal">Parcelar esta despesa</Label>
+              </div>
+            )}
             <div className="space-y-2">
               <Label>Descrição *</Label>
               <Input required maxLength={200} value={newForm.description}
@@ -1060,16 +1456,29 @@ export function PayablesPanel() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label>Valor (R$) *</Label>
+                <Label>{newForm.parcelado ? "Valor total (R$) *" : "Valor (R$) *"}</Label>
                 <Input type="number" min={0.01} step={0.01} required value={newForm.amount_due}
                   onChange={(e) => setNewForm({ ...newForm, amount_due: e.target.value })} />
               </div>
               <div className="space-y-2">
-                <Label>Vencimento *</Label>
+                <Label>{newForm.parcelado ? "Data da primeira parcela *" : "Vencimento *"}</Label>
                 <Input type="date" required value={newForm.due_date}
                   onChange={(e) => setNewForm({ ...newForm, due_date: e.target.value })} />
               </div>
             </div>
+            {newForm.parcelado && (
+              <div className="space-y-2">
+                <Label>Quantidade de parcelas *</Label>
+                <Input type="number" min={2} step={1} required value={newForm.installments_count}
+                  onChange={(e) => setNewForm({ ...newForm, installments_count: e.target.value })} />
+                {Number(newForm.amount_due) > 0 && Number(newForm.installments_count) > 1 && (
+                  <p className="text-xs text-muted-foreground">
+                    {newForm.installments_count}x de {brl(computeInstallmentAmounts(Number(newForm.amount_due), Number(newForm.installments_count))[0])}
+                    {" "}(última parcela: {brl(computeInstallmentAmounts(Number(newForm.amount_due), Number(newForm.installments_count)).at(-1) ?? 0)})
+                  </p>
+                )}
+              </div>
+            )}
             <div className="space-y-2">
               <Label>Observações</Label>
               <Textarea rows={2} maxLength={500} value={newForm.notes}
@@ -1129,11 +1538,24 @@ export function PayablesPanel() {
               Number(payAmount || 0) + Number(payTarget.amount_paid ?? 0) + Number(payTarget.credit_applied_amount ?? 0) >
                 Number(payTarget.amount_due) + 0.001 && (
                 <div className="space-y-3 rounded-md border bg-muted/30 p-3">
-                  <p className="text-sm font-medium">Pagamento maior que o valor da conta</p>
-                  <p className="text-sm text-muted-foreground">
-                    Foi identificado um pagamento maior que o saldo da conta. Como deseja tratar o excedente?
+                  <p className="text-sm font-medium">
+                    {payTarget.installment_group_id ? "Pagamento maior que o valor da parcela" : "Pagamento maior que o valor da conta"}
                   </p>
-                  {payTarget.kind === "avulso" ? (
+                  <p className="text-sm text-muted-foreground">
+                    Foi identificado um pagamento maior que o saldo {payTarget.installment_group_id ? "da parcela" : "da conta"}. Como deseja tratar o excedente?
+                  </p>
+                  {payTarget.kind === "avulso" && payTarget.installment_group_id ? (
+                    <RadioGroup value={payOverpaymentAction} onValueChange={(v) => setPayOverpaymentAction(v as typeof payOverpaymentAction)}>
+                      <div className="flex items-center gap-2">
+                        <RadioGroupItem value="installment_credit_last" id="po-installment-credit" />
+                        <Label htmlFor="po-installment-credit" className="font-normal cursor-pointer">Abater das últimas parcelas do parcelamento</Label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <RadioGroupItem value="fee" id="po-installment-fee" />
+                        <Label htmlFor="po-installment-fee" className="font-normal cursor-pointer">Taxa adicional apenas para esta parcela</Label>
+                      </div>
+                    </RadioGroup>
+                  ) : payTarget.kind === "avulso" ? (
                     <p className="text-sm">
                       O excedente será adicionado como taxa adicional apenas para esta conta.
                     </p>
@@ -1236,12 +1658,18 @@ export function PayablesPanel() {
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="font-serif text-xl">
-              {cancelTarget?.kind === "recorrente" ? "Cancelar conta recorrente" : "Cancelar conta"}
+              {cancelTarget?.kind === "recorrente"
+                ? "Cancelar conta recorrente"
+                : cancelTarget?.installment_group_id
+                  ? "Cancelar parcela"
+                  : "Cancelar conta"}
             </DialogTitle>
             <DialogDescription>
               {cancelTarget?.kind === "recorrente"
                 ? "Esta conta pertence a uma recorrência. Escolha se deseja cancelar apenas esta conta ou esta e as próximas recorrências."
-                : cancelTarget?.description}
+                : cancelTarget?.installment_group_id
+                  ? "Esta conta pertence a um parcelamento. Escolha se deseja cancelar apenas esta parcela ou esta e as próximas parcelas em aberto."
+                  : cancelTarget?.description}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={saveCancel} className="space-y-4">
@@ -1260,9 +1688,20 @@ export function PayablesPanel() {
                 </Label>
               </RadioGroup>
             )}
-            {cancelTarget?.kind === "recorrente" && cancelScope === "future" && (
+            {!!cancelTarget?.installment_group_id && (
+              <RadioGroup value={cancelScope} onValueChange={(v) => setCancelScope(v as "current" | "future")}>
+                <Label className="flex items-center gap-2 rounded-md border p-2 cursor-pointer">
+                  <RadioGroupItem value="current" /> Cancelar apenas esta parcela
+                </Label>
+                <Label className="flex items-center gap-2 rounded-md border p-2 cursor-pointer">
+                  <RadioGroupItem value="future" /> Cancelar esta e as próximas parcelas em aberto
+                </Label>
+              </RadioGroup>
+            )}
+            {((cancelTarget?.kind === "recorrente" && cancelScope === "future") ||
+              (!!cancelTarget?.installment_group_id && cancelScope === "future")) && (
               <p className="text-xs text-muted-foreground">
-                Contas pagas ou parcialmente pagas não serão alteradas em lote.
+                Contas/parcelas pagas, parciais ou com crédito aplicado não serão alteradas em lote.
               </p>
             )}
             <div className="space-y-2">
@@ -1284,12 +1723,18 @@ export function PayablesPanel() {
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="font-serif text-xl">
-              {editTarget?.kind === "recorrente" ? "Editar conta recorrente" : "Editar conta"}
+              {editTarget?.kind === "recorrente"
+                ? "Editar conta recorrente"
+                : editTarget?.installment_group_id
+                  ? "Editar parcela"
+                  : "Editar conta"}
             </DialogTitle>
             <DialogDescription>
               {editTarget?.kind === "recorrente"
                 ? "Esta conta pertence a uma recorrência. Escolha se deseja editar apenas esta conta ou esta e as próximas recorrências."
-                : editTarget?.description}
+                : editTarget?.installment_group_id
+                  ? "Esta conta pertence a um parcelamento. Escolha se deseja editar apenas esta parcela ou esta e as próximas parcelas em aberto."
+                  : editTarget?.description}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={saveEdit} className="space-y-4">
@@ -1303,9 +1748,21 @@ export function PayablesPanel() {
                 </Label>
               </RadioGroup>
             )}
-            {editTarget?.kind === "recorrente" && editScope === "future" && (
+            {!!editTarget?.installment_group_id && (
+              <RadioGroup value={editScope} onValueChange={(v) => setEditScope(v as "current" | "future")}>
+                <Label className="flex items-center gap-2 rounded-md border p-2 cursor-pointer">
+                  <RadioGroupItem value="current" /> Editar apenas esta parcela
+                </Label>
+                <Label className="flex items-center gap-2 rounded-md border p-2 cursor-pointer">
+                  <RadioGroupItem value="future" /> Editar esta e as próximas parcelas em aberto
+                </Label>
+              </RadioGroup>
+            )}
+            {((editTarget?.kind === "recorrente" && editScope === "future") ||
+              (!!editTarget?.installment_group_id && editScope === "future")) && (
               <p className="text-xs text-muted-foreground">
-                Contas pagas ou parcialmente pagas não serão alteradas em lote.
+                Contas/parcelas pagas, parciais ou com crédito aplicado não serão alteradas em lote.
+                {editTarget?.installment_group_id && " O vencimento das próximas parcelas não é recalculado."}
               </p>
             )}
             <div className="space-y-2">
@@ -1367,7 +1824,11 @@ export function PayablesPanel() {
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="font-serif text-xl">
-              {deleteTarget?.kind === "recorrente" ? "Excluir conta recorrente" : "Excluir conta"}
+              {deleteTarget?.kind === "recorrente"
+                ? "Excluir conta recorrente"
+                : deleteTarget?.installment_group_id
+                  ? "Excluir parcela"
+                  : "Excluir conta"}
             </DialogTitle>
             <DialogDescription>{deleteTarget?.description}</DialogDescription>
           </DialogHeader>
@@ -1392,7 +1853,32 @@ export function PayablesPanel() {
                 )}
               </>
             )}
-            {(deleteScope === "current" || deleteTarget?.kind !== "recorrente") && deleteTarget && hasPaymentRisk(deleteTarget) && (
+            {!!deleteTarget?.installment_group_id && (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Esta conta pertence a um parcelamento. Escolha se deseja excluir apenas esta parcela ou esta e as próximas parcelas em aberto.
+                </p>
+                <RadioGroup value={deleteScope} onValueChange={(v) => setDeleteScope(v as "current" | "future")}>
+                  <Label className="flex items-center gap-2 rounded-md border p-2 cursor-pointer">
+                    <RadioGroupItem value="current" /> Excluir apenas esta parcela
+                  </Label>
+                  <Label className="flex items-center gap-2 rounded-md border p-2 cursor-pointer">
+                    <RadioGroupItem value="future" /> Excluir esta e as próximas parcelas em aberto
+                  </Label>
+                </RadioGroup>
+                {deleteScope === "future" && (
+                  <p className="text-xs text-muted-foreground">
+                    Parcelas pagas, parciais ou com crédito aplicado não serão alteradas em lote — preservadas para manter o histórico.
+                  </p>
+                )}
+                {deleteScope === "current" && hasInstallmentRisk(deleteTarget) && (
+                  <p className="text-sm text-destructive-foreground rounded-md border border-destructive/40 bg-destructive/10 p-3">
+                    Esta parcela já possui pagamento ou crédito aplicado. A exclusão será bloqueada para preservar o histórico financeiro.
+                  </p>
+                )}
+              </>
+            )}
+            {!deleteTarget?.installment_group_id && (deleteScope === "current" || deleteTarget?.kind !== "recorrente") && deleteTarget && hasPaymentRisk(deleteTarget) && (
               <div className="space-y-2 rounded-md border border-destructive/40 bg-destructive/10 p-3">
                 <p className="text-sm text-destructive-foreground">
                   Esta conta possui pagamento registrado. Excluir apagará o histórico desta conta e seus pagamentos. Deseja continuar?

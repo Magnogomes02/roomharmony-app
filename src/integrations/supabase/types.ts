@@ -448,6 +448,51 @@ export type Database = {
         }
         Relationships: []
       }
+      payable_installment_groups: {
+        Row: {
+          category: string | null
+          created_at: string
+          created_by: string | null
+          description: string
+          first_due_date: string
+          id: string
+          installments_count: number
+          notes: string | null
+          status: string
+          supplier: string | null
+          total_amount: number
+          updated_at: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          description: string
+          first_due_date: string
+          id?: string
+          installments_count: number
+          notes?: string | null
+          status?: string
+          supplier?: string | null
+          total_amount: number
+          updated_at?: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          first_due_date?: string
+          id?: string
+          installments_count?: number
+          notes?: string | null
+          status?: string
+          supplier?: string | null
+          total_amount?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       notification_queue: {
         Row: {
           channel: string
@@ -551,6 +596,9 @@ export type Database = {
           description: string
           due_date: string
           id: string
+          installment_group_id: string | null
+          installment_number: number | null
+          installment_total: number | null
           kind: string
           notes: string | null
           parent_payable_id: string | null
@@ -577,6 +625,9 @@ export type Database = {
           description: string
           due_date: string
           id?: string
+          installment_group_id?: string | null
+          installment_number?: number | null
+          installment_total?: number | null
           kind: string
           notes?: string | null
           parent_payable_id?: string | null
@@ -603,6 +654,9 @@ export type Database = {
           description?: string
           due_date?: string
           id?: string
+          installment_group_id?: string | null
+          installment_number?: number | null
+          installment_total?: number | null
           kind?: string
           notes?: string | null
           parent_payable_id?: string | null
@@ -622,6 +676,13 @@ export type Database = {
             columns: ["parent_payable_id"]
             isOneToOne: false
             referencedRelation: "payables"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payables_installment_group_id_fkey"
+            columns: ["installment_group_id"]
+            isOneToOne: false
+            referencedRelation: "payable_installment_groups"
             referencedColumns: ["id"]
           },
         ]
