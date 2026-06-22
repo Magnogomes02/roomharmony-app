@@ -390,22 +390,31 @@ function FinanceiroPage() {
     return sum;
   }, [rows]);
 
+  // Retorna true/false (em vez de lançar) para não alterar o comportamento dos
+  // fluxos já existentes que chamam audit em modo "melhor esforço" (editar,
+  // excluir, criar manual). Só os fluxos de pagamento excedente checam o
+  // retorno e avisam o usuário explicitamente em caso de falha (Correção 4).
   async function audit(
     action: string,
     entity_id: string | null,
     metadata: Record<string, unknown>,
-  ) {
+  ): Promise<boolean> {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user) return;
-    await supabase.from("audit_logs").insert({
+    if (!user) return false;
+    const { error } = await supabase.from("audit_logs").insert({
       actor_id: user.id,
       action,
       entity_type: "receivable",
       entity_id,
       metadata: metadata as never,
     });
+    if (error) {
+      console.error("[financeiro] falha ao registrar auditoria", action, error);
+      return false;
+    }
+    return true;
   }
 
   function openPay(r: Receivable) {
@@ -473,31 +482,47 @@ function FinanceiroPage() {
         attachmentPath: attachment_path,
         notes: payForm.notes || null,
       });
-      await audit("receivable.payment_create", payRow.id, {
+      const auditOkCreate = await audit("receivable.payment_create", payRow.id, {
         payment_id: payment.id,
         amount,
         method: payForm.payment_method,
       });
+      let overpaymentWarning: string | null = null;
       if (overpaymentAction === "credit") {
         await setRemainingDue(payRow.id, { remainingDueDate: null, reason: null });
         const { data: { user } } = await supabase.auth.getUser();
-        await createCreditApplication({
-          module: "receivable",
-          sourceItemId: payRow.id,
-          sourcePaymentId: payment.id,
-          amount: overpaidAmount,
-          reason: payForm.notes || null,
-          createdBy: user?.id ?? null,
-        });
+        let creditOk = true;
         try {
-          await applyPendingCredits("receivable");
-        } catch (e) {
-          console.warn("applyPendingCredits(receivable) falhou", e);
+          await createCreditApplication({
+            module: "receivable",
+            sourceItemId: payRow.id,
+            sourcePaymentId: payment.id,
+            amount: overpaidAmount,
+            reason: payForm.notes || null,
+            createdBy: user?.id ?? null,
+          });
+        } catch (err) {
+          creditOk = false;
+          console.error("createCreditApplication falhou", err);
         }
-        await audit("receivable.overpayment_credit_next", payRow.id, {
+        if (creditOk) {
+          try {
+            await applyPendingCredits("receivable");
+          } catch (e) {
+            console.warn("applyPendingCredits(receivable) falhou", e);
+          }
+        }
+        const auditOkCredit = await audit("receivable.overpayment_credit_next", payRow.id, {
           payment_id: payment.id, amount_due_before: due, payment_amount: amount,
           amount_paid_after: newPaid, overpaid_amount: overpaidAmount, overpayment_action: "credit",
         });
+        if (!creditOk) {
+          overpaymentWarning =
+            "Pagamento registrado, mas falhou ao registrar o crédito para a próxima cobrança. Verifique manualmente e ajuste o saldo da próxima cobrança.";
+        } else if (!auditOkCreate || !auditOkCredit) {
+          overpaymentWarning =
+            "Pagamento e crédito registrados, mas a auditoria deste excedente falhou. O crédito já protege este pagamento contra estorno automático, mas registre o ocorrido manualmente se necessário.";
+        }
       } else if (overpaymentAction === "fee") {
         const newAmountDue = due + overpaidAmount;
         const { error: feeErr } = await supabase
@@ -506,10 +531,14 @@ function FinanceiroPage() {
           .eq("id", payRow.id);
         if (feeErr) throw feeErr;
         await setRemainingDue(payRow.id, { remainingDueDate: null, reason: null });
-        await audit("receivable.overpayment_current_fee", payRow.id, {
+        const auditOkFee = await audit("receivable.overpayment_current_fee", payRow.id, {
           payment_id: payment.id, amount_due_before: due, amount_due_after: newAmountDue, payment_amount: amount,
           amount_paid_after: newPaid, overpaid_amount: overpaidAmount, overpayment_action: "fee",
         });
+        if (!auditOkCreate || !auditOkFee) {
+          overpaymentWarning =
+            "Pagamento registrado e taxa aplicada, mas a auditoria deste excedente falhou. O estorno automático deste pagamento pode não ficar bloqueado — verifique manualmente se necessário.";
+        }
       } else if (isPartial) {
         await setRemainingDue(payRow.id, {
           remainingDueDate: payForm.remaining_due_date,
@@ -526,14 +555,17 @@ function FinanceiroPage() {
       if (generateReceiptAfterPay) {
         try {
           await createReceiptForReceivable(payRow.id, payment.id);
-          toast.success("Pagamento registrado e recibo gerado");
+          if (!overpaymentWarning) toast.success("Pagamento registrado e recibo gerado");
         } catch (e) {
           toast.warning("Pagamento registrado, mas não foi possível gerar o recibo", {
             description: e instanceof Error ? e.message : String(e),
           });
         }
-      } else {
+      } else if (!overpaymentWarning) {
         toast.success("Pagamento registrado");
+      }
+      if (overpaymentWarning) {
+        toast.warning(overpaymentWarning);
       }
       setPayOpen(false);
       load();
@@ -1263,7 +1295,8 @@ function FinanceiroPage() {
                             const eff = effectiveOf(r);
                             const due = Number(r.amount_due);
                             const paid = Number(r.amount_paid ?? 0);
-                            const saldo = Math.max(due - paid, 0);
+                            const credit = Number(r.credit_applied_amount ?? 0);
+                            const saldo = Math.max(due - paid - credit, 0);
                             const showPartial =
                               eff === "parcial" || (eff === "atrasado" && paid > 0);
                             const isLoss =
@@ -1345,7 +1378,7 @@ function FinanceiroPage() {
                                     >
                                       <History className="h-4 w-4" />
                                     </Button>
-                                    {canEdit && r.status !== "cancelado" && saldo > 0 && (
+                                    {canEdit && eff !== "cancelado" && eff !== "recebido" && (
                                       <Button
                                         size="icon"
                                         variant="ghost"

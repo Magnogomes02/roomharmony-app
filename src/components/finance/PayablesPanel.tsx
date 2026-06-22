@@ -237,13 +237,22 @@ export function PayablesPanel() {
     return { aPagar, pago, atrasado };
   }, [items]);
 
-  async function logAudit(action: string, entityId: string, metadata?: Json) {
+  // Retorna true/false (em vez de lançar) para não alterar o comportamento dos
+  // fluxos já existentes que chamam logAudit em modo "melhor esforço" (criar,
+  // editar, cancelar, excluir). Só os fluxos de pagamento excedente checam o
+  // retorno e avisam o usuário explicitamente em caso de falha (Correção 4).
+  async function logAudit(action: string, entityId: string, metadata?: Json): Promise<boolean> {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    await supabase.from("audit_logs").insert({
+    if (!user) return false;
+    const { error } = await supabase.from("audit_logs").insert({
       actor_id: user.id, action, entity_type: "payable",
       entity_id: entityId, metadata: metadata ?? null,
     });
+    if (error) {
+      console.error("[PayablesPanel] falha ao registrar auditoria", action, error);
+      return false;
+    }
+    return true;
   }
 
   async function saveNew(e: React.FormEvent) {
@@ -347,26 +356,44 @@ export function PayablesPanel() {
         .eq("id", payTarget.id);
       setSavingPay(false);
       if (updErr) return toast.error("Pagamento registrado mas falhou ao atualizar conta", { description: updErr.message });
-      await createCreditApplication({
-        module: "payable",
-        sourceItemId: payTarget.id,
-        sourcePaymentId: pay.id,
-        amount: overpaidAmount,
-        reason: payNotes.trim() || null,
-        createdBy: user?.id ?? null,
-      });
+      let creditOk = true;
       try {
-        await applyPendingCredits("payable");
+        await createCreditApplication({
+          module: "payable",
+          sourceItemId: payTarget.id,
+          sourcePaymentId: pay.id,
+          amount: overpaidAmount,
+          reason: payNotes.trim() || null,
+          createdBy: user?.id ?? null,
+        });
       } catch (err) {
-        console.warn("applyPendingCredits(payable) falhou", err);
+        creditOk = false;
+        console.error("createCreditApplication falhou", err);
       }
-      toast.success("Pagamento registrado. Excedente reservado como crédito para a próxima conta.");
-      setPayOpen(false);
-      await logAudit("payable.payment_create", payTarget.id, { payment_id: pay.id, amount, payment_method: payMethod });
-      await logAudit("payable.overpayment_credit_next", payTarget.id, {
+      if (creditOk) {
+        try {
+          await applyPendingCredits("payable");
+        } catch (err) {
+          console.warn("applyPendingCredits(payable) falhou", err);
+        }
+      }
+      const auditOk1 = await logAudit("payable.payment_create", payTarget.id, { payment_id: pay.id, amount, payment_method: payMethod });
+      const auditOk2 = await logAudit("payable.overpayment_credit_next", payTarget.id, {
         payment_id: pay.id, amount_due_before: due, payment_amount: amount, amount_paid_after: newPaid,
         overpaid_amount: overpaidAmount, overpayment_action: "credit",
       });
+      if (!creditOk) {
+        toast.error(
+          "Pagamento registrado, mas falhou ao registrar o crédito para a próxima conta. Verifique manualmente e ajuste o saldo da próxima conta.",
+        );
+      } else if (!auditOk1 || !auditOk2) {
+        toast.warning(
+          "Pagamento e crédito registrados, mas a auditoria deste excedente falhou. O crédito já protege este pagamento contra estorno automático, mas registre o ocorrido manualmente se necessário.",
+        );
+      } else {
+        toast.success("Pagamento registrado. Excedente reservado como crédito para a próxima conta.");
+      }
+      setPayOpen(false);
       load();
       return;
     }
@@ -386,6 +413,7 @@ export function PayablesPanel() {
         .eq("id", payTarget.id);
       if (updErr) { setSavingPay(false); return toast.error("Pagamento registrado mas falhou ao atualizar conta", { description: updErr.message }); }
       let affectedFutureCount = 0;
+      let increaseOk = true;
       try {
         const res = await increaseRecurringAmount(
           { id: payTarget.id, parent_payable_id: payTarget.parent_payable_id, reference_month: payTarget.reference_month },
@@ -393,19 +421,26 @@ export function PayablesPanel() {
         );
         affectedFutureCount = res.affectedFutureCount;
       } catch (err) {
+        increaseOk = false;
         toast.warning("Pagamento registrado, mas falhou ao atualizar o modelo/próximas contas.", {
           description: err instanceof Error ? err.message : String(err),
         });
       }
       setSavingPay(false);
-      toast.success("Pagamento registrado. Valor da recorrência atualizado.");
-      setPayOpen(false);
-      await logAudit("payable.payment_create", payTarget.id, { payment_id: pay.id, amount, payment_method: payMethod });
-      await logAudit("payable.overpayment_recurring_amount_increase", payTarget.id, {
+      const auditOk1 = await logAudit("payable.payment_create", payTarget.id, { payment_id: pay.id, amount, payment_method: payMethod });
+      const auditOk2 = await logAudit("payable.overpayment_recurring_amount_increase", payTarget.id, {
         payment_id: pay.id, amount_due_before: due, amount_due_after: newEffectivePaid, payment_amount: amount,
         amount_paid_after: newPaid, overpaid_amount: overpaidAmount, overpayment_action: "increase",
         affected_future_count: affectedFutureCount,
       });
+      if (!auditOk1 || !auditOk2) {
+        toast.warning(
+          "Pagamento registrado, mas a auditoria deste excedente falhou. O estorno automático deste pagamento pode não ficar bloqueado — verifique manualmente se necessário.",
+        );
+      } else if (increaseOk) {
+        toast.success("Pagamento registrado. Valor da recorrência atualizado.");
+      }
+      setPayOpen(false);
       load();
       return;
     }
@@ -426,11 +461,10 @@ export function PayablesPanel() {
       .eq("id", payTarget.id);
     setSavingPay(false);
     if (updErr) return toast.error("Pagamento registrado mas falhou ao atualizar conta", { description: updErr.message });
-    toast.success("Pagamento registrado");
-    setPayOpen(false);
-    await logAudit("payable.payment_create", payTarget.id, { payment_id: pay.id, amount, payment_method: payMethod });
+    const auditOkCreate = await logAudit("payable.payment_create", payTarget.id, { payment_id: pay.id, amount, payment_method: payMethod });
+    let auditOkFee = true;
     if (overpaymentAction === "fee") {
-      await logAudit("payable.overpayment_current_fee", payTarget.id, {
+      auditOkFee = await logAudit("payable.overpayment_current_fee", payTarget.id, {
         payment_id: pay.id, amount_due_before: due, amount_due_after: newAmountDue, payment_amount: amount,
         amount_paid_after: newPaid, overpaid_amount: overpaidAmount, overpayment_action: "fee",
       });
@@ -442,6 +476,14 @@ export function PayablesPanel() {
         reason: payRemainingDueReason || null,
       });
     }
+    if (overpaymentAction === "fee" && (!auditOkCreate || !auditOkFee)) {
+      toast.warning(
+        "Pagamento registrado e taxa aplicada, mas a auditoria deste excedente falhou. O estorno automático deste pagamento pode não ficar bloqueado — verifique manualmente se necessário.",
+      );
+    } else {
+      toast.success("Pagamento registrado");
+    }
+    setPayOpen(false);
     load();
   }
 

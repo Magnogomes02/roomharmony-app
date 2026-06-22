@@ -400,6 +400,54 @@ export type Database = {
           },
         ]
       }
+      financial_credit_applications: {
+        Row: {
+          amount: number
+          applied_at: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          metadata: Json | null
+          module: string
+          reason: string | null
+          reversed_at: string | null
+          source_item_id: string
+          source_payment_id: string | null
+          status: string
+          target_item_id: string | null
+        }
+        Insert: {
+          amount: number
+          applied_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          metadata?: Json | null
+          module: string
+          reason?: string | null
+          reversed_at?: string | null
+          source_item_id: string
+          source_payment_id?: string | null
+          status?: string
+          target_item_id?: string | null
+        }
+        Update: {
+          amount?: number
+          applied_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          metadata?: Json | null
+          module?: string
+          reason?: string | null
+          reversed_at?: string | null
+          source_item_id?: string
+          source_payment_id?: string | null
+          status?: string
+          target_item_id?: string | null
+        }
+        Relationships: []
+      }
       notification_queue: {
         Row: {
           channel: string
@@ -499,6 +547,7 @@ export type Database = {
           category: string | null
           created_at: string
           created_by: string | null
+          credit_applied_amount: number
           description: string
           due_date: string
           id: string
@@ -507,6 +556,10 @@ export type Database = {
           parent_payable_id: string | null
           recurrence_day: number | null
           reference_month: string
+          remaining_due_date: string | null
+          remaining_due_reason: string | null
+          remaining_due_updated_at: string | null
+          remaining_due_updated_by: string | null
           status: string
           supplier: string | null
           updated_at: string
@@ -520,6 +573,7 @@ export type Database = {
           category?: string | null
           created_at?: string
           created_by?: string | null
+          credit_applied_amount?: number
           description: string
           due_date: string
           id?: string
@@ -528,6 +582,10 @@ export type Database = {
           parent_payable_id?: string | null
           recurrence_day?: number | null
           reference_month: string
+          remaining_due_date?: string | null
+          remaining_due_reason?: string | null
+          remaining_due_updated_at?: string | null
+          remaining_due_updated_by?: string | null
           status?: string
           supplier?: string | null
           updated_at?: string
@@ -541,6 +599,7 @@ export type Database = {
           category?: string | null
           created_at?: string
           created_by?: string | null
+          credit_applied_amount?: number
           description?: string
           due_date?: string
           id?: string
@@ -549,6 +608,10 @@ export type Database = {
           parent_payable_id?: string | null
           recurrence_day?: number | null
           reference_month?: string
+          remaining_due_date?: string | null
+          remaining_due_reason?: string | null
+          remaining_due_updated_at?: string | null
+          remaining_due_updated_by?: string | null
           status?: string
           supplier?: string | null
           updated_at?: string
@@ -924,6 +987,7 @@ export type Database = {
           cancelled_by: string | null
           contract_id: string | null
           created_at: string
+          credit_applied_amount: number
           due_date: string
           id: string
           kind: string
@@ -932,6 +996,10 @@ export type Database = {
           payment_method: string | null
           professional_id: string
           reference_month: string
+          remaining_due_date: string | null
+          remaining_due_reason: string | null
+          remaining_due_updated_at: string | null
+          remaining_due_updated_by: string | null
           room_id: string | null
           status: string
           updated_at: string
@@ -947,6 +1015,7 @@ export type Database = {
           cancelled_by?: string | null
           contract_id?: string | null
           created_at?: string
+          credit_applied_amount?: number
           due_date: string
           id?: string
           kind: string
@@ -955,6 +1024,10 @@ export type Database = {
           payment_method?: string | null
           professional_id: string
           reference_month: string
+          remaining_due_date?: string | null
+          remaining_due_reason?: string | null
+          remaining_due_updated_at?: string | null
+          remaining_due_updated_by?: string | null
           room_id?: string | null
           status?: string
           updated_at?: string
@@ -970,6 +1043,7 @@ export type Database = {
           cancelled_by?: string | null
           contract_id?: string | null
           created_at?: string
+          credit_applied_amount?: number
           due_date?: string
           id?: string
           kind?: string
@@ -978,6 +1052,10 @@ export type Database = {
           payment_method?: string | null
           professional_id?: string
           reference_month?: string
+          remaining_due_date?: string | null
+          remaining_due_reason?: string | null
+          remaining_due_updated_at?: string | null
+          remaining_due_updated_by?: string | null
           room_id?: string | null
           status?: string
           updated_at?: string
