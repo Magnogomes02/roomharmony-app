@@ -9,72 +9,37 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as LoginRouteImport } from './routes/login'
-import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as AppSalasRouteImport } from './routes/_app/salas'
-import { Route as AppRealocacaoRouteImport } from './routes/_app/realocacao'
-import { Route as AppProfissionaisRouteImport } from './routes/_app/profissionais'
-import { Route as AppPreferenciasRouteImport } from './routes/_app/preferencias'
-import { Route as AppFinanceiroRouteImport } from './routes/_app/financeiro'
-import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
-import { Route as AppContratosRouteImport } from './routes/_app/contratos'
-import { Route as AppConflitosRouteImport } from './routes/_app/conflitos'
-import { Route as AppCalendarioRouteImport } from './routes/_app/calendario'
+import { Route as AppRouteImport } from './routes/_app'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppAuditoriaRouteImport } from './routes/_app/auditoria'
+import { Route as AppCalendarioRouteImport } from './routes/_app/calendario'
+import { Route as AppConflitosRouteImport } from './routes/_app/conflitos'
+import { Route as AppContratosRouteImport } from './routes/_app/contratos'
+import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
+import { Route as AppFinanceiroRouteImport } from './routes/_app/financeiro'
+import { Route as AppPreferenciasRouteImport } from './routes/_app/preferencias'
+import { Route as AppProfissionaisRouteImport } from './routes/_app/profissionais'
+import { Route as AppRealocacaoRouteImport } from './routes/_app/realocacao'
+import { Route as AppSalasRouteImport } from './routes/_app/salas'
 
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppRoute = AppRouteImport.update({
   id: '/_app',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AppSalasRoute = AppSalasRouteImport.update({
-  id: '/salas',
-  path: '/salas',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppRealocacaoRoute = AppRealocacaoRouteImport.update({
-  id: '/realocacao',
-  path: '/realocacao',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppProfissionaisRoute = AppProfissionaisRouteImport.update({
-  id: '/profissionais',
-  path: '/profissionais',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppPreferenciasRoute = AppPreferenciasRouteImport.update({
-  id: '/preferencias',
-  path: '/preferencias',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppFinanceiroRoute = AppFinanceiroRouteImport.update({
-  id: '/financeiro',
-  path: '/financeiro',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppDashboardRoute = AppDashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppContratosRoute = AppContratosRouteImport.update({
-  id: '/contratos',
-  path: '/contratos',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppConflitosRoute = AppConflitosRouteImport.update({
-  id: '/conflitos',
-  path: '/conflitos',
+const AppAuditoriaRoute = AppAuditoriaRouteImport.update({
+  id: '/auditoria',
+  path: '/auditoria',
   getParentRoute: () => AppRoute,
 } as any)
 const AppCalendarioRoute = AppCalendarioRouteImport.update({
@@ -82,9 +47,44 @@ const AppCalendarioRoute = AppCalendarioRouteImport.update({
   path: '/calendario',
   getParentRoute: () => AppRoute,
 } as any)
-const AppAuditoriaRoute = AppAuditoriaRouteImport.update({
-  id: '/auditoria',
-  path: '/auditoria',
+const AppConflitosRoute = AppConflitosRouteImport.update({
+  id: '/conflitos',
+  path: '/conflitos',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppContratosRoute = AppContratosRouteImport.update({
+  id: '/contratos',
+  path: '/contratos',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppDashboardRoute = AppDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppFinanceiroRoute = AppFinanceiroRouteImport.update({
+  id: '/financeiro',
+  path: '/financeiro',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPreferenciasRoute = AppPreferenciasRouteImport.update({
+  id: '/preferencias',
+  path: '/preferencias',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppProfissionaisRoute = AppProfissionaisRouteImport.update({
+  id: '/profissionais',
+  path: '/profissionais',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppRealocacaoRoute = AppRealocacaoRouteImport.update({
+  id: '/realocacao',
+  path: '/realocacao',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSalasRoute = AppSalasRouteImport.update({
+  id: '/salas',
+  path: '/salas',
   getParentRoute: () => AppRoute,
 } as any)
 
@@ -186,11 +186,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_app': {
@@ -200,67 +200,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_app/salas': {
-      id: '/_app/salas'
-      path: '/salas'
-      fullPath: '/salas'
-      preLoaderRoute: typeof AppSalasRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/realocacao': {
-      id: '/_app/realocacao'
-      path: '/realocacao'
-      fullPath: '/realocacao'
-      preLoaderRoute: typeof AppRealocacaoRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/profissionais': {
-      id: '/_app/profissionais'
-      path: '/profissionais'
-      fullPath: '/profissionais'
-      preLoaderRoute: typeof AppProfissionaisRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/preferencias': {
-      id: '/_app/preferencias'
-      path: '/preferencias'
-      fullPath: '/preferencias'
-      preLoaderRoute: typeof AppPreferenciasRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/financeiro': {
-      id: '/_app/financeiro'
-      path: '/financeiro'
-      fullPath: '/financeiro'
-      preLoaderRoute: typeof AppFinanceiroRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/dashboard': {
-      id: '/_app/dashboard'
-      path: '/dashboard'
-      fullPath: '/dashboard'
-      preLoaderRoute: typeof AppDashboardRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/contratos': {
-      id: '/_app/contratos'
-      path: '/contratos'
-      fullPath: '/contratos'
-      preLoaderRoute: typeof AppContratosRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/conflitos': {
-      id: '/_app/conflitos'
-      path: '/conflitos'
-      fullPath: '/conflitos'
-      preLoaderRoute: typeof AppConflitosRouteImport
+    '/_app/auditoria': {
+      id: '/_app/auditoria'
+      path: '/auditoria'
+      fullPath: '/auditoria'
+      preLoaderRoute: typeof AppAuditoriaRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/calendario': {
@@ -270,11 +221,60 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppCalendarioRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/auditoria': {
-      id: '/_app/auditoria'
-      path: '/auditoria'
-      fullPath: '/auditoria'
-      preLoaderRoute: typeof AppAuditoriaRouteImport
+    '/_app/conflitos': {
+      id: '/_app/conflitos'
+      path: '/conflitos'
+      fullPath: '/conflitos'
+      preLoaderRoute: typeof AppConflitosRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/contratos': {
+      id: '/_app/contratos'
+      path: '/contratos'
+      fullPath: '/contratos'
+      preLoaderRoute: typeof AppContratosRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/dashboard': {
+      id: '/_app/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AppDashboardRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/financeiro': {
+      id: '/_app/financeiro'
+      path: '/financeiro'
+      fullPath: '/financeiro'
+      preLoaderRoute: typeof AppFinanceiroRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/preferencias': {
+      id: '/_app/preferencias'
+      path: '/preferencias'
+      fullPath: '/preferencias'
+      preLoaderRoute: typeof AppPreferenciasRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/profissionais': {
+      id: '/_app/profissionais'
+      path: '/profissionais'
+      fullPath: '/profissionais'
+      preLoaderRoute: typeof AppProfissionaisRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/realocacao': {
+      id: '/_app/realocacao'
+      path: '/realocacao'
+      fullPath: '/realocacao'
+      preLoaderRoute: typeof AppRealocacaoRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/salas': {
+      id: '/_app/salas'
+      path: '/salas'
+      fullPath: '/salas'
+      preLoaderRoute: typeof AppSalasRouteImport
       parentRoute: typeof AppRoute
     }
   }
