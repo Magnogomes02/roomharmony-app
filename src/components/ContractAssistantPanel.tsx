@@ -15,10 +15,12 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import {
+  ASSISTANT_LOW_BALANCE,
   ASSISTANT_MAX_REQUEST,
   ASSISTANT_SHORTCUTS,
   PROVIDER_NAME,
   findUnknownPlaceholders,
+  releaseLabel,
   replaceUnknownPlaceholders,
   sanitizeAssistantHtml,
   type AssistantChoice,
@@ -116,8 +118,17 @@ export function ContractAssistantPanel({
 
   const unknown = useMemo(() => (html ? findUnknownPlaceholders(html) : []), [html]);
   const configured = usage ? PROVIDERS.filter((p) => usage.providers[p].configured) : [];
+  // limite do dia de cada IA, enquanto não liberar
+  const exhausted = (p: AssistantProvider) => {
+    const until = usage?.providers[p].exhaustedUntil;
+    return until && Date.parse(until) > Date.now() ? until : null;
+  };
   const hasRoom = (p: AssistantProvider) =>
-    !!usage && usage.providers[p].configured && usage.providers[p].used < usage.limit;
+    !!usage && usage.providers[p].configured && !exhausted(p);
+  const firstRelease = configured
+    .map(exhausted)
+    .filter((u): u is string => !!u)
+    .sort()[0];
   const blockedReason = !usage
     ? null
     : !usage.isGestor
@@ -127,12 +138,22 @@ export function ContractAssistantPanel({
         : choice === "auto"
           ? configured.some(hasRoom)
             ? null
-            : `Você usou os ${usage.limit} pedidos de cada IA hoje. O limite renova à meia-noite.`
+            : configured.length > 1
+              ? `O Gemini e o Groq atingiram o limite do dia. O primeiro libera ${releaseLabel(firstRelease)}.`
+              : `O ${PROVIDER_NAME[configured[0]]} atingiu o limite do dia. Libera ${releaseLabel(firstRelease)}.`
           : !usage.providers[choice].configured
             ? `O ${PROVIDER_NAME[choice]} não está configurado. Escolha o Automático.`
             : !hasRoom(choice)
-              ? `Você usou os ${usage.limit} pedidos do ${PROVIDER_NAME[choice]} hoje. Escolha outra IA ou o Automático.`
+              ? `O ${PROVIDER_NAME[choice]} atingiu o limite do dia; libera ${releaseLabel(exhausted(choice)!)}. Escolha outra IA ou o Automático.`
               : null;
+  // o Groq informa o saldo do dia; avisa quando restar pouco
+  const groq = usage?.providers.groq;
+  const groqLow =
+    !!groq?.configured &&
+    !exhausted("groq") &&
+    groq.remaining !== undefined &&
+    !!groq.dailyLimit &&
+    groq.remaining <= groq.dailyLimit * ASSISTANT_LOW_BALANCE;
 
   async function run(next: Pending) {
     const seq = ++requestSeq.current;
@@ -213,12 +234,31 @@ export function ContractAssistantPanel({
           <SheetDescription>
             Use só variáveis como {"{{LOCATARIO_NOME}}"}; não cole nomes, CPF ou outros dados reais.
           </SheetDescription>
-          {usage?.isGestor && configured.length > 0 && (
-            <p className="text-xs font-medium tabular-nums text-muted-foreground">
-              Pedidos hoje:{" "}
-              {configured
-                .map((p) => `${PROVIDER_NAME[p]} ${usage.providers[p].used}/${usage.limit}`)
-                .join(" · ")}
+          {usage?.isGestor &&
+            configured.length > 0 &&
+            (configured.some(exhausted) ? (
+              // com uma IA no limite, cada IA em sua linha, para o horário de liberação não quebrar
+              <ul className="space-y-0.5 text-xs font-medium tabular-nums text-muted-foreground">
+                {configured.map((p) => (
+                  <li key={p} className={cn(exhausted(p) && "text-warning-ink")}>
+                    {exhausted(p)
+                      ? `${PROVIDER_NAME[p]}: limite do dia atingido · libera ${releaseLabel(exhausted(p)!)}`
+                      : `${PROVIDER_NAME[p]}: ${usage.providers[p].used} ${usage.providers[p].used === 1 ? "pedido" : "pedidos"} hoje`}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-xs font-medium tabular-nums text-muted-foreground">
+                Hoje:{" "}
+                {configured
+                  .map((p) => `${PROVIDER_NAME[p]} ${usage.providers[p].used}`)
+                  .join(" · ")}
+              </p>
+            ))}
+          {groqLow && (
+            <p role="status" className="text-xs font-medium tabular-nums text-warning-ink">
+              Groq: {groq!.remaining === 1 ? "resta 1 pedido" : `restam ${groq!.remaining} pedidos`}{" "}
+              hoje.
             </p>
           )}
         </SheetHeader>
@@ -433,7 +473,7 @@ export function ContractAssistantPanel({
                     answeredBy.fallbackFrom === "busy"
                       ? " (o Gemini estava ocupado)"
                       : answeredBy.fallbackFrom === "limit"
-                        ? " (os pedidos do Gemini de hoje acabaram)"
+                        ? " (o Gemini atingiu o limite do dia)"
                         : ""
                   }.`}
               </p>

@@ -6,9 +6,11 @@ import { CONTRACT_TEMPLATE_VARIABLES } from "@/lib/contractTemplates";
  * verificação de variáveis desconhecidas.
  */
 
-/** Pedidos por gestor, por dia, em cada IA (Gemini e Groq contam separado). */
-export const ASSISTANT_DAILY_LIMIT = 30;
 export const ASSISTANT_AUDIT_ACTION = "ai.contract_assist";
+/** Limite do dia de uma IA atingido (Google ou Groq); a IA fica esgotada até liberar. */
+export const ASSISTANT_LIMIT_AUDIT_ACTION = "ai.provider_limit";
+/** Avisa quando restar esta fração (ou menos) dos pedidos do dia no Groq. */
+export const ASSISTANT_LOW_BALANCE = 0.1;
 export const ASSISTANT_MAX_REQUEST = 1000;
 export const ASSISTANT_MAX_SELECTION = 6000;
 
@@ -134,4 +136,16 @@ export function sanitizeAssistantHtml(html: string): string {
   const out = [...doc.body.childNodes].map(walk).join("").trim();
   // texto solto vira parágrafo, para o editor e o PDF tratarem igual
   return /^<(p|h3|ul|ol)>/.test(out) ? out : `<p>${out}</p>`;
+}
+
+/** "às 04:00" ou "amanhã às 04:00", no horário de Recife. */
+export function releaseLabel(iso: string, now = new Date()): string {
+  const fmt = (d: Date, o: Intl.DateTimeFormatOptions) =>
+    new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Recife", ...o }).format(d);
+  const at = new Date(iso);
+  const time = fmt(at, { hour: "2-digit", minute: "2-digit" });
+  const day = (d: Date) => fmt(d, { year: "numeric", month: "2-digit", day: "2-digit" });
+  if (day(at) === day(now)) return `às ${time}`;
+  if (day(at) === day(new Date(now.getTime() + 24 * 60 * 60 * 1000))) return `amanhã às ${time}`;
+  return `em ${fmt(at, { day: "2-digit", month: "2-digit" })} às ${time}`;
 }
