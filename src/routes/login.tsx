@@ -67,7 +67,7 @@ function LoginPage() {
             Contratos, agenda, conflitos e auditoria em um só lugar.
           </p>
         </div>
-        <p className="text-xs text-sidebar-foreground/50">
+        <p className="text-xs text-sidebar-foreground/65">
           © {new Date().getFullYear()} Versão Saúde · Gestão clínica
         </p>
       </div>
@@ -149,11 +149,11 @@ function SignInForm({ email, password, loading, onEmail, onPassword, onSubmit }:
     <form onSubmit={onSubmit} className="space-y-4 pt-2">
       <div className="space-y-2">
         <Label htmlFor="email">E-mail</Label>
-        <Input id="email" type="email" required value={email} onChange={(e) => onEmail(e.target.value)} />
+        <Input id="email" type="email" autoComplete="email" required value={email} onChange={(e) => onEmail(e.target.value)} />
       </div>
       <div className="space-y-2">
         <Label htmlFor="password">Senha</Label>
-        <Input id="password" type="password" required value={password} onChange={(e) => onPassword(e.target.value)} />
+        <Input id="password" type="password" autoComplete="current-password" required value={password} onChange={(e) => onPassword(e.target.value)} />
       </div>
       <Button type="submit" className="w-full" disabled={loading}>
         {loading ? "Entrando..." : "Entrar"}

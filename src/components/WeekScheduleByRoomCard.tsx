@@ -198,7 +198,7 @@ export function WeekScheduleByRoomCard() {
                 </div>
                 <div className="truncate opacity-80">{prof?.full_name ?? "—"}</div>
                 {isConflict && (
-                  <div className="mt-0.5 flex items-center gap-0.5 text-[9px] font-medium text-destructive">
+                  <div className="mt-0.5 flex items-center gap-0.5 text-[10px] font-medium text-destructive">
                     <AlertTriangle className="h-2.5 w-2.5" />
                     Conflito
                   </div>
@@ -273,7 +273,7 @@ export function WeekScheduleByRoomCard() {
                         <div className="flex flex-col justify-center pr-1 text-[10px]">
                           <span className="font-medium text-foreground/80">{row.label}</span>
                           {shiftRange && (
-                            <span className="text-[9px] text-muted-foreground">{shiftRange}</span>
+                            <span className="text-[10px] text-muted-foreground">{shiftRange}</span>
                           )}
                         </div>
                         {days.map((d) => {
@@ -285,7 +285,7 @@ export function WeekScheduleByRoomCard() {
                           return (
                             <div key={dayKey} className="min-h-[44px] space-y-1">
                               {items.length === 0 ? (
-                                <div className="flex h-full min-h-[44px] items-center justify-center rounded border border-dashed border-border/40 text-[10px] text-muted-foreground/60">
+                                <div className="flex h-full min-h-[44px] items-center justify-center rounded border border-dashed border-border/40 text-[10px] text-muted-foreground">
                                   —
                                 </div>
                               ) : (

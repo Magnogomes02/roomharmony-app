@@ -241,23 +241,23 @@ function RealocacaoPage() {
         <Card>
           <CardHeader><CardTitle>1. O que remanejar</CardTitle><CardDescription>Sala, período e motivo.</CardDescription></CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-1.5"><Label>Sala de origem</Label>
+            <div className="space-y-1.5"><Label htmlFor="f-sala-de-origem">Sala de origem</Label>
               <Select value={originRoom} onValueChange={setOriginRoom}>
-                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectTrigger id="f-sala-de-origem"><SelectValue placeholder="Selecione" /></SelectTrigger>
                 <SelectContent>{rooms.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5"><Label>Motivo</Label>
+            <div className="space-y-1.5"><Label htmlFor="f-motivo">Motivo</Label>
               <Select value={reason} onValueChange={setReason}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger id="f-motivo"><SelectValue /></SelectTrigger>
                 <SelectContent>{REASONS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5"><Label>Data inicial</Label><Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} /></div>
-            <div className="space-y-1.5"><Label>Data final</Label><Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} /></div>
-            <div className="space-y-1.5"><Label>Turno</Label>
+            <div className="space-y-1.5"><Label htmlFor="f-data-inicial">Data inicial</Label><Input id="f-data-inicial" type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} /></div>
+            <div className="space-y-1.5"><Label htmlFor="f-data-final">Data final</Label><Input id="f-data-final" type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} /></div>
+            <div className="space-y-1.5"><Label htmlFor="f-turno">Turno</Label>
               <Select value={shift} onValueChange={(v) => setShift(v as ShiftFilter)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger id="f-turno"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todos">Todos</SelectItem>
                   {(["manha", "tarde", "noite"] as ShiftKey[]).map((k) => (
@@ -268,16 +268,16 @@ function RealocacaoPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5"><Label>Profissional</Label>
+            <div className="space-y-1.5"><Label htmlFor="f-profissional">Profissional</Label>
               <Select value={profFilter} onValueChange={setProfFilter}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger id="f-profissional"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todos">Todos</SelectItem>
                   {profs.map((p) => <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5 md:col-span-2"><Label>Observações</Label><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Detalhes do imprevisto (opcional)" /></div>
+            <div className="space-y-1.5 md:col-span-2"><Label htmlFor="f-observacoes">Observações</Label><Textarea id="f-observacoes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Detalhes do imprevisto (opcional)" /></div>
             <div className="md:col-span-2 flex justify-end">
               <Button disabled={!originRoom} onClick={() => setStep(2)}>Próximo</Button>
             </div>
@@ -289,14 +289,14 @@ function RealocacaoPage() {
         <Card>
           <CardHeader><CardTitle>2. Para onde remanejar</CardTitle><CardDescription>Origem: {roomName(originRoom)}</CardDescription></CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-1.5"><Label>Sala de destino</Label>
+            <div className="space-y-1.5"><Label htmlFor="f-sala-de-destino">Sala de destino</Label>
               <Select value={destRoom} onValueChange={setDestRoom}>
-                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectTrigger id="f-sala-de-destino"><SelectValue placeholder="Selecione" /></SelectTrigger>
                 <SelectContent>{rooms.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5"><Label>Deslocar datas (dias)</Label>
-              <Input type="number" value={dayShift} onChange={(e) => setDayShift(parseInt(e.target.value || "0", 10))} />
+            <div className="space-y-1.5"><Label htmlFor="f-deslocar-datas-dias">Deslocar datas (dias)</Label>
+              <Input id="f-deslocar-datas-dias" type="number" value={dayShift} onChange={(e) => setDayShift(parseInt(e.target.value || "0", 10))} />
               <p className="text-xs text-muted-foreground">0 = mesmo dia e horário. Ex.: 7 = mesma hora na semana seguinte.</p>
             </div>
             <div className="md:col-span-2 flex justify-between">

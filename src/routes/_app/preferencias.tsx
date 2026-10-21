@@ -378,8 +378,8 @@ function PreferenciasPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label>Nome da clínica</Label>
-            <Input
+            <Label htmlFor="f-nome-da-clinica">Nome da clínica</Label>
+            <Input id="f-nome-da-clinica"
               value={branding.clinic_name ?? ""}
               maxLength={150}
               disabled={!canEdit}
@@ -387,8 +387,8 @@ function PreferenciasPage() {
             />
           </div>
           <div className="space-y-2">
-            <Label>CNPJ</Label>
-            <Input
+            <Label htmlFor="f-cnpj">CNPJ</Label>
+            <Input id="f-cnpj"
               value={branding.cnpj ?? ""}
               maxLength={20}
               disabled={!canEdit}
@@ -396,8 +396,8 @@ function PreferenciasPage() {
             />
           </div>
           <div className="space-y-2">
-            <Label>Endereço</Label>
-            <Input
+            <Label htmlFor="f-endereco">Endereço</Label>
+            <Input id="f-endereco"
               value={branding.address ?? ""}
               maxLength={250}
               disabled={!canEdit}
@@ -427,8 +427,8 @@ function PreferenciasPage() {
                 <Label>{SHIFT_LABELS[k]}</Label>
               </div>
               <div className="col-span-4 space-y-1">
-                <Label className="text-xs">Início</Label>
-                <Input
+                <Label htmlFor={`f-inicio-${k}`} className="text-xs">Início</Label>
+                <Input id={`f-inicio-${k}`}
                   type="time"
                   value={shifts[k].start}
                   disabled={!canEdit}
@@ -436,8 +436,8 @@ function PreferenciasPage() {
                 />
               </div>
               <div className="col-span-4 space-y-1">
-                <Label className="text-xs">Fim</Label>
-                <Input
+                <Label htmlFor={`f-fim-${k}`} className="text-xs">Fim</Label>
+                <Input id={`f-fim-${k}`}
                   type="time"
                   value={shifts[k].end}
                   disabled={!canEdit}
@@ -532,12 +532,12 @@ function PreferenciasPage() {
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>Disposição</Label>
+                  <Label htmlFor="f-disposicao">Disposição</Label>
                   <Select
                     value={sigSettings.layout}
                     onValueChange={(v) => setSigSettings({ ...sigSettings, layout: v as SignatureSettings["layout"] })}
                   >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger id="f-disposicao"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="side_by_side">Lado a lado</SelectItem>
                       <SelectItem value="stacked">Empilhado</SelectItem>
@@ -545,8 +545,8 @@ function PreferenciasPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Altura reservada (mm)</Label>
-                  <Input
+                  <Label htmlFor="f-altura-reservada-mm">Altura reservada (mm)</Label>
+                  <Input id="f-altura-reservada-mm"
                     type="number" min={25} max={80}
                     value={sigSettings.reserved_height_mm}
                     onChange={(e) => setSigSettings({ ...sigSettings, reserved_height_mm: Number(e.target.value) || 40 })}
@@ -608,15 +608,15 @@ function PreferenciasPage() {
             <div className="space-y-4 md:col-span-2">
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>Nome *</Label>
-                  <Input
+                  <Label htmlFor="f-nome">Nome *</Label>
+                  <Input id="f-nome"
                     value={tplForm.name} maxLength={150}
                     onChange={(e) => setTplForm({ ...tplForm, name: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Descrição</Label>
-                  <Input
+                  <Label htmlFor="f-descricao">Descrição</Label>
+                  <Input id="f-descricao"
                     value={tplForm.description ?? ""} maxLength={250}
                     onChange={(e) => setTplForm({ ...tplForm, description: e.target.value })}
                   />
@@ -645,8 +645,8 @@ function PreferenciasPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>Título do contrato *</Label>
-                <Input
+                <Label htmlFor="f-titulo-do-contrato">Título do contrato *</Label>
+                <Input id="f-titulo-do-contrato"
                   value={tplForm.title} maxLength={250}
                   placeholder="Ex.: CONTRATO DE SUBLOCAÇÃO DE IMÓVEL"
                   onChange={(e) => setTplForm({ ...tplForm, title: e.target.value })}
@@ -748,22 +748,22 @@ function PreferenciasPage() {
         <CardContent className="grid gap-4 md:grid-cols-3">
           <div className="space-y-4 md:col-span-2">
             <div className="space-y-2">
-              <Label>Título do recibo</Label>
-              <Input
+              <Label htmlFor="f-titulo-do-recibo">Título do recibo</Label>
+              <Input id="f-titulo-do-recibo"
                 value={receipt.title} maxLength={120} disabled={!canEdit}
                 onChange={(e) => setReceipt({ ...receipt, title: e.target.value })}
               />
             </div>
             <div className="space-y-2">
-              <Label>Texto declarativo</Label>
-              <Textarea
+              <Label htmlFor="f-texto-declarativo">Texto declarativo</Label>
+              <Textarea id="f-texto-declarativo"
                 rows={5} value={receipt.body} disabled={!canEdit}
                 onChange={(e) => setReceipt({ ...receipt, body: e.target.value })}
               />
             </div>
             <div className="space-y-2">
-              <Label>Rodapé</Label>
-              <Textarea
+              <Label htmlFor="f-rodape">Rodapé</Label>
+              <Textarea id="f-rodape"
                 rows={2} value={receipt.footer} disabled={!canEdit}
                 onChange={(e) => setReceipt({ ...receipt, footer: e.target.value })}
               />
@@ -791,8 +791,8 @@ function PreferenciasPage() {
                 <Label>Mostrar código de autenticação</Label>
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Cor de destaque</Label>
-                <Input
+                <Label htmlFor="f-cor-de-destaque" className="text-xs">Cor de destaque</Label>
+                <Input id="f-cor-de-destaque"
                   type="color" value={receipt.accent_color} disabled={!canEdit}
                   onChange={(e) => setReceipt({ ...receipt, accent_color: e.target.value })}
                 />

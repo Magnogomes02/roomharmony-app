@@ -1416,9 +1416,9 @@ export function PayablesPanel() {
           </DialogHeader>
           <form onSubmit={saveNew} className="space-y-4">
             <div className="space-y-2">
-              <Label>Tipo *</Label>
+              <Label htmlFor="f-cp-tipo">Tipo *</Label>
               <Select value={newForm.kind} onValueChange={(v) => setNewForm({ ...newForm, kind: v as "avulso" | "recorrente" })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger id="f-cp-tipo"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="avulso">Avulso</SelectItem>
                   <SelectItem value="recorrente">Recorrente</SelectItem>
@@ -1441,38 +1441,38 @@ export function PayablesPanel() {
               </div>
             )}
             <div className="space-y-2">
-              <Label>Descrição *</Label>
-              <Input required maxLength={200} value={newForm.description}
+              <Label htmlFor="f-cp-descricao">Descrição *</Label>
+              <Input id="f-cp-descricao" required maxLength={200} value={newForm.description}
                 onChange={(e) => setNewForm({ ...newForm, description: e.target.value })} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label>Fornecedor</Label>
-                <Input maxLength={100} value={newForm.supplier}
+                <Label htmlFor="f-cp-fornecedor">Fornecedor</Label>
+                <Input id="f-cp-fornecedor" maxLength={100} value={newForm.supplier}
                   onChange={(e) => setNewForm({ ...newForm, supplier: e.target.value })} />
               </div>
               <div className="space-y-2">
-                <Label>Categoria</Label>
-                <Input maxLength={80} placeholder="ex: Aluguel, Utilities…" value={newForm.category}
+                <Label htmlFor="f-cp-categoria">Categoria</Label>
+                <Input id="f-cp-categoria" maxLength={80} placeholder="ex: Aluguel, Utilities…" value={newForm.category}
                   onChange={(e) => setNewForm({ ...newForm, category: e.target.value })} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label>{newForm.parcelado ? "Valor total (R$) *" : "Valor (R$) *"}</Label>
-                <Input type="number" min={0.01} step={0.01} required value={newForm.amount_due}
+                <Label htmlFor="f-cp-campo">{newForm.parcelado ? "Valor total (R$) *" : "Valor (R$) *"}</Label>
+                <Input id="f-cp-campo" type="number" min={0.01} step={0.01} required value={newForm.amount_due}
                   onChange={(e) => setNewForm({ ...newForm, amount_due: e.target.value })} />
               </div>
               <div className="space-y-2">
-                <Label>{newForm.parcelado ? "Data da primeira parcela *" : "Vencimento *"}</Label>
-                <Input type="date" required value={newForm.due_date}
+                <Label htmlFor="f-cp-campo-2">{newForm.parcelado ? "Data da primeira parcela *" : "Vencimento *"}</Label>
+                <Input id="f-cp-campo-2" type="date" required value={newForm.due_date}
                   onChange={(e) => setNewForm({ ...newForm, due_date: e.target.value })} />
               </div>
             </div>
             {newForm.parcelado && (
               <div className="space-y-2">
-                <Label>Quantidade de parcelas *</Label>
-                <Input type="number" min={2} step={1} required value={newForm.installments_count}
+                <Label htmlFor="f-cp-quantidade-de-parcelas">Quantidade de parcelas *</Label>
+                <Input id="f-cp-quantidade-de-parcelas" type="number" min={2} step={1} required value={newForm.installments_count}
                   onChange={(e) => setNewForm({ ...newForm, installments_count: e.target.value })} />
                 {Number(newForm.amount_due) > 0 && Number(newForm.installments_count) > 1 && (
                   <p className="text-xs text-muted-foreground">
@@ -1483,8 +1483,8 @@ export function PayablesPanel() {
               </div>
             )}
             <div className="space-y-2">
-              <Label>Observações</Label>
-              <Textarea rows={2} maxLength={500} value={newForm.notes}
+              <Label htmlFor="f-cp-observacoes">Observações</Label>
+              <Textarea id="f-cp-observacoes" rows={2} maxLength={500} value={newForm.notes}
                 onChange={(e) => setNewForm({ ...newForm, notes: e.target.value })} />
             </div>
             <DialogFooter>
@@ -1514,8 +1514,8 @@ export function PayablesPanel() {
               </div>
             )}
             <div className="space-y-2">
-              <Label>Valor a pagar (R$) *</Label>
-              <Input type="number" min={0.01} step={0.01} required value={payAmount}
+              <Label htmlFor="f-cp-valor-a-pagar-r">Valor a pagar (R$) *</Label>
+              <Input id="f-cp-valor-a-pagar-r" type="number" min={0.01} step={0.01} required value={payAmount}
                 onChange={(e) => setPayAmount(e.target.value)} />
             </div>
             {payTarget &&
@@ -1526,13 +1526,13 @@ export function PayablesPanel() {
                     Pagamento parcial — informe a nova data de vencimento do saldo restante.
                   </p>
                   <div className="space-y-2">
-                    <Label>Nova data de vencimento do saldo *</Label>
-                    <Input type="date" value={payRemainingDueDate}
+                    <Label htmlFor="f-cp-nova-data-de-vencimento-do-saldo">Nova data de vencimento do saldo *</Label>
+                    <Input id="f-cp-nova-data-de-vencimento-do-saldo" type="date" value={payRemainingDueDate}
                       onChange={(e) => setPayRemainingDueDate(e.target.value)} />
                   </div>
                   <div className="space-y-2">
-                    <Label>Motivo (opcional)</Label>
-                    <Input value={payRemainingDueReason}
+                    <Label htmlFor="f-cp-motivo-opcional">Motivo (opcional)</Label>
+                    <Input id="f-cp-motivo-opcional" value={payRemainingDueReason}
                       onChange={(e) => setPayRemainingDueReason(e.target.value)} />
                   </div>
                 </div>
@@ -1581,17 +1581,17 @@ export function PayablesPanel() {
                 </div>
               )}
             <div className="space-y-2">
-              <Label>Forma de pagamento</Label>
+              <Label htmlFor="f-cp-forma-de-pagamento">Forma de pagamento</Label>
               <Select value={payMethod} onValueChange={setPayMethod}>
-                <SelectTrigger><SelectValue placeholder="Selecione…" /></SelectTrigger>
+                <SelectTrigger id="f-cp-forma-de-pagamento"><SelectValue placeholder="Selecione…" /></SelectTrigger>
                 <SelectContent>
                   {PAYMENT_METHODS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Observações</Label>
-              <Textarea rows={2} value={payNotes} onChange={(e) => setPayNotes(e.target.value)} />
+              <Label htmlFor="f-cp-observacoes-2">Observações</Label>
+              <Textarea id="f-cp-observacoes-2" rows={2} value={payNotes} onChange={(e) => setPayNotes(e.target.value)} />
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setPayOpen(false)}>Cancelar</Button>
@@ -1708,8 +1708,8 @@ export function PayablesPanel() {
               </p>
             )}
             <div className="space-y-2">
-              <Label>Motivo {cancelTarget?.kind === "recorrente" ? "*" : "(opcional)"}</Label>
-              <Textarea rows={3} value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} />
+              <Label htmlFor="f-cp-motivo">Motivo {cancelTarget?.kind === "recorrente" ? "*" : "(opcional)"}</Label>
+              <Textarea id="f-cp-motivo" rows={3} value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} />
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setCancelOpen(false)}>Voltar</Button>
@@ -1769,38 +1769,38 @@ export function PayablesPanel() {
               </p>
             )}
             <div className="space-y-2">
-              <Label>Descrição *</Label>
-              <Input required maxLength={200} value={editForm.description}
+              <Label htmlFor="f-cp-descricao-2">Descrição *</Label>
+              <Input id="f-cp-descricao-2" required maxLength={200} value={editForm.description}
                 onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label>Fornecedor</Label>
-                <Input maxLength={100} value={editForm.supplier}
+                <Label htmlFor="f-cp-fornecedor-2">Fornecedor</Label>
+                <Input id="f-cp-fornecedor-2" maxLength={100} value={editForm.supplier}
                   onChange={(e) => setEditForm({ ...editForm, supplier: e.target.value })} />
               </div>
               <div className="space-y-2">
-                <Label>Categoria</Label>
-                <Input maxLength={80} value={editForm.category}
+                <Label htmlFor="f-cp-categoria-2">Categoria</Label>
+                <Input id="f-cp-categoria-2" maxLength={80} value={editForm.category}
                   onChange={(e) => setEditForm({ ...editForm, category: e.target.value })} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label>Valor (R$) *</Label>
-                <Input type="number" min={0.01} step={0.01} required value={editForm.amount_due}
+                <Label htmlFor="f-cp-valor-r">Valor (R$) *</Label>
+                <Input id="f-cp-valor-r" type="number" min={0.01} step={0.01} required value={editForm.amount_due}
                   onChange={(e) => setEditForm({ ...editForm, amount_due: e.target.value })} />
               </div>
               <div className="space-y-2">
-                <Label>Vencimento *</Label>
-                <Input type="date" required value={editForm.due_date}
+                <Label htmlFor="f-cp-vencimento">Vencimento *</Label>
+                <Input id="f-cp-vencimento" type="date" required value={editForm.due_date}
                   onChange={(e) => setEditForm({ ...editForm, due_date: e.target.value })} />
               </div>
             </div>
             {editTarget?.kind === "recorrente" && (
               <div className="space-y-2">
-                <Label>Dia de recorrência</Label>
-                <Input type="number" min={1} max={28} placeholder="ex: 10" value={editForm.recurrence_day}
+                <Label htmlFor="f-cp-dia-de-recorrencia">Dia de recorrência</Label>
+                <Input id="f-cp-dia-de-recorrencia" type="number" min={1} max={28} placeholder="ex: 10" value={editForm.recurrence_day}
                   onChange={(e) => setEditForm({ ...editForm, recurrence_day: e.target.value })} />
                 {editScope === "future" && (
                   <p className="text-xs text-muted-foreground">
@@ -1810,8 +1810,8 @@ export function PayablesPanel() {
               </div>
             )}
             <div className="space-y-2">
-              <Label>Observações</Label>
-              <Textarea rows={2} maxLength={500} value={editForm.notes}
+              <Label htmlFor="f-cp-observacoes-3">Observações</Label>
+              <Textarea id="f-cp-observacoes-3" rows={2} maxLength={500} value={editForm.notes}
                 onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} />
             </div>
             <DialogFooter>

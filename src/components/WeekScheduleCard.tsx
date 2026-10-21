@@ -133,13 +133,13 @@ export function WeekScheduleCard() {
           <CalendarDays className="h-5 w-5 text-primary" /> Reservas da semana
         </CardTitle>
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" onClick={() => setOffset((o) => o - 1)}>
+          <Button variant="ghost" size="icon" onClick={() => setOffset((o) => o - 1)} aria-label="Semana anterior">
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <Button variant="ghost" size="sm" onClick={() => setOffset(0)} disabled={offset === 0}>
             Hoje
           </Button>
-          <Button variant="ghost" size="icon" onClick={() => setOffset((o) => o + 1)}>
+          <Button variant="ghost" size="icon" onClick={() => setOffset((o) => o + 1)} aria-label="Próxima semana">
             <ChevronRight className="h-4 w-4" />
           </Button>
           <Link to="/calendario" className="ml-2 text-xs font-medium text-primary-ink underline-offset-4 hover:underline">

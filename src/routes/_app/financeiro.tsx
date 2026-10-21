@@ -1415,8 +1415,8 @@ function FinanceiroPage() {
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label>Valor pago (R$)</Label>
-                <Input
+                <Label htmlFor="f-valor-pago-r">Valor pago (R$)</Label>
+                <Input id="f-valor-pago-r"
                   type="number"
                   step="0.01"
                   value={payForm.amount_paid}
@@ -1424,8 +1424,8 @@ function FinanceiroPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Data do pagamento</Label>
-                <Input
+                <Label htmlFor="f-data-do-pagamento">Data do pagamento</Label>
+                <Input id="f-data-do-pagamento"
                   type="date"
                   value={payForm.paid_at}
                   onChange={(e) => setPayForm({ ...payForm, paid_at: e.target.value })}
@@ -1440,16 +1440,16 @@ function FinanceiroPage() {
                     Pagamento parcial — informe a nova data de vencimento do saldo restante.
                   </p>
                   <div className="space-y-2">
-                    <Label>Nova data de vencimento do saldo *</Label>
-                    <Input
+                    <Label htmlFor="f-nova-data-de-vencimento-do-saldo">Nova data de vencimento do saldo *</Label>
+                    <Input id="f-nova-data-de-vencimento-do-saldo"
                       type="date"
                       value={payForm.remaining_due_date}
                       onChange={(e) => setPayForm({ ...payForm, remaining_due_date: e.target.value })}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Motivo (opcional)</Label>
-                    <Input
+                    <Label htmlFor="f-motivo-opcional">Motivo (opcional)</Label>
+                    <Input id="f-motivo-opcional"
                       value={payForm.remaining_due_reason}
                       onChange={(e) => setPayForm({ ...payForm, remaining_due_reason: e.target.value })}
                     />
@@ -1490,12 +1490,12 @@ function FinanceiroPage() {
                 </div>
               )}
             <div className="space-y-2">
-              <Label>Forma de pagamento</Label>
+              <Label htmlFor="f-forma-de-pagamento">Forma de pagamento</Label>
               <Select
                 value={payForm.payment_method}
                 onValueChange={(v) => setPayForm({ ...payForm, payment_method: v })}
               >
-                <SelectTrigger>
+                <SelectTrigger id="f-forma-de-pagamento">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1508,18 +1508,18 @@ function FinanceiroPage() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Observação</Label>
-              <Textarea
+              <Label htmlFor="f-observacao">Observação</Label>
+              <Textarea id="f-observacao"
                 rows={3}
                 value={payForm.notes}
                 onChange={(e) => setPayForm({ ...payForm, notes: e.target.value })}
               />
             </div>
             <div className="space-y-2">
-              <Label className="flex items-center gap-2">
+              <Label htmlFor="f-comprovante-opcional" className="flex items-center gap-2">
                 <Paperclip className="h-4 w-4" /> Comprovante (opcional)
               </Label>
-              <Input
+              <Input id="f-comprovante-opcional"
                 type="file"
                 accept=".pdf,.png,.jpg,.jpeg"
                 onChange={(e) => setPayFile(e.target.files?.[0] ?? null)}
@@ -1581,8 +1581,8 @@ function FinanceiroPage() {
               })}
             </RadioGroup>
             <div className="space-y-2">
-              <Label>Motivo do estorno</Label>
-              <Textarea
+              <Label htmlFor="f-motivo-do-estorno">Motivo do estorno</Label>
+              <Textarea id="f-motivo-do-estorno"
                 rows={3}
                 value={revReason}
                 onChange={(e) => setRevReason(e.target.value)}
@@ -1637,8 +1637,8 @@ function FinanceiroPage() {
               </Label>
             </RadioGroup>
             <div className="space-y-2">
-              <Label>Motivo</Label>
-              <Textarea
+              <Label htmlFor="f-motivo">Motivo</Label>
+              <Textarea id="f-motivo"
                 rows={3}
                 value={cancelReason}
                 onChange={(e) => setCancelReason(e.target.value)}
@@ -1747,8 +1747,8 @@ function FinanceiroPage() {
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label>Valor previsto (R$)</Label>
-                <Input
+                <Label htmlFor="f-valor-previsto-r">Valor previsto (R$)</Label>
+                <Input id="f-valor-previsto-r"
                   type="number"
                   step="0.01"
                   value={editForm.amount_due}
@@ -1756,8 +1756,8 @@ function FinanceiroPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Vencimento</Label>
-                <Input
+                <Label htmlFor="f-vencimento">Vencimento</Label>
+                <Input id="f-vencimento"
                   type="date"
                   value={editForm.due_date}
                   onChange={(e) => setEditForm({ ...editForm, due_date: e.target.value })}
@@ -1765,8 +1765,8 @@ function FinanceiroPage() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Observação</Label>
-              <Textarea
+              <Label htmlFor="f-observacao-2">Observação</Label>
+              <Textarea id="f-observacao-2"
                 rows={3}
                 value={editForm.notes}
                 onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
@@ -1797,7 +1797,7 @@ function FinanceiroPage() {
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label>Profissional *</Label>
+                <Label htmlFor="f-profissional">Profissional *</Label>
                 <Select
                   value={newForm.professional_id}
                   onValueChange={(v) => {
@@ -1805,7 +1805,7 @@ function FinanceiroPage() {
                     setNewRoomIds([]);
                   }}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="f-profissional">
                     <SelectValue placeholder="Selecione..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -1818,7 +1818,7 @@ function FinanceiroPage() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Contrato (opcional)</Label>
+                <Label htmlFor="f-contrato-opcional">Contrato (opcional)</Label>
                 <Select
                   value={newForm.contract_id || "none"}
                   onValueChange={(v) => {
@@ -1831,7 +1831,7 @@ function FinanceiroPage() {
                   }}
                   disabled={!newForm.professional_id}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="f-contrato-opcional">
                     <SelectValue placeholder="Sem contrato (avulso)" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1849,20 +1849,20 @@ function FinanceiroPage() {
 
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-2">
-                <Label>Ano</Label>
-                <Input
+                <Label htmlFor="f-ano">Ano</Label>
+                <Input id="f-ano"
                   type="number"
                   value={newForm.year}
                   onChange={(e) => setNewForm({ ...newForm, year: Number(e.target.value) })}
                 />
               </div>
               <div className="space-y-2">
-                <Label>Mês</Label>
+                <Label htmlFor="f-mes">Mês</Label>
                 <Select
                   value={String(newForm.month)}
                   onValueChange={(v) => setNewForm({ ...newForm, month: Number(v) })}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="f-mes">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1875,8 +1875,8 @@ function FinanceiroPage() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Vencimento</Label>
-                <Input
+                <Label htmlFor="f-vencimento-2">Vencimento</Label>
+                <Input id="f-vencimento-2"
                   type="date"
                   value={newForm.due_date}
                   onChange={(e) => setNewForm({ ...newForm, due_date: e.target.value })}
@@ -1885,8 +1885,8 @@ function FinanceiroPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Valor (R$)</Label>
-              <Input
+              <Label htmlFor="f-valor-r">Valor (R$)</Label>
+              <Input id="f-valor-r"
                 type="number"
                 step="0.01"
                 value={newForm.amount_due}
@@ -1935,8 +1935,8 @@ function FinanceiroPage() {
 
 
             <div className="space-y-2">
-              <Label>Observação / motivo</Label>
-              <Textarea
+              <Label htmlFor="f-observacao-motivo">Observação / motivo</Label>
+              <Textarea id="f-observacao-motivo"
                 rows={2}
                 value={newForm.notes}
                 onChange={(e) => setNewForm({ ...newForm, notes: e.target.value })}

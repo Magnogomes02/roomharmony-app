@@ -983,8 +983,8 @@ function ContratosPage() {
 
           <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
             <div>
-              <Label className="text-xs text-muted-foreground">Valor mínimo (R$)</Label>
-              <Input
+              <Label htmlFor="f-valor-minimo-r" className="text-xs text-muted-foreground">Valor mínimo (R$)</Label>
+              <Input id="f-valor-minimo-r"
                 type="number" min="0" step="0.01" inputMode="decimal"
                 placeholder="0,00"
                 value={minValueFilter}
@@ -992,8 +992,8 @@ function ContratosPage() {
               />
             </div>
             <div>
-              <Label className="text-xs text-muted-foreground">Valor máximo (R$)</Label>
-              <Input
+              <Label htmlFor="f-valor-maximo-r" className="text-xs text-muted-foreground">Valor máximo (R$)</Label>
+              <Input id="f-valor-maximo-r"
                 type="number" min="0" step="0.01" inputMode="decimal"
                 placeholder="0,00"
                 value={maxValueFilter}
@@ -1133,13 +1133,13 @@ function ContratosPage() {
             <section className="space-y-4">
               <h3 className="font-serif text-lg">Profissional</h3>
               <div className="space-y-2">
-                <Label>Profissional (locatário) *</Label>
+                <Label htmlFor="f-profissional-locatario">Profissional (locatário) *</Label>
                 <Select
                   value={form.professional_id}
                   onValueChange={(v) => setForm({ ...form, professional_id: v })}
                   disabled={!!editing}
                 >
-                  <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                  <SelectTrigger id="f-profissional-locatario"><SelectValue placeholder="Selecione..." /></SelectTrigger>
                   <SelectContent>
                     {professionals.map((p) => (
                       <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>
@@ -1209,12 +1209,12 @@ function ContratosPage() {
                       >
                         <div className="grid grid-cols-12 items-end gap-2">
                           <div className="col-span-2 space-y-1">
-                            <Label className="text-xs">Dia</Label>
+                            <Label htmlFor={`f-dia-${i}`} className="text-xs">Dia</Label>
                             <Select
                               value={String(s.weekday)}
                               onValueChange={(v) => updateSchedule(i, { weekday: Number(v) })}
                             >
-                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectTrigger id={`f-dia-${i}`}><SelectValue /></SelectTrigger>
                               <SelectContent>
                                 {WEEKDAY_LABELS.map((lbl, idx) => (
                                   <SelectItem key={idx} value={String(idx)}>{lbl}</SelectItem>
@@ -1223,9 +1223,9 @@ function ContratosPage() {
                             </Select>
                           </div>
                           <div className="col-span-3 space-y-1">
-                            <Label className="text-xs">Sala</Label>
+                            <Label htmlFor={`f-sala-${i}`} className="text-xs">Sala</Label>
                             <Select value={s.room_id} onValueChange={(v) => updateSchedule(i, { room_id: v })}>
-                              <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                              <SelectTrigger id={`f-sala-${i}`}><SelectValue placeholder="Selecione" /></SelectTrigger>
                               <SelectContent>
                                 {rooms.filter((r) => r.active).map((r) => (
                                   <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
@@ -1234,12 +1234,12 @@ function ContratosPage() {
                             </Select>
                           </div>
                           <div className="col-span-2 space-y-1">
-                            <Label className="text-xs">Tipo</Label>
+                            <Label htmlFor={`f-tipo-${i}`} className="text-xs">Tipo</Label>
                             <Select
                               value={s._mode ?? "horario"}
                               onValueChange={(v) => setRowMode(i, v as "horario" | "turno")}
                             >
-                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectTrigger id={`f-tipo-${i}`}><SelectValue /></SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="horario">Horário</SelectItem>
                                 <SelectItem value="turno">Turno</SelectItem>
@@ -1248,12 +1248,12 @@ function ContratosPage() {
                           </div>
                           {s._mode === "turno" ? (
                             <div className="col-span-4 space-y-1">
-                              <Label className="text-xs">Turno</Label>
+                              <Label htmlFor={`f-turno-${i}`} className="text-xs">Turno</Label>
                               <Select
                                 value={s._shift ?? "manha"}
                                 onValueChange={(v) => setRowShift(i, v as ShiftKey)}
                               >
-                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectTrigger id={`f-turno-${i}`}><SelectValue /></SelectTrigger>
                                 <SelectContent>
                                   {(["manha", "tarde", "noite"] as ShiftKey[]).map((k) => (
                                     <SelectItem key={k} value={k}>
@@ -1266,13 +1266,13 @@ function ContratosPage() {
                           ) : (
                             <>
                               <div className="col-span-2 space-y-1">
-                                <Label className="text-xs">Início</Label>
-                                <Input type="time" value={s.start_time}
+                                <Label htmlFor={`f-inicio-${i}`} className="text-xs">Início</Label>
+                                <Input id={`f-inicio-${i}`} type="time" value={s.start_time}
                                   onChange={(e) => updateSchedule(i, { start_time: e.target.value })} />
                               </div>
                               <div className="col-span-2 space-y-1">
-                                <Label className="text-xs">Fim</Label>
-                                <Input type="time" value={s.end_time}
+                                <Label htmlFor={`f-fim-${i}`} className="text-xs">Fim</Label>
+                                <Input id={`f-fim-${i}`} type="time" value={s.end_time}
                                   onChange={(e) => updateSchedule(i, { end_time: e.target.value })} />
                               </div>
                             </>
@@ -1363,23 +1363,23 @@ function ContratosPage() {
               <h3 className="font-serif text-lg">Vigência e valor</h3>
               <div className="grid gap-4 sm:grid-cols-3">
                 <div className="space-y-2">
-                  <Label>Início *</Label>
-                  <Input type="date" required value={form.start_date}
+                  <Label htmlFor="f-inicio-2">Início *</Label>
+                  <Input id="f-inicio-2" type="date" required value={form.start_date}
                     onChange={(e) => setForm({ ...form, start_date: e.target.value })} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Término</Label>
-                  <Input type="date" value={form.end_date}
+                  <Label htmlFor="f-termino">Término</Label>
+                  <Input id="f-termino" type="date" value={form.end_date}
                     onChange={(e) => setForm({ ...form, end_date: e.target.value })} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Valor mensal (R$)</Label>
-                  <Input type="number" step="0.01" min="0" value={form.monthly_value}
+                  <Label htmlFor="f-valor-mensal-r">Valor mensal (R$)</Label>
+                  <Input id="f-valor-mensal-r" type="number" step="0.01" min="0" value={form.monthly_value}
                     onChange={(e) => setForm({ ...form, monthly_value: e.target.value })} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Dia de vencimento (1-28)</Label>
-                  <Input type="number" min="1" max="28" value={form.due_day}
+                  <Label htmlFor="f-dia-de-vencimento-1-28">Dia de vencimento (1-28)</Label>
+                  <Input id="f-dia-de-vencimento-1-28" type="number" min="1" max="28" value={form.due_day}
                     onChange={(e) => setForm({ ...form, due_day: e.target.value })} />
                 </div>
                 <div className="space-y-2 sm:col-span-3">
@@ -1458,15 +1458,15 @@ function ContratosPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>Cláusulas adicionais</Label>
-                <Textarea rows={6} maxLength={5000}
+                <Label htmlFor="f-clausulas-adicionais">Cláusulas adicionais</Label>
+                <Textarea id="f-clausulas-adicionais" rows={6} maxLength={5000}
                   value={form.extra_clauses}
                   onChange={(e) => setForm({ ...form, extra_clauses: e.target.value })} />
               </div>
 
               <div className="space-y-2">
-                <Label>Observações internas</Label>
-                <Textarea rows={3} maxLength={2000}
+                <Label htmlFor="f-observacoes-internas">Observações internas</Label>
+                <Textarea id="f-observacoes-internas" rows={3} maxLength={2000}
                   value={form.notes}
                   onChange={(e) => setForm({ ...form, notes: e.target.value })} />
               </div>
@@ -1477,18 +1477,18 @@ function ContratosPage() {
               <h3 className="font-serif text-lg">Assinatura</h3>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>Locador (assinante)</Label>
-                  <Input maxLength={150} value={form.locador_name}
+                  <Label htmlFor="f-locador-assinante">Locador (assinante)</Label>
+                  <Input id="f-locador-assinante" maxLength={150} value={form.locador_name}
                     onChange={(e) => setForm({ ...form, locador_name: e.target.value })} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Locatário (editável)</Label>
-                  <Input maxLength={150} value={form.signed_by_name}
+                  <Label htmlFor="f-locatario-editavel">Locatário (editável)</Label>
+                  <Input id="f-locatario-editavel" maxLength={150} value={form.signed_by_name}
                     onChange={(e) => setForm({ ...form, signed_by_name: e.target.value })} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Data de assinatura</Label>
-                  <Input type="date" value={form.signed_at}
+                  <Label htmlFor="f-data-de-assinatura">Data de assinatura</Label>
+                  <Input id="f-data-de-assinatura" type="date" value={form.signed_at}
                     onChange={(e) => setForm({ ...form, signed_at: e.target.value })} />
                 </div>
               </div>
@@ -1645,9 +1645,9 @@ function ContratosPage() {
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>A partir de qual mês o contrato encerra? *</Label>
+              <Label htmlFor="f-a-partir-de-qual-mes-o-contrato-">A partir de qual mês o contrato encerra? *</Label>
               <Select value={cancelEffectiveMonth} onValueChange={setCancelEffectiveMonth}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger id="f-a-partir-de-qual-mes-o-contrato-"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {cancelMonths.length === 0 ? (
                     <SelectItem value={cancelEffectiveMonth || "atual"}>
@@ -1678,8 +1678,8 @@ function ContratosPage() {
             </div>
             {cancelHasFee && (
               <div className="space-y-2">
-                <Label>Valor da multa (R$) *</Label>
-                <Input
+                <Label htmlFor="f-valor-da-multa-r">Valor da multa (R$) *</Label>
+                <Input id="f-valor-da-multa-r"
                   type="number" step="0.01" min="0.01"
                   value={cancelFeeAmount}
                   onChange={(e) => setCancelFeeAmount(e.target.value)}
@@ -1691,8 +1691,8 @@ function ContratosPage() {
             )}
 
             <div className="space-y-2">
-              <Label>Motivo do cancelamento *</Label>
-              <Textarea
+              <Label htmlFor="f-motivo-do-cancelamento">Motivo do cancelamento *</Label>
+              <Textarea id="f-motivo-do-cancelamento"
                 rows={3}
                 value={cancelReason}
                 onChange={(e) => setCancelReason(e.target.value)}

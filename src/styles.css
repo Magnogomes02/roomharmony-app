@@ -10,6 +10,11 @@
    ============================================== */
 
 @theme inline {
+  /* font-serif/font-sans do Tailwind apontam para as fontes da marca
+     (antes font-serif caía na serifa do sistema fora de h1–h4) */
+  --font-serif: 'Cormorant Garamond', 'Inter', serif;
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -101,7 +106,9 @@
 
   --border: oklch(0.92 0.015 85);               /* #E8E2D0 borda suave */
   --input: oklch(0.92 0.015 85);
-  --ring: oklch(0.78 0.14 85);
+  /* anel de foco em Dourado Tinta: ~5:1 sobre as superfícies claras e visível
+     ao redor do botão dourado (com respiro de 2px) */
+  --ring: oklch(0.50 0.10 80);
 
   --chart-1: oklch(0.78 0.14 85);
   --chart-2: oklch(0.62 0.08 145);

@@ -355,10 +355,13 @@ function ProfissionaisPage() {
                     <TableCell className="text-right">
                       {canEdit && (
                         <div className="flex justify-end gap-1">
-                          <Button size="icon" variant="ghost" onClick={() => openEdit(p)}>
+                          <Button size="icon" variant="ghost" onClick={() => openEdit(p)}
+                            title="Editar profissional" aria-label={`Editar ${p.full_name}`}>
                             <Pencil className="h-4 w-4" />
                           </Button>
-                          <Button size="icon" variant="ghost" onClick={() => toggleActive(p)}>
+                          <Button size="icon" variant="ghost" onClick={() => toggleActive(p)}
+                            title={p.active ? "Inativar profissional" : "Reativar profissional"}
+                            aria-label={`${p.active ? "Inativar" : "Reativar"} ${p.full_name}`}>
                             <Power className="h-4 w-4" />
                           </Button>
                         </div>
@@ -498,10 +501,12 @@ function ProfissionaisPage() {
                               <p className="text-xs text-muted-foreground truncate">{att.description}</p>
                             )}
                           </div>
-                          <Button type="button" size="icon" variant="ghost" onClick={() => downloadAttachment(att)}>
+                          <Button type="button" size="icon" variant="ghost" onClick={() => downloadAttachment(att)}
+                            title="Baixar anexo" aria-label="Baixar anexo">
                             <Download className="h-4 w-4" />
                           </Button>
-                          <Button type="button" size="icon" variant="ghost" onClick={() => deleteExisting(att)}>
+                          <Button type="button" size="icon" variant="ghost" onClick={() => deleteExisting(att)}
+                            title="Excluir anexo" aria-label="Excluir anexo">
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
                         </div>
@@ -516,8 +521,8 @@ function ProfissionaisPage() {
                         <div key={p.tmpId} className="space-y-2 rounded-md border p-3">
                           <div className="grid gap-2 sm:grid-cols-2">
                             <div className="space-y-1">
-                              <Label className="text-xs">Categoria</Label>
-                              <Input
+                              <Label htmlFor={`f-categoria-${p.tmpId}`} className="text-xs">Categoria</Label>
+                              <Input id={`f-categoria-${p.tmpId}`}
                                 placeholder="Ex.: Diploma, RG, Comprovante"
                                 value={p.category}
                                 maxLength={60}
@@ -525,8 +530,8 @@ function ProfissionaisPage() {
                               />
                             </div>
                             <div className="space-y-1">
-                              <Label className="text-xs">Descrição</Label>
-                              <Input
+                              <Label htmlFor={`f-descricao-${p.tmpId}`} className="text-xs">Descrição</Label>
+                              <Input id={`f-descricao-${p.tmpId}`}
                                 placeholder="Detalhe opcional"
                                 value={p.description}
                                 maxLength={250}
@@ -540,7 +545,8 @@ function ProfissionaisPage() {
                               accept={ACCEPT}
                               onChange={(e) => updatePending(p.tmpId, { file: e.target.files?.[0] ?? null })}
                             />
-                            <Button type="button" size="icon" variant="ghost" onClick={() => removePending(p.tmpId)}>
+                            <Button type="button" size="icon" variant="ghost" onClick={() => removePending(p.tmpId)}
+                              title="Remover anexo" aria-label="Remover anexo">
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                           </div>

@@ -66,10 +66,11 @@ export function NotificationBell() {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative h-8 w-8">
+        <Button variant="ghost" size="icon" className="relative h-8 w-8"
+          aria-label={unreadCount > 0 ? `Notificações (${unreadCount} não lidas)` : "Notificações"}>
           <Bell className="h-4 w-4" />
           {unreadCount > 0 && (
-            <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[9px] font-bold text-destructive-foreground">
+            <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
               {unreadCount > 9 ? "9+" : unreadCount}
             </span>
           )}
@@ -110,7 +111,7 @@ export function NotificationBell() {
                         </p>
                       )}
                       <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{n.message}</p>
-                      <p className="mt-1 text-[10px] text-muted-foreground/60">
+                      <p className="mt-1 text-[10px] text-muted-foreground">
                         {formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: ptBR })}
                       </p>
                     </div>

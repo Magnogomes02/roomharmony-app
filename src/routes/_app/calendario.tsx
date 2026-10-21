@@ -474,7 +474,7 @@ function CalendarioPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={() => setDate(addDays(date, -1))}>
+          <Button variant="outline" size="icon" onClick={() => setDate(addDays(date, -1))} aria-label="Dia anterior">
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <Button variant="outline" onClick={() => setDate(startOfDay(new Date()))}>Hoje</Button>
@@ -495,7 +495,7 @@ function CalendarioPage() {
               />
             </PopoverContent>
           </Popover>
-          <Button variant="outline" size="icon" onClick={() => setDate(addDays(date, 1))}>
+          <Button variant="outline" size="icon" onClick={() => setDate(addDays(date, 1))} aria-label="Próximo dia">
             <ChevronRight className="h-4 w-4" />
           </Button>
           {canEdit && (
@@ -519,9 +519,9 @@ function CalendarioPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Cor por</Label>
+              <Label htmlFor="f-cor-por" className="text-xs uppercase tracking-wide text-muted-foreground">Cor por</Label>
               <Select value={colorMode} onValueChange={(v) => setColorMode(v as ColorMode)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger id="f-cor-por"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="sala">Sala</SelectItem>
                   <SelectItem value="profissional">Profissional</SelectItem>
@@ -530,8 +530,8 @@ function CalendarioPage() {
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Status</Label>
+            <div className="space-y-2" role="group" aria-labelledby="filtro-status">
+              <Label id="filtro-status" className="text-xs uppercase tracking-wide text-muted-foreground">Status</Label>
               {["ativa", "conflito", "realocada", "cancelada"].map((s) => (
                 <label key={s} className="flex items-center gap-2 text-sm">
                   <Checkbox checked={statusFilter.has(s)} onCheckedChange={() => setStatusFilter((p) => toggleSet(p, s))} />
@@ -540,8 +540,8 @@ function CalendarioPage() {
               ))}
             </div>
 
-            <div className="space-y-2">
-              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Salas</Label>
+            <div className="space-y-2" role="group" aria-labelledby="filtro-salas">
+              <Label id="filtro-salas" className="text-xs uppercase tracking-wide text-muted-foreground">Salas</Label>
               <div className="max-h-40 space-y-1 overflow-auto">
                 {rooms.map((r) => (
                   <label key={r.id} className="flex items-center gap-2 text-sm">
@@ -556,8 +556,8 @@ function CalendarioPage() {
             </div>
 
             <div className="space-y-2">
-              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Profissionais</Label>
-              <Input placeholder="Buscar..." value={profSearch} onChange={(e) => setProfSearch(e.target.value)} className="h-8" />
+              <Label htmlFor="f-profissionais" className="text-xs uppercase tracking-wide text-muted-foreground">Profissionais</Label>
+              <Input id="f-profissionais" placeholder="Buscar..." value={profSearch} onChange={(e) => setProfSearch(e.target.value)} className="h-8" />
               <div className="max-h-48 space-y-1 overflow-auto">
                 {filteredProfsForFilter.map((p) => (
                   <label key={p.id} className="flex items-center gap-2 text-sm">
@@ -590,7 +590,7 @@ function CalendarioPage() {
                       const min = HOUR_START * 60 + i * SLOT_MINUTES;
                       const isHour = min % 60 === 0;
                       return (
-                        <div key={i} style={{ height: PX_PER_SLOT }} className={cn("border-b px-2 text-[10px]", isHour ? "text-foreground" : "text-muted-foreground/60")}>
+                        <div key={i} style={{ height: PX_PER_SLOT }} className={cn("border-b px-2 text-[10px]", isHour ? "text-foreground" : "text-muted-foreground")}>
                           {isHour ? `${String(Math.floor(min / 60)).padStart(2, "0")}:00` : ""}
                         </div>
                       );
@@ -615,6 +615,7 @@ function CalendarioPage() {
                                 key={i}
                                 type="button"
                                 disabled={!canEdit}
+                                aria-label={`Nova reserva na ${room.name} às ${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`}
                                 onClick={() => openNewAt(room.id, i)}
                                 style={{ height: PX_PER_SLOT }}
                                 className={cn(
@@ -698,18 +699,18 @@ function CalendarioPage() {
               <span className="text-xs text-muted-foreground">(não gera cobrança)</span>
             </label>
             <div className="space-y-2">
-              <Label>Sala</Label>
+              <Label htmlFor="f-sala">Sala</Label>
               <Select value={newForm.room_id} onValueChange={(v) => setNewForm({ ...newForm, room_id: v })}>
-                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectTrigger id="f-sala"><SelectValue placeholder="Selecione" /></SelectTrigger>
                 <SelectContent>
                   {rooms.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Responsável</Label>
+              <Label htmlFor="f-responsavel">Responsável</Label>
               <Select value={newForm.professional_id} onValueChange={(v) => setNewForm({ ...newForm, professional_id: v })}>
-                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectTrigger id="f-responsavel"><SelectValue placeholder="Selecione" /></SelectTrigger>
                 <SelectContent>
                   {professionals.map((p) => <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>)}
                 </SelectContent>
@@ -717,27 +718,27 @@ function CalendarioPage() {
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-2">
-                <Label>Início</Label>
-                <Input type="time" value={newForm.start} onChange={(e) => setNewForm({ ...newForm, start: e.target.value })} />
+                <Label htmlFor="f-inicio">Início</Label>
+                <Input id="f-inicio" type="time" value={newForm.start} onChange={(e) => setNewForm({ ...newForm, start: e.target.value })} />
               </div>
               <div className="space-y-2">
-                <Label>Fim</Label>
-                <Input type="time" value={newForm.end} onChange={(e) => setNewForm({ ...newForm, end: e.target.value })} />
+                <Label htmlFor="f-fim">Fim</Label>
+                <Input id="f-fim" type="time" value={newForm.end} onChange={(e) => setNewForm({ ...newForm, end: e.target.value })} />
               </div>
             </div>
             {!newForm.is_maintenance && (
               <>
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-2">
-                    <Label>Valor avulso (R$)</Label>
-                    <Input type="number" step="0.01" min="0" placeholder="0,00"
+                    <Label htmlFor="f-valor-avulso-r">Valor avulso (R$)</Label>
+                    <Input id="f-valor-avulso-r" type="number" step="0.01" min="0" placeholder="0,00"
                       value={newForm.avulso_amount}
                       onChange={(e) => setNewForm({ ...newForm, avulso_amount: e.target.value })} />
                   </div>
                   <div className="space-y-2">
-                    <Label>Pagamento</Label>
+                    <Label htmlFor="f-pagamento">Pagamento</Label>
                     <label className="flex h-10 items-center gap-2 rounded-md border px-3 text-sm">
-                      <Checkbox checked={newForm.avulso_paid}
+                      <Checkbox id="f-pagamento" checked={newForm.avulso_paid}
                         onCheckedChange={(v) => setNewForm({ ...newForm, avulso_paid: !!v })} />
                       Já pago no ato
                     </label>
@@ -804,9 +805,9 @@ function CalendarioPage() {
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-2">
-              <Label>Sala</Label>
+              <Label htmlFor="f-sala-2">Sala</Label>
               <Select value={reallocForm.room_id} onValueChange={(v) => setReallocForm({ ...reallocForm, room_id: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger id="f-sala-2"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {rooms.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
                 </SelectContent>
@@ -828,12 +829,12 @@ function CalendarioPage() {
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-2">
-                <Label>Início</Label>
-                <Input type="time" value={reallocForm.start} onChange={(e) => setReallocForm({ ...reallocForm, start: e.target.value })} />
+                <Label htmlFor="f-inicio-2">Início</Label>
+                <Input id="f-inicio-2" type="time" value={reallocForm.start} onChange={(e) => setReallocForm({ ...reallocForm, start: e.target.value })} />
               </div>
               <div className="space-y-2">
-                <Label>Fim</Label>
-                <Input type="time" value={reallocForm.end} onChange={(e) => setReallocForm({ ...reallocForm, end: e.target.value })} />
+                <Label htmlFor="f-fim-2">Fim</Label>
+                <Input id="f-fim-2" type="time" value={reallocForm.end} onChange={(e) => setReallocForm({ ...reallocForm, end: e.target.value })} />
               </div>
             </div>
           </div>

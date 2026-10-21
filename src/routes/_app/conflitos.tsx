@@ -397,9 +397,9 @@ function ConflitosPage() {
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-2">
-              <Label>Sala</Label>
+              <Label htmlFor="f-sala">Sala</Label>
               <Select value={adjustForm.room_id} onValueChange={(v) => setAdjustForm({ ...adjustForm, room_id: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger id="f-sala"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {rooms.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
                 </SelectContent>
@@ -423,13 +423,13 @@ function ConflitosPage() {
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-2">
-                <Label>Início</Label>
-                <Input type="time" value={adjustForm.start}
+                <Label htmlFor="f-inicio">Início</Label>
+                <Input id="f-inicio" type="time" value={adjustForm.start}
                   onChange={(e) => setAdjustForm({ ...adjustForm, start: e.target.value })} />
               </div>
               <div className="space-y-2">
-                <Label>Fim</Label>
-                <Input type="time" value={adjustForm.end}
+                <Label htmlFor="f-fim">Fim</Label>
+                <Input id="f-fim" type="time" value={adjustForm.end}
                   onChange={(e) => setAdjustForm({ ...adjustForm, end: e.target.value })} />
               </div>
             </div>
@@ -453,8 +453,8 @@ function ConflitosPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
-            <Label>Observação</Label>
-            <Textarea rows={3} value={resolveForm.notes}
+            <Label htmlFor="f-observacao">Observação</Label>
+            <Textarea id="f-observacao" rows={3} value={resolveForm.notes}
               onChange={(e) => setResolveForm({ ...resolveForm, notes: e.target.value })}
               placeholder="Ex.: Profissionais combinaram a troca diretamente." />
           </div>
