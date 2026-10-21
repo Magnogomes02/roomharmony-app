@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { countPendingConflicts, findOverlappingBookings, registerBookingConflicts } from "@/lib/scheduleConflicts";
 
 export const Route = createFileRoute("/_app/conflitos")({
   component: ConflitosPage,
@@ -197,25 +198,51 @@ function ConflitosPage() {
     }).eq("id", target.id);
     if (error) { toast.error("Erro ao ajustar", { description: error.message }); return; }
 
-    // se o outro lado não tem mais sobreposição com este, reativa
     const other = conflict.a?.id === target.id ? conflict.b : conflict.a;
-    if (other) {
-      const oStart = parseISO(other.start_at), oEnd = parseISO(other.end_at);
-      const stillOverlap =
-        other.room_id === room_id && oStart < newEnd && oEnd > newStart;
-      if (!stillOverlap && other.status === "conflito") {
-        await supabase.from("bookings").update({ status: "ativa" }).eq("id", other.id);
+    let stillOverlapsOther = false;
+    let newConflicts = 0;
+    try {
+      // o novo horário pode continuar sobreposto (o gestor confirmou): nesse
+      // caso o conflito segue pendente, em vez de ser marcado como resolvido
+      const overlapping = await findOverlappingBookings(room_id, newStart, newEnd, [target.id]);
+      stillOverlapsOther = !!other && overlapping.some((o) => o.id === other.id);
+      newConflicts = await registerBookingConflicts(target.id, room_id, overlapping);
+
+      if (!stillOverlapsOther) {
+        const { error: resErr } = await supabase.from("booking_conflicts").update({
+          status: "resolvido",
+          resolved_at: new Date().toISOString(),
+          resolution_notes: "Reserva ajustada para outra sala ou horário.",
+        }).eq("id", conflict.id);
+        if (resErr) throw resErr;
+        // o outro lado só volta a "ativa" se não tiver mais nenhum conflito pendente
+        if (other && other.status === "conflito" && (await countPendingConflicts(other.id)) === 0) {
+          await supabase.from("bookings").update({ status: "ativa" }).eq("id", other.id);
+        }
       }
+    } catch (e) {
+      toast.error("Ajuste salvo, mas não foi possível atualizar os conflitos", {
+        description: e instanceof Error ? e.message : String(e),
+      });
+      load();
+      return;
     }
 
-    await supabase.from("booking_conflicts").update({
-      status: "resolvido",
-      resolved_at: new Date().toISOString(),
-      resolution_notes: `Reserva ${target.id.slice(0, 8)} ajustada (sala/horário).`,
-    }).eq("id", conflict.id);
-
-    await audit("conflict.adjust", conflict.id, { booking_id: target.id, room_id, start: newStart.toISOString(), end: newEnd.toISOString() });
-    toast.success("Conflito ajustado");
+    await audit("conflict.adjust", conflict.id, {
+      booking_id: target.id, room_id, start: newStart.toISOString(), end: newEnd.toISOString(),
+      still_pending: stillOverlapsOther, new_conflicts: newConflicts,
+    });
+    if (stillOverlapsOther) {
+      toast.warning("Ajuste salvo, mas as reservas ainda se sobrepõem", {
+        description: "O conflito continua pendente.",
+      });
+    } else if (newConflicts > 0) {
+      toast.warning("Conflito resolvido, mas o novo horário gerou outro conflito", {
+        description: "Confira a lista de conflitos pendentes.",
+      });
+    } else {
+      toast.success("Conflito resolvido");
+    }
     setAdjustOpen(false);
     load();
   }

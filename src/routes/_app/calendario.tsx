@@ -29,6 +29,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { entityColor, isValidHex, sortRooms } from "@/lib/entityColors";
+import { toDateOnlyString } from "@/lib/dateOnly";
+import { findOverlappingBookings, registerBookingConflicts } from "@/lib/scheduleConflicts";
 
 export const Route = createFileRoute("/_app/calendario")({
   component: CalendarioPage,
@@ -203,6 +205,19 @@ function CalendarioPage() {
     return ((data as Booking[]) ?? []).filter((b) => b.id !== ignoreId);
   }
 
+  // Sobreposição aceita pelo gestor vira conflito pendente (aparece em
+  // Conflitos e no Dashboard) em vez de duas reservas "ativas" invisíveis.
+  async function registerForcedConflict(bookingId: string, roomId: string, start: Date, end: Date) {
+    try {
+      const overlapping = await findOverlappingBookings(roomId, start, end, [bookingId]);
+      await registerBookingConflicts(bookingId, roomId, overlapping);
+    } catch (e) {
+      toast.warning("Reserva salva, mas o conflito não foi registrado", {
+        description: `Confira a sala na tela Conflitos. (${e instanceof Error ? e.message : String(e)})`,
+      });
+    }
+  }
+
   async function audit(action: string, entity_id: string | null, metadata: Json) {
     const { data: { user: auditUser } } = await supabase.auth.getUser();
     if (!auditUser) return;
@@ -278,8 +293,8 @@ function CalendarioPage() {
 
     // gera recebível avulso se há valor e não é manutenção
     if (!newForm.is_maintenance && amountNum && amountNum > 0) {
-      const today = new Date().toISOString().slice(0, 10);
-      const monthRef = new Date(start.getFullYear(), start.getMonth(), 1).toISOString().slice(0, 10);
+      const today = toDateOnlyString(new Date());
+      const monthRef = toDateOnlyString(new Date(start.getFullYear(), start.getMonth(), 1));
       const recPayload = {
         kind: "avulso" as const,
         booking_id: data!.id,
@@ -300,6 +315,8 @@ function CalendarioPage() {
         });
       }
     }
+
+    if (force && data) await registerForcedConflict(data.id, newForm.room_id, start, end);
 
     await audit("booking.create", data?.id ?? null, { source: newForm.is_maintenance ? "manutencao" : "avulsa", is_maintenance: newForm.is_maintenance, forced_conflict: force, amount: amountNum });
 
@@ -370,6 +387,8 @@ function CalendarioPage() {
     }).eq("id", detailBooking.id);
     if (e2) { toast.error("Erro ao atualizar original", { description: e2.message }); return; }
 
+    if (force && novo) await registerForcedConflict(novo.id, reallocForm.room_id, start, end);
+
     await audit("booking.reallocate", detailBooking.id, { to: novo?.id, forced_conflict: force });
     toast.success("Reserva realocada");
     setReallocOpen(false);
@@ -383,7 +402,8 @@ function CalendarioPage() {
       const { data: contracts } = await supabase
         .from("contracts")
         .select("id,professional_id,start_date,end_date,status")
-        .in("status", ["assinado", "ativo", "rascunho"]);
+        // só contratos vigentes geram agenda; rascunhos ainda não foram fechados
+        .eq("status", "ativo");
       const { data: schedules } = await supabase
         .from("contract_schedules")
         .select("id,contract_id,room_id,weekday,start_time,end_time");
@@ -394,7 +414,7 @@ function CalendarioPage() {
       // janela
       const from = startOfDay(genFrom);
       const to = startOfDay(genTo);
-      let created = 0, skipped = 0;
+      let created = 0, skipped = 0, failed = 0;
 
       for (let d = new Date(from); d <= to; d = addDays(d, 1)) {
         const weekday = d.getDay();
@@ -428,11 +448,18 @@ function CalendarioPage() {
             source: "recorrencia",
             contract_id: c.id,
           });
-          if (!error) created++;
+          if (error) failed++;
+          else created++;
         }
       }
-      await audit("booking.generate", null, { from: from.toISOString(), to: to.toISOString(), created, skipped });
-      toast.success(`Geração concluída`, { description: `${created} criadas, ${skipped} já existentes.` });
+      await audit("booking.generate", null, { from: from.toISOString(), to: to.toISOString(), created, skipped, failed });
+      if (failed > 0) {
+        toast.warning("Geração concluída com falhas", {
+          description: `${created} criadas, ${skipped} já existentes, ${failed} não puderam ser criadas. Tente gerar de novo.`,
+        });
+      } else {
+        toast.success("Geração concluída", { description: `${created} criadas, ${skipped} já existentes.` });
+      }
       setGenOpen(false);
       loadBookings();
     } finally {

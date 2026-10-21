@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Plus, Pencil, Power, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,6 +15,16 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { entityColor, sortRooms } from "@/lib/entityColors";
 
@@ -42,6 +52,7 @@ function SalasPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
+  const [deactivateTarget, setDeactivateTarget] = useState<{ room: Room; futureBookings: number } | null>(null);
   const [editing, setEditing] = useState<Room | null>(null);
   const [form, setForm] = useState(empty);
   const [saving, setSaving] = useState(false);
@@ -102,10 +113,26 @@ function SalasPage() {
   }
 
   async function toggleActive(r: Room) {
-    const { error } = await supabase.from("rooms").update({ active: !r.active }).eq("id", r.id);
+    if (r.active) {
+      // salas inativas somem do Calendário: avisa antes se há reservas futuras
+      const { count, error } = await supabase
+        .from("bookings")
+        .select("id", { count: "exact", head: true })
+        .eq("room_id", r.id)
+        .in("status", ["ativa", "conflito"])
+        .gte("start_at", new Date().toISOString());
+      if (error) return toast.error("Erro ao verificar reservas", { description: error.message });
+      setDeactivateTarget({ room: r, futureBookings: count ?? 0 });
+      return;
+    }
+    await setRoomActive(r, true);
+  }
+
+  async function setRoomActive(r: Room, active: boolean) {
+    const { error } = await supabase.from("rooms").update({ active }).eq("id", r.id);
     if (error) return toast.error("Erro", { description: error.message });
-    toast.success(r.active ? "Sala inativada" : "Sala reativada");
-    await logAudit("room.toggle_active", r.id, { active: !r.active });
+    toast.success(active ? "Sala reativada" : "Sala inativada");
+    await logAudit("room.toggle_active", r.id, { active });
     load();
   }
 
@@ -188,10 +215,13 @@ function SalasPage() {
                     <TableCell className="text-right">
                       {canEdit && (
                         <div className="flex justify-end gap-1">
-                          <Button size="icon" variant="ghost" onClick={() => openEdit(r)}>
+                          <Button size="icon" variant="ghost" onClick={() => openEdit(r)}
+                            title="Editar sala" aria-label={`Editar ${r.name}`}>
                             <Pencil className="h-4 w-4" />
                           </Button>
-                          <Button size="icon" variant="ghost" onClick={() => toggleActive(r)}>
+                          <Button size="icon" variant="ghost" onClick={() => toggleActive(r)}
+                            title={r.active ? "Inativar sala" : "Reativar sala"}
+                            aria-label={`${r.active ? "Inativar" : "Reativar"} ${r.name}`}>
                             <Power className="h-4 w-4" />
                           </Button>
                         </div>
@@ -271,6 +301,43 @@ function SalasPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!deactivateTarget} onOpenChange={(o) => { if (!o) setDeactivateTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-serif">Inativar {deactivateTarget?.room.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deactivateTarget && deactivateTarget.futureBookings > 0 ? (
+                <>
+                  Esta sala tem <strong>{deactivateTarget.futureBookings} reserva(s) futura(s)</strong>.
+                  Salas inativas não aparecem no Calendário, então essas reservas ficariam escondidas.
+                  Realoque-as para outra sala antes de inativar.
+                </>
+              ) : (
+                "A sala deixa de aparecer no Calendário e não poderá receber novas reservas até ser reativada."
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            {deactivateTarget && deactivateTarget.futureBookings > 0 && (
+              <Button variant="outline" asChild>
+                <Link to="/realocacao">Ir para Realocação</Link>
+              </Button>
+            )}
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                const target = deactivateTarget;
+                setDeactivateTarget(null);
+                if (target) setRoomActive(target.room, false);
+              }}
+            >
+              {deactivateTarget && deactivateTarget.futureBookings > 0 ? "Inativar mesmo assim" : "Inativar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

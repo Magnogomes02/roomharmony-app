@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toDateOnlyString } from "@/lib/dateOnly";
+import { DEFAULT_SHIFTS, loadShiftDefaults, type ShiftDefaults, type ShiftKey } from "@/lib/shifts";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/realocacao")({
@@ -44,7 +45,15 @@ interface PlanItem {
 }
 interface LogRow { id: string; created_at: string; metadata: Json }
 
-const SHIFTS = { todos: [0, 24], manha: [0, 12], tarde: [12, 18], noite: [18, 24] } as const;
+const SHIFT_NAMES: Record<ShiftKey, string> = { manha: "Manhã", tarde: "Tarde", noite: "Noite" };
+
+type ShiftFilter = "todos" | ShiftKey;
+
+const minutesOfDay = (d: Date) => d.getHours() * 60 + d.getMinutes();
+const toMinutes = (hhmm: string) => {
+  const [h, m] = hhmm.split(":").map(Number);
+  return h * 60 + m;
+};
 const REASONS = ["Manutenção emergencial", "Reforma da sala", "Dedetização/limpeza", "Solicitação do profissional", "Outro"];
 
 function RealocacaoPage() {
@@ -59,7 +68,8 @@ function RealocacaoPage() {
   const [originRoom, setOriginRoom] = useState("");
   const [fromDate, setFromDate] = useState(today);
   const [toDate, setToDate] = useState(today);
-  const [shift, setShift] = useState<keyof typeof SHIFTS>("todos");
+  const [shift, setShift] = useState<ShiftFilter>("todos");
+  const [shiftDefs, setShiftDefs] = useState<ShiftDefaults>(DEFAULT_SHIFTS);
   const [profFilter, setProfFilter] = useState("todos");
   const [reason, setReason] = useState(REASONS[0]);
   const [notes, setNotes] = useState("");
@@ -90,6 +100,7 @@ function RealocacaoPage() {
       ]);
       setRooms((r.data as Room[]) ?? []);
       setProfs((p.data as Prof[]) ?? []);
+      setShiftDefs(await loadShiftDefaults());
     })();
     loadLogs();
   }, []);
@@ -109,10 +120,14 @@ function RealocacaoPage() {
       if (profFilter !== "todos") q = q.eq("professional_id", profFilter);
       const { data, error } = await q;
       if (error) throw error;
-      const [h0, h1] = SHIFTS[shift];
+      // turnos configurados em Preferências; a reserva entra no turno quando
+      // ocupa pelo menos parte dele
+      const range = shift === "todos" ? null : shiftDefs[shift];
       const source = ((data as Booking[]) ?? []).filter((b) => {
-        const h = new Date(b.start_at).getHours();
-        return h >= h0 && h < h1;
+        if (!range) return true;
+        const bStart = minutesOfDay(new Date(b.start_at));
+        const bEnd = minutesOfDay(new Date(b.end_at)) || 24 * 60;
+        return bStart < toMinutes(range.end) && bEnd > toMinutes(range.start);
       });
       if (source.length === 0) { setPlan([]); setStep(3); return; }
 
@@ -241,11 +256,15 @@ function RealocacaoPage() {
             <div className="space-y-1.5"><Label>Data inicial</Label><Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} /></div>
             <div className="space-y-1.5"><Label>Data final</Label><Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} /></div>
             <div className="space-y-1.5"><Label>Turno</Label>
-              <Select value={shift} onValueChange={(v) => setShift(v as keyof typeof SHIFTS)}>
+              <Select value={shift} onValueChange={(v) => setShift(v as ShiftFilter)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="todos">Todos</SelectItem><SelectItem value="manha">Manhã</SelectItem>
-                  <SelectItem value="tarde">Tarde</SelectItem><SelectItem value="noite">Noite</SelectItem>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  {(["manha", "tarde", "noite"] as ShiftKey[]).map((k) => (
+                    <SelectItem key={k} value={k}>
+                      {SHIFT_NAMES[k]} ({shiftDefs[k].start}–{shiftDefs[k].end})
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

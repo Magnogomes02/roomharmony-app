@@ -196,3 +196,77 @@ export function suggestAlternatives(
 
 export const TIMELINE_START_MIN = 6 * 60;
 export const TIMELINE_END_MIN = 22 * 60;
+
+export interface OverlappingBooking {
+  id: string;
+  status: string;
+}
+
+/** Reservas ativas ou em conflito que se sobrepõem ao intervalo na sala. */
+export async function findOverlappingBookings(
+  roomId: string,
+  start: Date,
+  end: Date,
+  ignoreIds: string[] = [],
+): Promise<OverlappingBooking[]> {
+  const { data, error } = await supabase
+    .from("bookings")
+    .select("id,status")
+    .eq("room_id", roomId)
+    .in("status", ["ativa", "conflito"])
+    .lt("start_at", end.toISOString())
+    .gt("end_at", start.toISOString());
+  if (error) throw error;
+  return ((data ?? []) as OverlappingBooking[]).filter((b) => !ignoreIds.includes(b.id));
+}
+
+/**
+ * Registra uma sobreposição aceita pelo gestor ("continuar mesmo assim"):
+ * cria o conflito pendente para cada par que ainda não tem um, e marca as
+ * reservas envolvidas como "conflito". Assim a sobreposição aparece em
+ * Conflitos e no Dashboard em vez de ficar invisível.
+ * Retorna quantos conflitos novos foram criados.
+ */
+export async function registerBookingConflicts(
+  bookingId: string,
+  roomId: string,
+  overlapping: OverlappingBooking[],
+): Promise<number> {
+  if (overlapping.length === 0) return 0;
+  const otherIds = overlapping.map((o) => o.id);
+  const { data: existing, error: exErr } = await supabase
+    .from("booking_conflicts")
+    .select("booking_id_a,booking_id_b")
+    .eq("status", "pendente")
+    .or(`booking_id_a.eq.${bookingId},booking_id_b.eq.${bookingId}`);
+  if (exErr) throw exErr;
+  const alreadyPaired = new Set(
+    (existing ?? []).map((c) => (c.booking_id_a === bookingId ? c.booking_id_b : c.booking_id_a)),
+  );
+  const toInsert = otherIds
+    .filter((id) => !alreadyPaired.has(id))
+    .map((id) => ({ booking_id_a: bookingId, booking_id_b: id, room_id: roomId, status: "pendente" }));
+  if (toInsert.length > 0) {
+    const { error } = await supabase.from("booking_conflicts").insert(toInsert);
+    if (error) throw error;
+  }
+  const { error: stErr } = await supabase
+    .from("bookings")
+    .update({ status: "conflito" })
+    .in("id", [bookingId, ...overlapping.filter((o) => o.status === "ativa").map((o) => o.id)]);
+  if (stErr) throw stErr;
+  return toInsert.length;
+}
+
+/** Quantos conflitos pendentes a reserva ainda tem, ignorando um deles. */
+export async function countPendingConflicts(bookingId: string, ignoreConflictId?: string): Promise<number> {
+  let q = supabase
+    .from("booking_conflicts")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "pendente")
+    .or(`booking_id_a.eq.${bookingId},booking_id_b.eq.${bookingId}`);
+  if (ignoreConflictId) q = q.neq("id", ignoreConflictId);
+  const { count, error } = await q;
+  if (error) throw error;
+  return count ?? 0;
+}
