@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { parseDateOnlyLocal, toDateOnlyString } from "@/lib/dateOnly";
+import { toCents } from "@/lib/money";
 
 export type PaymentStatus = "ativo" | "estornado" | "cancelado";
 
@@ -33,10 +34,9 @@ export type EffectiveStatus = "a_receber" | "parcial" | "recebido" | "atrasado" 
 
 export function computeEffectiveStatus(r: ReceivableLikeFull): EffectiveStatus {
   if (r.status === "cancelado") return "cancelado";
-  const due = Number(r.amount_due) || 0;
-  const paid = Number(r.amount_paid) || 0;
-  const credit = Number(r.credit_applied_amount) || 0;
-  const effectivePaid = paid + credit;
+  // comparação em centavos inteiros (evita 30,2999… < 30,30)
+  const due = toCents(r.amount_due);
+  const effectivePaid = toCents(r.amount_paid) + toCents(r.credit_applied_amount);
   if (effectivePaid >= due && due > 0) return "recebido";
   const today = new Date();
   today.setHours(0, 0, 0, 0);

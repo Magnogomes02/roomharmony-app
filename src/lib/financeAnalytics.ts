@@ -3,6 +3,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 import { getMonthIndexFromDateOnly, getYearFromDateOnly } from "@/lib/dateOnly";
+import { summarizeReceivables, type ReceivableTotalsRow } from "@/lib/receivableTotals";
 
 export interface MonthlyFinancialSummary {
   month: string; // YYYY-MM
@@ -82,8 +83,8 @@ export async function loadAnnualFinancialSummary(year: number): Promise<AnnualFi
     supabase
       .from("receivables")
       .select("reference_month,due_date,amount_due,amount_paid,status,cancel_type,credit_applied_amount,remaining_due_date")
-      .gte("reference_month", start)
-      .lte("reference_month", end),
+      .gte("due_date", start)
+      .lte("due_date", end),
     supabase
       .from("payables")
       .select("reference_month,due_date,amount_due,amount_paid,status")
@@ -119,43 +120,22 @@ export async function loadAnnualFinancialSummary(year: number): Promise<AnnualFi
     };
   });
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
+  // regra única de totais (Dashboard, Financeiro e Análise): cada recebível
+  // conta no mês do vencimento; ver src/lib/receivableTotals.ts
+  const rowsByMonth: ReceivableRow[][] = Array.from({ length: 12 }, () => []);
   for (const r of rows) {
-    const refYear = getYearFromDateOnly(r.reference_month);
-    if (refYear !== year) continue;
-    const idx = getMonthIndexFromDateOnly(r.reference_month);
-    const bucket = monthly[idx];
-    if (!bucket) continue;
-
-    // cobrança gerada errada não entra em previsto/recebido/perda
-    if (r.status === "cancelado" && r.cancel_type === "cobranca_errada") continue;
-
-    const due = num(r.amount_due);
-    const paid = num(r.amount_paid);
-    const credit = num(r.credit_applied_amount);
-    bucket.expected += due;
-
-    // pagamento parcial conta como recebido (crédito aplicado não é dinheiro novo)
-    if (paid > 0) bucket.received += Math.min(paid, due);
-
-    if (r.status === "cancelado") {
-      // perda = saldo aberto (perda_contrato é o único cenário restante)
-      const saldo = Math.max(due - paid - credit, 0);
-      bucket.lost += saldo;
-      continue;
-    }
-
-    const saldo = Math.max(due - paid - credit, 0);
-    if (saldo > 0) {
-      const effectivePaid = paid + credit;
-      const refDateStr = effectivePaid > 0 && r.remaining_due_date ? r.remaining_due_date : r.due_date;
-      const dueDate = new Date(refDateStr + "T12:00:00");
-      if (dueDate < today) bucket.overdue += saldo;
-      else bucket.receivable += saldo;
-    }
+    if (getYearFromDateOnly(r.due_date) !== year) continue;
+    rowsByMonth[getMonthIndexFromDateOnly(r.due_date)]?.push(r);
   }
+  rowsByMonth.forEach((monthRows, idx) => {
+    const t = summarizeReceivables(monthRows as ReceivableTotalsRow[]);
+    const bucket = monthly[idx];
+    bucket.expected = t.expected;
+    bucket.received = t.received;
+    bucket.receivable = t.toReceive;
+    bucket.overdue = t.overdue;
+    bucket.lost = t.lost;
+  });
 
   // Aggregate payables by month (reference_month preferred, fallback to due_date)
   for (const p of payRows) {

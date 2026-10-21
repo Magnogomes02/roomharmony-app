@@ -11,10 +11,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { WeekScheduleByRoomCard } from "@/components/WeekScheduleByRoomCard";
 import { startOfMonth, endOfMonth, startOfWeek, addDays } from "date-fns";
 import { parseDateOnlyLocal, formatDateOnlyBR, toDateOnlyString } from "@/lib/dateOnly";
-import { computeEffectiveStatus as computeReceivableEffectiveStatus } from "@/lib/paymentsService";
 import { computeEffectiveStatus as computePayableEffectiveStatus, generateRecurringForYear } from "@/lib/payablesStatus";
 import { createNotification } from "@/lib/notifications";
 import { applyPendingCredits } from "@/lib/creditApplications";
+import { summarizeReceivables, type ReceivableTotalsRow } from "@/lib/receivableTotals";
 
 export const Route = createFileRoute("/_app/dashboard")({
   component: DashboardPage,
@@ -53,7 +53,7 @@ function DashboardPage() {
           .gt("end_at", weekStart.toISOString())
           .in("status", ["ativa", "conflito"]),
         supabase.from("booking_conflicts").select("id", { count: "exact", head: true }).eq("status", "pendente"),
-        supabase.from("receivables").select("kind,status,due_date,amount_due,amount_paid,credit_applied_amount,remaining_due_date")
+        supabase.from("receivables").select("kind,status,cancel_type,due_date,amount_due,amount_paid,credit_applied_amount,remaining_due_date")
           .gte("due_date", monthStart).lte("due_date", monthEnd),
         supabase.from("payables").select("kind,status,due_date,amount_due,amount_paid,credit_applied_amount,remaining_due_date")
           .gte("reference_month", monthStart).lte("reference_month", monthEnd)
@@ -70,26 +70,13 @@ function DashboardPage() {
         recebidoContrato: 0, recebidoAvulso: 0,
         atrasadoContrato: 0, atrasadoAvulso: 0,
       };
-      for (const r of (receivables.data ?? []) as { kind: string; status: string; due_date: string; amount_due: number; amount_paid: number | null; credit_applied_amount: number | null; remaining_due_date: string | null }[]) {
-        if (r.status === "cancelado") continue;
-        const due = Number(r.amount_due);
-        const paid = Number(r.amount_paid ?? 0);
-        const credit = Number(r.credit_applied_amount ?? 0);
-        const saldo = Math.max(due - paid - credit, 0);
-        const k = r.kind === "avulso" ? "Avulso" : "Contrato";
-        const effectiveStatus = computeReceivableEffectiveStatus({
-          status: r.status,
-          due_date: r.due_date,
-          amount_due: due,
-          amount_paid: paid,
-          credit_applied_amount: credit,
-          remaining_due_date: r.remaining_due_date,
-        });
-        if (paid > 0) fin[`recebido${k}` as keyof typeof fin] += paid;
-        if (saldo > 0) {
-          if (effectiveStatus === "atrasado") fin[`atrasado${k}` as keyof typeof fin] += saldo;
-          else fin[`aReceber${k}` as keyof typeof fin] += saldo;
-        }
+      // regra única de totais (Dashboard, Financeiro e Análise): src/lib/receivableTotals.ts
+      const recRows = (receivables.data ?? []) as (ReceivableTotalsRow & { kind: string })[];
+      for (const [k, kind] of [["Contrato", "contrato"], ["Avulso", "avulso"]] as const) {
+        const t = summarizeReceivables(recRows.filter((r) => r.kind === kind));
+        fin[`aReceber${k}`] = t.toReceive;
+        fin[`recebido${k}`] = t.received;
+        fin[`atrasado${k}`] = t.overdue;
       }
 
       const pag = {
@@ -240,7 +227,7 @@ function DashboardPage() {
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 sm:grid-cols-3">
-            <FinBlock label="A vencer" total={(f?.aReceberContrato ?? 0) + (f?.aReceberAvulso ?? 0)}
+            <FinBlock label="A receber" total={(f?.aReceberContrato ?? 0) + (f?.aReceberAvulso ?? 0)}
               item1={f?.aReceberContrato ?? 0} item2={f?.aReceberAvulso ?? 0} tone="warning" loading={isLoading} />
             <FinBlock label="Recebido" total={(f?.recebidoContrato ?? 0) + (f?.recebidoAvulso ?? 0)}
               item1={f?.recebidoContrato ?? 0} item2={f?.recebidoAvulso ?? 0} tone="success" loading={isLoading} />

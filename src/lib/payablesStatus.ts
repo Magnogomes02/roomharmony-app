@@ -1,6 +1,7 @@
 import { startOfMonth, endOfMonth, getDaysInMonth } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { toDateOnlyString } from "@/lib/dateOnly";
+import { toCents } from "@/lib/money";
 
 export type PayableStatus = "a_pagar" | "parcial" | "pago" | "atrasado" | "cancelado";
 
@@ -25,10 +26,9 @@ interface PayableStatusInput {
 
 export function computeEffectiveStatus(p: PayableStatusInput): PayableStatus {
   if (p.status === "cancelado") return "cancelado";
-  const paid = Number(p.amount_paid ?? 0);
-  const credit = Number(p.credit_applied_amount ?? 0);
-  const due = Number(p.amount_due);
-  const effectivePaid = paid + credit;
+  // comparação em centavos inteiros (evita 30,2999… < 30,30)
+  const due = toCents(p.amount_due);
+  const effectivePaid = toCents(p.amount_paid) + toCents(p.credit_applied_amount);
   if (effectivePaid >= due) return "pago";
   const today = toDateOnlyString(new Date());
   if (effectivePaid > 0) {

@@ -79,6 +79,7 @@ import {
   type EffectiveStatus,
 } from "@/lib/paymentsService";
 import { applyPendingCredits } from "@/lib/creditApplications";
+import { summarizeReceivables } from "@/lib/receivableTotals";
 import { toDateOnlyString } from "@/lib/dateOnly";
 
 export const Route = createFileRoute("/_app/financeiro")({
@@ -364,31 +365,15 @@ function FinanceiroPage() {
   }, [rows, tab, kindFilter, search, profMap]);
 
   const totals = useMemo(() => {
-    const sum = { a_receber: 0, recebido: 0, atrasado: 0, lost: 0, parcial: 0 };
-    for (const r of rows) {
-      if (r.status === "cancelado") {
-        if (r.cancel_type === "perda_contrato") {
-          const saldo = Math.max(
-            Number(r.amount_due) - Number(r.amount_paid ?? 0) - Number(r.credit_applied_amount ?? 0),
-            0,
-          );
-          sum.lost += saldo;
-        }
-        continue;
-      }
-      const due = Number(r.amount_due);
-      const paid = Number(r.amount_paid ?? 0);
-      const credit = Number(r.credit_applied_amount ?? 0);
-      const eff = effectiveOf(r);
-      if (paid > 0) sum.recebido += Math.min(paid, due);
-      const saldo = Math.max(due - paid - credit, 0);
-      if (saldo > 0) {
-        if (eff === "atrasado") sum.atrasado += saldo;
-        else sum.a_receber += saldo;
-      }
-      if (eff === "parcial") sum.parcial += saldo;
-    }
-    return sum;
+    // regra única de totais (Dashboard, Financeiro e Análise): src/lib/receivableTotals.ts
+    const t = summarizeReceivables(rows, (r) => effectiveOf(r as Receivable));
+    return {
+      a_receber: t.toReceive,
+      recebido: t.received,
+      atrasado: t.overdue,
+      lost: t.lost,
+      parcial: t.partialOpen,
+    };
   }, [rows]);
 
   // Retorna true/false (em vez de lançar) para não alterar o comportamento dos
