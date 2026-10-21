@@ -9,14 +9,17 @@ import {
   ASSISTANT_MAX_REQUEST,
   ASSISTANT_MAX_SELECTION,
   ASSISTANT_SHORTCUTS,
+  PROVIDER_NAME,
   stripCodeFences,
+  type AssistantChoice,
+  type AssistantProvider,
 } from "@/lib/contractAssistant";
 import { CONTRACT_TEMPLATE_VARIABLES } from "@/lib/contractTemplates";
 
 /**
  * Assistente de contratos: roda só no servidor. A chave do Gemini
  * (GEMINI_API_KEY) e as instruções do modelo nunca chegam ao navegador.
- * Só gestores usam; limite diário por gestor contado na auditoria.
+ * Só gestores usam; limite diário por gestor e por IA, contado na auditoria.
  */
 
 export type AssistantErrorCode =
@@ -31,7 +34,9 @@ export type AssistantErrorCode =
   | "provider_error"
   | "empty";
 
-export type AssistantProvider = "gemini" | "groq";
+export type { AssistantChoice, AssistantProvider };
+/** Pedidos de hoje por IA; cada uma tem o próprio limite diário. */
+export type ProviderUsage = Record<AssistantProvider, { used: number; configured: boolean }>;
 
 type Failure = Extract<AssistantResult, { ok: false }>;
 type Generated = { ok: true; html: string; model: string; provider: AssistantProvider };
@@ -40,25 +45,25 @@ export type AssistantResult =
   | {
       ok: true;
       html: string;
-      used: number;
+      usage: ProviderUsage;
       limit: number;
-      /** "groq" quando o Gemini falhou e o provedor reserva respondeu */
       provider: AssistantProvider;
+      /** no Automático, por que a resposta não veio do Gemini */
+      fallbackFrom?: "busy" | "limit";
     }
   | {
       ok: false;
       code: AssistantErrorCode;
       message: string;
-      /** motivo técnico devolvido pelo Google (status, código e mensagem), para diagnóstico */
+      /** motivo técnico devolvido pelo provedor (status, código e mensagem), para diagnóstico */
       detail?: string;
-      used?: number;
+      usage?: ProviderUsage;
       limit?: number;
     };
 
 export interface AssistantUsage {
-  used: number;
+  providers: ProviderUsage;
   limit: number;
-  configured: boolean;
   isGestor: boolean;
 }
 
@@ -83,14 +88,24 @@ async function isGestor(supabase: Db, userId: string): Promise<boolean> {
   return data === true;
 }
 
-async function usedToday(supabase: Db, userId: string): Promise<number> {
-  const { count } = await supabase
+/** Pedidos de hoje por IA, contados na auditoria (registros antigos, sem provedor, são do Gemini). */
+async function usageToday(supabase: Db, userId: string): Promise<ProviderUsage> {
+  const { data } = await supabase
     .from("audit_logs")
-    .select("id", { count: "exact", head: true })
+    .select("metadata")
     .eq("actor_id", userId)
     .eq("action", ASSISTANT_AUDIT_ACTION)
-    .gte("created_at", startOfClinicDayIso());
-  return count ?? 0;
+    .gte("created_at", startOfClinicDayIso())
+    .limit(500);
+  const usage: ProviderUsage = {
+    gemini: { used: 0, configured: Boolean(process.env.GEMINI_API_KEY) },
+    groq: { used: 0, configured: Boolean(process.env.GROQ_API_KEY) },
+  };
+  for (const row of data ?? []) {
+    const provider = (row.metadata as { provider?: string } | null)?.provider;
+    usage[provider === "groq" ? "groq" : "gemini"].used++;
+  }
+  return usage;
 }
 
 function systemInstruction(): string {
@@ -113,6 +128,7 @@ const inputSchema = z.object({
   shortcutId: z.string().max(40).optional(),
   selection: z.string().max(ASSISTANT_MAX_SELECTION).optional(),
   variation: z.number().int().min(0).max(20).default(0),
+  provider: z.enum(["auto", "gemini", "groq"]).default("auto"),
 });
 
 function userPrompt(input: z.infer<typeof inputSchema>): string {
@@ -522,50 +538,78 @@ export const askContractAssistant = createServerFn({ method: "POST" })
       return { ok: false, code: "empty", message: "Descreva a cláusula ou escolha um atalho." };
     }
 
-    const used = await usedToday(supabase, userId);
-    if (used >= ASSISTANT_DAILY_LIMIT) {
-      return {
-        ok: false,
-        code: "limit",
-        message: `Você usou os ${ASSISTANT_DAILY_LIMIT} pedidos de hoje. O limite renova à meia-noite.`,
-        used,
-        limit: ASSISTANT_DAILY_LIMIT,
-      };
-    }
-
-    const geminiKey = process.env.GEMINI_API_KEY;
-    const groqKey = process.env.GROQ_API_KEY;
-    if (!geminiKey && !groqKey) {
+    const usage = await usageToday(supabase, userId);
+    const limit = ASSISTANT_DAILY_LIMIT;
+    const order: AssistantProvider[] =
+      data.provider === "auto" ? ["gemini", "groq"] : [data.provider];
+    const configured = order.filter((p) => usage[p].configured);
+    if (!configured.length) {
       return {
         ok: false,
         code: "not_configured",
         message:
-          "O assistente ainda não está configurado: falta o segredo GEMINI_API_KEY no servidor.",
+          data.provider === "groq"
+            ? "O Groq não está configurado: falta o segredo GROQ_API_KEY no servidor."
+            : "O assistente ainda não está configurado: falta o segredo GEMINI_API_KEY no servidor.",
+        usage,
+        limit,
+      };
+    }
+    const open = configured.filter((p) => usage[p].used < limit);
+    if (!open.length) {
+      return {
+        ok: false,
+        code: "limit",
+        message:
+          data.provider === "auto"
+            ? `Você usou os ${limit} pedidos de cada IA hoje. O limite renova à meia-noite.`
+            : `Você usou os ${limit} pedidos do ${PROVIDER_NAME[data.provider]} hoje. Escolha outra IA ou o Automático.`,
+        usage,
+        limit,
       };
     }
 
     const prompt = userPrompt(data);
     const temperature = data.variation > 0 ? 0.8 : 0.4;
-    let gen: Generated | Failure = geminiKey
-      ? await runGemini(geminiKey, prompt, temperature)
-      : { ok: false, code: "not_configured", message: "", detail: "GEMINI_API_KEY ausente" };
-    // provedor reserva: só entra quando o Gemini falha (sobrecarga, cota, modelo, rede)
-    if (!gen.ok && groqKey && gen.code !== "provider_blocked") {
-      const backup = await runGroq(groqKey, prompt, temperature);
-      if (backup.ok) gen = backup;
-      else if (gen.code === "not_configured") gen = backup;
-      else
-        gen = {
-          ...gen,
-          message:
-            backup.code === "provider_key"
-              ? backup.message
-              : "O Gemini e o provedor reserva estão ocupados agora. Tente de novo em alguns minutos.",
-          detail: `${gen.detail ?? ""} · Reserva (Groq): ${backup.detail ?? backup.message}`,
-        };
+    let gen: Generated | null = null;
+    const failures: Failure[] = [];
+    // no Automático, a próxima IA só entra quando a anterior falha (sobrecarga, cota, modelo, rede)
+    for (const p of open) {
+      const key = (p === "gemini" ? process.env.GEMINI_API_KEY : process.env.GROQ_API_KEY)!;
+      const res =
+        p === "gemini"
+          ? await runGemini(key, prompt, temperature)
+          : await runGroq(key, prompt, temperature);
+      if (res.ok) {
+        gen = res;
+        break;
+      }
+      failures.push({ ...res, detail: `${PROVIDER_NAME[p]}: ${res.detail ?? res.message}` });
+      if (res.code === "provider_blocked") break;
     }
-    if (!gen.ok) return gen;
+    if (!gen) {
+      const first = failures[0];
+      if (failures.length === 1) return { ...first, usage, limit };
+      const keyError = failures.find((f) => f.code === "provider_key");
+      return {
+        ...first,
+        message:
+          keyError?.message ??
+          "O Gemini e o Groq estão ocupados agora. Tente de novo em alguns minutos.",
+        detail: failures.map((f) => f.detail).join(" · "),
+        usage,
+        limit,
+      };
+    }
     const { html } = gen;
+    const fallbackFrom =
+      data.provider === "auto" && gen.provider === "groq"
+        ? open.includes("gemini")
+          ? ("busy" as const)
+          : usage.gemini.configured
+            ? ("limit" as const)
+            : undefined
+        : undefined;
 
     // registra o uso (sem guardar o texto); é também o contador do limite diário
     await supabase.from("audit_logs").insert({
@@ -583,13 +627,11 @@ export const askContractAssistant = createServerFn({ method: "POST" })
       },
     });
 
-    return {
-      ok: true,
-      html,
-      used: used + 1,
-      limit: ASSISTANT_DAILY_LIMIT,
-      provider: gen.provider,
+    const after: ProviderUsage = {
+      ...usage,
+      [gen.provider]: { ...usage[gen.provider], used: usage[gen.provider].used + 1 },
     };
+    return { ok: true, html, usage: after, limit, provider: gen.provider, fallbackFrom };
   });
 
 export const getContractAssistantUsage = createServerFn({ method: "GET" })
@@ -597,10 +639,11 @@ export const getContractAssistantUsage = createServerFn({ method: "GET" })
   .handler(async ({ context }): Promise<AssistantUsage> => {
     const { supabase, userId } = context;
     const gestor = await isGestor(supabase, userId);
-    return {
-      used: gestor ? await usedToday(supabase, userId) : 0,
-      limit: ASSISTANT_DAILY_LIMIT,
-      configured: Boolean(process.env.GEMINI_API_KEY || process.env.GROQ_API_KEY),
-      isGestor: gestor,
-    };
+    const providers: ProviderUsage = gestor
+      ? await usageToday(supabase, userId)
+      : {
+          gemini: { used: 0, configured: false },
+          groq: { used: 0, configured: false },
+        };
+    return { providers, limit: ASSISTANT_DAILY_LIMIT, isGestor: gestor };
   });

@@ -6,12 +6,19 @@ import { CONTRACT_TEMPLATE_VARIABLES } from "@/lib/contractTemplates";
  * verificação de variáveis desconhecidas.
  */
 
+/** Pedidos por gestor, por dia, em cada IA (Gemini e Groq contam separado). */
 export const ASSISTANT_DAILY_LIMIT = 30;
 export const ASSISTANT_AUDIT_ACTION = "ai.contract_assist";
 export const ASSISTANT_MAX_REQUEST = 1000;
 export const ASSISTANT_MAX_SELECTION = 6000;
 
 export type AssistantMode = "draft" | "improve";
+
+export type AssistantProvider = "gemini" | "groq";
+/** "auto": Gemini primeiro e Groq de reserva. */
+export type AssistantChoice = "auto" | AssistantProvider;
+
+export const PROVIDER_NAME: Record<AssistantProvider, string> = { gemini: "Gemini", groq: "Groq" };
 
 export interface AssistantShortcut {
   id: string;
@@ -53,7 +60,9 @@ export const ASSISTANT_SHORTCUTS: AssistantShortcut[] = [
 ];
 
 /** Variáveis oficiais do sistema que a IA pode usar. */
-export const ASSISTANT_VARIABLE_KEYS: readonly string[] = CONTRACT_TEMPLATE_VARIABLES.map((v) => v.key);
+export const ASSISTANT_VARIABLE_KEYS: readonly string[] = CONTRACT_TEMPLATE_VARIABLES.map(
+  (v) => v.key,
+);
 
 const PLACEHOLDER_RE = /\{\{\s*([A-Za-z0-9_]+)\s*\}\}/g;
 

@@ -11,15 +11,19 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import {
   ASSISTANT_MAX_REQUEST,
   ASSISTANT_SHORTCUTS,
+  PROVIDER_NAME,
   findUnknownPlaceholders,
   replaceUnknownPlaceholders,
   sanitizeAssistantHtml,
+  type AssistantChoice,
   type AssistantMode,
+  type AssistantProvider,
 } from "@/lib/contractAssistant";
 import {
   askContractAssistant,
@@ -41,6 +45,18 @@ interface Pending {
   request: string;
   shortcutId?: string;
   variation: number;
+}
+
+const CHOICE_KEY = "assistente-contratos:ia";
+const PROVIDERS: AssistantProvider[] = ["gemini", "groq"];
+
+function readChoice(): AssistantChoice {
+  try {
+    const v = localStorage.getItem(CHOICE_KEY);
+    return v === "gemini" || v === "groq" ? v : "auto";
+  } catch {
+    return "auto";
+  }
 }
 
 /** Destaca as variáveis na prévia: conhecidas em dourado, desconhecidas em vermelho. */
@@ -69,7 +85,20 @@ export function ContractAssistantPanel({
     null,
   );
   const [html, setHtml] = useState("");
-  const [viaBackup, setViaBackup] = useState(false);
+  const [answeredBy, setAnsweredBy] = useState<{
+    provider: AssistantProvider;
+    fallbackFrom?: "busy" | "limit";
+  } | null>(null);
+  const [choice, setChoiceState] = useState<AssistantChoice>("auto");
+  useEffect(() => setChoiceState(readChoice()), []);
+  function setChoice(next: AssistantChoice) {
+    setChoiceState(next);
+    try {
+      localStorage.setItem(CHOICE_KEY, next);
+    } catch {
+      // sem armazenamento local: vale só nesta sessão
+    }
+  }
   const [last, setLast] = useState<Pending | null>(null);
   // pedido em andamento; "Cancelar" descarta a resposta que chegar depois
   const requestSeq = useRef(0);
@@ -86,16 +115,24 @@ export function ContractAssistantPanel({
   }, [open, hasSelection]);
 
   const unknown = useMemo(() => (html ? findUnknownPlaceholders(html) : []), [html]);
-  const limitReached = !!usage && usage.used >= usage.limit;
+  const configured = usage ? PROVIDERS.filter((p) => usage.providers[p].configured) : [];
+  const hasRoom = (p: AssistantProvider) =>
+    !!usage && usage.providers[p].configured && usage.providers[p].used < usage.limit;
   const blockedReason = !usage
     ? null
     : !usage.isGestor
       ? "O Assistente de contratos é exclusivo para gestores."
-      : !usage.configured
+      : configured.length === 0
         ? "O assistente ainda não está configurado: falta o segredo GEMINI_API_KEY no servidor."
-        : limitReached
-          ? `Você usou os ${usage.limit} pedidos de hoje. O limite renova à meia-noite.`
-          : null;
+        : choice === "auto"
+          ? configured.some(hasRoom)
+            ? null
+            : `Você usou os ${usage.limit} pedidos de cada IA hoje. O limite renova à meia-noite.`
+          : !usage.providers[choice].configured
+            ? `O ${PROVIDER_NAME[choice]} não está configurado. Escolha o Automático.`
+            : !hasRoom(choice)
+              ? `Você usou os ${usage.limit} pedidos do ${PROVIDER_NAME[choice]} hoje. Escolha outra IA ou o Automático.`
+              : null;
 
   async function run(next: Pending) {
     const seq = ++requestSeq.current;
@@ -110,13 +147,14 @@ export function ContractAssistantPanel({
           shortcutId: next.shortcutId,
           selection: next.mode === "improve" ? selectionText : undefined,
           variation: next.variation,
+          provider: choice,
         },
       });
       if (seq !== requestSeq.current) return;
       if (res.ok) {
         setHtml(sanitizeAssistantHtml(res.html));
-        setViaBackup(res.provider === "groq");
-        setUsage((u) => (u ? { ...u, used: res.used } : u));
+        setAnsweredBy({ provider: res.provider, fallbackFrom: res.fallbackFrom });
+        setUsage((u) => (u ? { ...u, providers: res.usage } : u));
       } else {
         setError({
           message: res.message,
@@ -130,7 +168,7 @@ export function ContractAssistantPanel({
             "provider_model",
           ].includes(res.code),
         });
-        if (res.used !== undefined) setUsage((u) => (u ? { ...u, used: res.used! } : u));
+        if (res.usage) setUsage((u) => (u ? { ...u, providers: res.usage! } : u));
       }
     } catch {
       if (seq !== requestSeq.current) return;
@@ -175,9 +213,12 @@ export function ContractAssistantPanel({
           <SheetDescription>
             Use só variáveis como {"{{LOCATARIO_NOME}}"}; não cole nomes, CPF ou outros dados reais.
           </SheetDescription>
-          {usage?.isGestor && (
+          {usage?.isGestor && configured.length > 0 && (
             <p className="text-xs font-medium tabular-nums text-muted-foreground">
-              {usage.used} de {usage.limit} pedidos hoje
+              Pedidos hoje:{" "}
+              {configured
+                .map((p) => `${PROVIDER_NAME[p]} ${usage.providers[p].used}/${usage.limit}`)
+                .join(" · ")}
             </p>
           )}
         </SheetHeader>
@@ -202,6 +243,35 @@ export function ContractAssistantPanel({
             <p className="-mt-2 text-xs text-muted-foreground">
               Para aprimorar um trecho, selecione-o no editor antes de abrir o assistente.
             </p>
+          )}
+
+          {configured.length > 1 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span id="assistente-ia" className="text-sm font-medium">
+                IA
+              </span>
+              <ToggleGroup
+                type="single"
+                variant="outline"
+                size="sm"
+                aria-labelledby="assistente-ia"
+                value={choice}
+                onValueChange={(v) => v && setChoice(v as AssistantChoice)}
+                className="justify-start"
+              >
+                <ToggleGroupItem
+                  value="auto"
+                  title="Gemini primeiro; Groq se o Gemini falhar ou acabar"
+                >
+                  Automático
+                </ToggleGroupItem>
+                {PROVIDERS.map((p) => (
+                  <ToggleGroupItem key={p} value={p}>
+                    {PROVIDER_NAME[p]}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
+            </div>
           )}
 
           {blockedReason && (
@@ -358,8 +428,14 @@ export function ContractAssistantPanel({
               )}
               <p className="text-xs text-muted-foreground">
                 Texto sugerido por IA. Revise antes de usar; não substitui orientação jurídica.
-                {viaBackup &&
-                  " O Gemini estava ocupado; esta versão veio do provedor reserva (Groq)."}
+                {answeredBy &&
+                  ` Gerado pelo ${PROVIDER_NAME[answeredBy.provider]}${
+                    answeredBy.fallbackFrom === "busy"
+                      ? " (o Gemini estava ocupado)"
+                      : answeredBy.fallbackFrom === "limit"
+                        ? " (os pedidos do Gemini de hoje acabaram)"
+                        : ""
+                  }.`}
               </p>
             </div>
           )}
