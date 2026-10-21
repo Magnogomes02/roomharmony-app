@@ -61,6 +61,8 @@ import {
   RECEIVABLE_STATUS_LABELS,
 } from "@/lib/labels";
 import { useConfirm } from "@/components/ConfirmDialog";
+import { SortableTableHead } from "@/components/SortableTableHead";
+import { useTableSort } from "@/hooks/useTableSort";
 import { StatusToggleFilter, useVisibleStatuses, type StatusTone } from "@/components/finance/StatusToggleFilter";
 import {
   createReceiptForReceivable,
@@ -178,6 +180,9 @@ const RECEIVABLE_BUCKET_META: Record<ReceivableBucket, { label: string; tone: St
   perda: { label: "Perdas", tone: "muted" },
   errada: { label: "Erradas", tone: "muted" },
 };
+
+// ordem de urgência da coluna Status: o que precisa de ação primeiro
+const STATUS_URGENCY: readonly ReceivableBucket[] = ["atrasado", "a_receber", "parcial", "recebido", "perda", "errada"];
 
 function brl(v: number | null | undefined) {
   return (Number(v) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -406,6 +411,28 @@ function FinanceiroPage() {
     () => searched.filter((row) => statusFilter.selected.has(bucketOf(row))),
     [searched, statusFilter.selected], // eslint-disable-line react-hooks/exhaustive-deps
   );
+
+  // nomes das salas na mesma regra da coluna "Sala" (multi-sala, sala do
+  // recebível ou salas do contrato), para ordenar pelo que aparece na tela
+  function roomNamesOf(r: Receivable): string {
+    let ids: string[] = (roomsByRec.get(r.id) ?? []).slice();
+    if (ids.length === 0 && r.room_id) ids = [r.room_id];
+    if (ids.length === 0 && r.contract_id) ids = contractRoomsMap.get(r.contract_id) ?? [];
+    return Array.from(new Set(ids))
+      .map((id) => roomMap.get(id))
+      .filter(Boolean)
+      .join(", ");
+  }
+
+  const tableSort = useTableSort<Receivable>("financeiro.recebiveis", {
+    profissional: (r) => profMap.get(r.professional_id),
+    tipo: (r) => labelOf(RECEIVABLE_KIND_LABELS, r.kind),
+    sala: (r) => roomNamesOf(r),
+    vencimento: (r) => r.due_date,
+    valor: (r) => Number(r.amount_due),
+    status: (r) => STATUS_URGENCY.indexOf(bucketOf(r)),
+  });
+  const sortedRows = tableSort.apply(filtered);
 
   const totals = useMemo(() => {
     // regra única de totais (Dashboard, Financeiro e Análise): src/lib/receivableTotals.ts
@@ -1231,12 +1258,12 @@ function FinanceiroPage() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Profissional</TableHead>
-                          <TableHead>Tipo</TableHead>
-                          <TableHead>Sala</TableHead>
-                          <TableHead>Vencimento</TableHead>
-                          <TableHead>Valor</TableHead>
-                          <TableHead>Status</TableHead>
+                          <SortableTableHead sort={tableSort} column="profissional">Profissional</SortableTableHead>
+                          <SortableTableHead sort={tableSort} column="tipo">Tipo</SortableTableHead>
+                          <SortableTableHead sort={tableSort} column="sala">Sala</SortableTableHead>
+                          <SortableTableHead sort={tableSort} column="vencimento">Vencimento</SortableTableHead>
+                          <SortableTableHead sort={tableSort} column="valor">Valor</SortableTableHead>
+                          <SortableTableHead sort={tableSort} column="status">Status</SortableTableHead>
                           <TableHead className="text-right">Ações</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -1269,7 +1296,7 @@ function FinanceiroPage() {
                             </TableCell>
                           </TableRow>
                         ) : (
-                          filtered.map((r) => {
+                          sortedRows.map((r) => {
                             const eff = effectiveOf(r);
                             const due = Number(r.amount_due);
                             const paid = Number(r.amount_paid ?? 0);

@@ -242,6 +242,12 @@ Os componentes são táteis e confiantes: respondem a cada toque, têm contraste
 - **Focus:** anel de 1px em Dourado Acolhida, sem outline nativo.
 - **Error / Disabled:** desabilitado fica a 50% de opacidade. O erro é sinalizado com texto Vermelho Alerta abaixo do campo.
 
+### Tabelas e listas (ordenação padrão)
+- **Toda tabela nova usa ordenação por coluna:** `useTableSort` (`src/hooks/useTableSort.ts`) com `SortableTableHead` (`src/components/SortableTableHead.tsx`). O título inteiro é o botão; o ciclo é crescente → decrescente → ordem original da tela, uma coluna por vez, e a escolha é lembrada por tabela neste navegador.
+- **Indicador:** seta dupla clara (40% de opacidade) nas colunas ordenáveis; seta para cima ou para baixo em Dourado Tinta na coluna ativa, com o título em Tinta Quente. Ações, cor e colunas sem valor comparável não são ordenáveis.
+- **Regras de comparação:** texto em ordem alfabética do português (sem diferenciar maiúsculas e acentos, números dentro do texto em ordem numérica), valores e datas pelo valor real, status em ordem de urgência, vazios sempre por último. Empates mantêm a ordem original.
+- **Listas em cards** (ex.: Conflitos) usam o mesmo hook com um seletor "Ordenar por" e um botão para inverter o sentido.
+
 ### Navigation
 - **Sidebar:** é o balcão em Nogueira Noturna, com texto Junta de Areia e ícones de 16px ao lado de rótulos em 14px. No hover e no item ativo, o fundo vira Nogueira Realce. No topo fica a marca (quadrado dourado de 36px com cantos de 12px e o nome em serifa). No rodapé ficam o e-mail do usuário, o papel em dourado e caixa alta e o botão Sair.
 - **Mobile:** abaixo de 768px a sidebar vira gaveta de 18rem, aberta pelo gatilho no cabeçalho fixo.

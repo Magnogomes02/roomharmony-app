@@ -15,7 +15,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { toDateOnlyString } from "@/lib/dateOnly";
+import { formatDateOnlyBR, toDateOnlyString } from "@/lib/dateOnly";
+import { SortableTableHead } from "@/components/SortableTableHead";
+import { useTableSort } from "@/hooks/useTableSort";
 import { DEFAULT_SHIFTS, loadShiftDefaults, type ShiftDefaults, type ShiftKey } from "@/lib/shifts";
 import { toast } from "sonner";
 
@@ -85,6 +87,21 @@ function RealocacaoPage() {
 
   const roomName = (id: string) => rooms.find((r) => r.id === id)?.name ?? "—";
   const profName = (id: string) => profs.find((p) => p.id === id)?.full_name ?? "—";
+
+  const planSort = useTableSort<PlanItem>("realocacao.previa", {
+    profissional: (p) => profName(p.booking.professional_id),
+    atual: (p) => p.booking.start_at,
+    novo: (p) => p.newStart,
+    situacao: (p) => p.conflicts.length,
+  });
+  const logMeta = (l: LogRow) => (l.metadata ?? {}) as Record<string, unknown>;
+  const logSort = useTableSort<LogRow>("realocacao.historico", {
+    data: (l) => l.created_at,
+    salas: (l) => `${String(logMeta(l).origin_room_name ?? "")} ${String(logMeta(l).dest_room_name ?? "")}`,
+    periodo: (l) => String(logMeta(l).from_date ?? ""),
+    motivo: (l) => String(logMeta(l).reason ?? ""),
+    qtd: (l) => Number(logMeta(l).moved_count ?? 0),
+  });
 
   async function loadLogs() {
     const { data } = await supabase.from("audit_logs").select("id,created_at,metadata")
@@ -327,17 +344,20 @@ function RealocacaoPage() {
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader><TableRow>
-                      <TableHead className="w-10" /><TableHead>Profissional</TableHead><TableHead>Atual</TableHead>
-                      <TableHead>Novo horário</TableHead><TableHead>Situação</TableHead>
+                      <TableHead className="w-10" />
+                      <SortableTableHead sort={planSort} column="profissional">Profissional</SortableTableHead>
+                      <SortableTableHead sort={planSort} column="atual">Atual</SortableTableHead>
+                      <SortableTableHead sort={planSort} column="novo">Novo horário</SortableTableHead>
+                      <SortableTableHead sort={planSort} column="situacao">Situação</SortableTableHead>
                     </TableRow></TableHeader>
                     <TableBody>
-                      {plan.map((p, idx) => {
+                      {planSort.apply(plan).map((p) => {
                         const blocked = p.conflicts.length > 0 && !includeConflicts;
                         return (
                           <TableRow key={p.booking.id} className={blocked ? "opacity-60" : ""}>
                             <TableCell>
                               <Checkbox checked={p.selected && !blocked} disabled={blocked}
-                                onCheckedChange={(v) => setPlan((pl) => pl.map((x, i) => i === idx ? { ...x, selected: !!v } : x))} />
+                                onCheckedChange={(v) => setPlan((pl) => pl.map((x) => x.booking.id === p.booking.id ? { ...x, selected: !!v } : x))} />
                             </TableCell>
                             <TableCell>{profName(p.booking.professional_id)}{p.booking.is_maintenance && <Badge variant="outline" className="ml-2">Manutenção</Badge>}</TableCell>
                             <TableCell className="whitespace-nowrap">{fmt(parseISO(p.booking.start_at))}–{format(parseISO(p.booking.end_at), "HH:mm")}</TableCell>
@@ -387,15 +407,21 @@ function RealocacaoPage() {
         <CardContent>
           {logs.length === 0 ? <p className="text-sm text-muted-foreground">Nenhuma realocação registrada.</p> : (
             <Table>
-              <TableHeader><TableRow><TableHead>Data</TableHead><TableHead>Origem → Destino</TableHead><TableHead>Período</TableHead><TableHead>Motivo</TableHead><TableHead>Qtd.</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow>
+                <SortableTableHead sort={logSort} column="data">Data</SortableTableHead>
+                <SortableTableHead sort={logSort} column="salas">Origem → Destino</SortableTableHead>
+                <SortableTableHead sort={logSort} column="periodo">Período</SortableTableHead>
+                <SortableTableHead sort={logSort} column="motivo">Motivo</SortableTableHead>
+                <SortableTableHead sort={logSort} column="qtd">Qtd.</SortableTableHead>
+              </TableRow></TableHeader>
               <TableBody>
-                {logs.map((l) => {
+                {logSort.apply(logs).map((l) => {
                   const m = (l.metadata ?? {}) as Record<string, unknown>;
                   return (
                     <TableRow key={l.id}>
                       <TableCell className="whitespace-nowrap">{format(parseISO(l.created_at), "dd/MM/yyyy HH:mm")}</TableCell>
                       <TableCell>{String(m.origin_room_name ?? "—")} → {String(m.dest_room_name ?? "—")}</TableCell>
-                      <TableCell className="whitespace-nowrap">{String(m.from_date ?? "")} a {String(m.to_date ?? "")}</TableCell>
+                      <TableCell className="whitespace-nowrap">{formatDateOnlyBR(String(m.from_date ?? ""))} a {formatDateOnlyBR(String(m.to_date ?? ""))}</TableCell>
                       <TableCell>{String(m.reason ?? "—")}</TableCell>
                       <TableCell>{String(m.moved_count ?? 0)}{Number(m.conflicts_count) > 0 && ` (${String(m.conflicts_count)} c/ conflito)`}</TableCell>
                     </TableRow>

@@ -26,6 +26,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
+import { SortableTableHead } from "@/components/SortableTableHead";
+import { useTableSort } from "@/hooks/useTableSort";
 import { entityColor, sortRooms } from "@/lib/entityColors";
 
 export const Route = createFileRoute("/_app/salas")({
@@ -150,6 +152,14 @@ function SalasPage() {
     return !q || r.name.toLowerCase().includes(q) || (r.description ?? "").toLowerCase().includes(q);
   });
 
+  const tableSort = useTableSort<Room>("salas", {
+    nome: (r) => r.name,
+    descricao: (r) => r.description,
+    capacidade: (r) => r.capacity,
+    ordem: (r) => r.sort_order,
+    status: (r) => (r.active ? 0 : 1),
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -181,11 +191,11 @@ function SalasPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-12">Cor</TableHead>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Descrição</TableHead>
-                  <TableHead>Capacidade</TableHead>
-                  <TableHead>Ordem</TableHead>
-                  <TableHead>Status</TableHead>
+                  <SortableTableHead sort={tableSort} column="nome">Nome</SortableTableHead>
+                  <SortableTableHead sort={tableSort} column="descricao">Descrição</SortableTableHead>
+                  <SortableTableHead sort={tableSort} column="capacidade">Capacidade</SortableTableHead>
+                  <SortableTableHead sort={tableSort} column="ordem">Ordem</SortableTableHead>
+                  <SortableTableHead sort={tableSort} column="status">Status</SortableTableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -194,7 +204,7 @@ function SalasPage() {
                   <TableRow><TableCell colSpan={7} className="py-8 text-center text-muted-foreground">Carregando...</TableCell></TableRow>
                 ) : filtered.length === 0 ? (
                   <TableRow><TableCell colSpan={7} className="py-8 text-center text-muted-foreground">Nenhuma sala encontrada.</TableCell></TableRow>
-                ) : filtered.map((r) => (
+                ) : tableSort.apply(filtered).map((r) => (
                   <TableRow key={r.id}>
                     <TableCell>
                       <span

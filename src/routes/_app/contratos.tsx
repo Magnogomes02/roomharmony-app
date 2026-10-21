@@ -56,6 +56,8 @@ import { MONTHS_PT } from "@/lib/paymentsService";
 import { buildReceiptAuthenticationCode } from "@/lib/receiptPdf";
 import { createNotification } from "@/lib/notifications";
 import { useConfirm } from "@/components/ConfirmDialog";
+import { SortableTableHead } from "@/components/SortableTableHead";
+import { useTableSort } from "@/hooks/useTableSort";
 
 
 
@@ -109,6 +111,9 @@ const emptyForm = {
 };
 
 
+
+// ordem da coluna Status: vigentes primeiro
+const CONTRACT_STATUS_ORDER = ["ativo", "rascunho", "encerrado", "cancelado"];
 
 const statusVariant: Record<string, "default" | "secondary" | "destructive" | "outline" | "success"> = {
   rascunho: "secondary", ativo: "success", encerrado: "outline", cancelado: "destructive",
@@ -844,6 +849,27 @@ function ContratosPage() {
     });
   }, [contracts, search, statusFilter, roomFilter, startMonthFilter, startYearFilter, endMonthFilter, endYearFilter, minValueFilter, maxValueFilter, roomMap]);
 
+  const tableSort = useTableSort<Contract>("contratos", {
+    profissional: (c) => c.professional?.full_name,
+    salas: (c) => summarizeSchedules(c.schedules),
+    vigencia: (c) => c.start_date,
+    valor: (c) => Number(c.monthly_value),
+    status: (c) => CONTRACT_STATUS_ORDER.indexOf(c.status),
+  });
+  const sortedContracts = tableSort.apply(filtered);
+
+  type GenConflict = NonNullable<typeof genPreview.plan>["conflicts"][number];
+  const genConflictSort = useTableSort<GenConflict>("contratos.ocorrencias", {
+    data: (c) => c.date,
+    sala: (c) => roomMap.get(c.schedule.room_id)?.name,
+    horario: (c) => c.schedule.start_time,
+  });
+
+  const attachmentSort = useTableSort<Attachment>("contratos.anexos", {
+    arquivo: (a) => a.file_name,
+    enviado: (a) => a.created_at,
+  });
+
   const availableYears = useMemo(() => {
     const set = new Set<number>();
     for (const c of contracts) {
@@ -1022,11 +1048,11 @@ function ContratosPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Profissional</TableHead>
-                  <TableHead>Salas / dias</TableHead>
-                  <TableHead>Vigência</TableHead>
-                  <TableHead>Valor mensal</TableHead>
-                  <TableHead>Status</TableHead>
+                  <SortableTableHead sort={tableSort} column="profissional">Profissional</SortableTableHead>
+                  <SortableTableHead sort={tableSort} column="salas">Salas / dias</SortableTableHead>
+                  <SortableTableHead sort={tableSort} column="vigencia">Vigência</SortableTableHead>
+                  <SortableTableHead sort={tableSort} column="valor">Valor mensal</SortableTableHead>
+                  <SortableTableHead sort={tableSort} column="status">Status</SortableTableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -1035,7 +1061,7 @@ function ContratosPage() {
                   <TableRow><TableCell colSpan={6} className="py-8 text-center text-muted-foreground">Carregando...</TableCell></TableRow>
                 ) : filtered.length === 0 ? (
                   <TableRow><TableCell colSpan={6} className="py-8 text-center text-muted-foreground">Nenhum contrato encontrado.</TableCell></TableRow>
-                ) : filtered.map((c) => (
+                ) : sortedContracts.map((c) => (
                   <TableRow key={c.id}>
                     <TableCell className="font-medium">{c.professional?.full_name ?? "—"}</TableCell>
                     <TableCell className="text-sm">{summarizeSchedules(c.schedules)}</TableCell>
@@ -1526,13 +1552,13 @@ function ContratosPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Data</TableHead>
-                  <TableHead>Sala</TableHead>
-                  <TableHead>Horário</TableHead>
+                  <SortableTableHead sort={genConflictSort} column="data">Data</SortableTableHead>
+                  <SortableTableHead sort={genConflictSort} column="sala">Sala</SortableTableHead>
+                  <SortableTableHead sort={genConflictSort} column="horario">Horário</SortableTableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(genPreview.plan?.conflicts ?? []).slice(0, 50).map((c, i) => (
+                {genConflictSort.apply(genPreview.plan?.conflicts ?? []).slice(0, 50).map((c, i) => (
                   <TableRow key={i}>
                     <TableCell>{c.date.toLocaleDateString("pt-BR")} ({WEEKDAY_LABELS[c.schedule.weekday]})</TableCell>
                     <TableCell>{roomMap.get(c.schedule.room_id)?.name ?? "—"}</TableCell>
@@ -1745,15 +1771,15 @@ function ContratosPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Arquivo</TableHead>
-                  <TableHead>Enviado em</TableHead>
+                  <SortableTableHead sort={attachmentSort} column="arquivo">Arquivo</SortableTableHead>
+                  <SortableTableHead sort={attachmentSort} column="enviado">Enviado em</SortableTableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {attachments.length === 0 ? (
                   <TableRow><TableCell colSpan={3} className="py-6 text-center text-muted-foreground">Nenhum anexo.</TableCell></TableRow>
-                ) : attachments.map((a) => (
+                ) : attachmentSort.apply(attachments).map((a) => (
                   <TableRow key={a.id}>
                     <TableCell className="font-medium">{a.file_name}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">

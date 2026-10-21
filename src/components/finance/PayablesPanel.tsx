@@ -65,6 +65,8 @@ import {
 } from "@/lib/installmentCredits";
 import type { Json } from "@/integrations/supabase/types";
 import { useConfirm } from "@/components/ConfirmDialog";
+import { SortableTableHead } from "@/components/SortableTableHead";
+import { useTableSort } from "@/hooks/useTableSort";
 import { StatusToggleFilter, useVisibleStatuses, type StatusTone } from "@/components/finance/StatusToggleFilter";
 
 interface Payable {
@@ -148,6 +150,9 @@ const PAYABLE_STATUS_TONE: Record<PayableStatus, StatusTone> = {
   atrasado: "destructive",
   cancelado: "muted",
 };
+
+// ordem de urgência da coluna Status: o que precisa de ação primeiro
+const PAYABLE_URGENCY: readonly PayableStatus[] = ["atrasado", "a_pagar", "parcial", "pago", "cancelado"];
 
 const STATUS_VARIANT: Record<
   PayableStatus,
@@ -282,6 +287,24 @@ export function PayablesPanel() {
     () => searched.filter((p) => statusFilter.selected.has(computeEffectiveStatus(p))),
     [searched, statusFilter.selected],
   );
+
+  const tableSort = useTableSort<Payable>("financeiro.contas", {
+    descricao: (p) => p.description,
+    fornecedor: (p) => p.supplier,
+    categoria: (p) => p.category,
+    vencimento: (p) => p.due_date,
+    status: (p) => PAYABLE_URGENCY.indexOf(computeEffectiveStatus(p)),
+    valor: (p) => Number(p.amount_due),
+    pago: (p) => Number(p.amount_paid ?? 0),
+  });
+  const sortedRows = tableSort.apply(filtered);
+
+  const histSort = useTableSort<PayablePayment>("financeiro.contas.historico", {
+    data: (pay) => pay.paid_at,
+    valor: (pay) => Number(pay.amount),
+    metodo: (pay) => pay.payment_method,
+    status: (pay) => pay.status,
+  });
 
   const summary = useMemo(() => {
     let aPagar = 0, pago = 0, atrasado = 0;
@@ -1339,13 +1362,13 @@ export function PayablesPanel() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Descrição</TableHead>
-                  <TableHead>Fornecedor</TableHead>
-                  <TableHead>Categoria</TableHead>
-                  <TableHead>Vencimento</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Valor</TableHead>
-                  <TableHead className="text-right">Pago</TableHead>
+                  <SortableTableHead sort={tableSort} column="descricao">Descrição</SortableTableHead>
+                  <SortableTableHead sort={tableSort} column="fornecedor">Fornecedor</SortableTableHead>
+                  <SortableTableHead sort={tableSort} column="categoria">Categoria</SortableTableHead>
+                  <SortableTableHead sort={tableSort} column="vencimento">Vencimento</SortableTableHead>
+                  <SortableTableHead sort={tableSort} column="status">Status</SortableTableHead>
+                  <SortableTableHead sort={tableSort} column="valor" align="right">Valor</SortableTableHead>
+                  <SortableTableHead sort={tableSort} column="pago" align="right">Pago</SortableTableHead>
                   {canEdit && <TableHead className="text-right">Ações</TableHead>}
                 </TableRow>
               </TableHeader>
@@ -1363,7 +1386,7 @@ export function PayablesPanel() {
                       "Nenhuma conta encontrada."
                     )}
                   </TableCell></TableRow>
-                ) : filtered.map((p) => {
+                ) : sortedRows.map((p) => {
                   const eff = computeEffectiveStatus(p);
                   return (
                     <TableRow key={p.id} className={eff === "cancelado" ? "opacity-50" : ""}>
@@ -1655,15 +1678,15 @@ export function PayablesPanel() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Valor</TableHead>
-                    <TableHead>Método</TableHead>
-                    <TableHead>Status</TableHead>
+                    <SortableTableHead sort={histSort} column="data">Data</SortableTableHead>
+                    <SortableTableHead sort={histSort} column="valor">Valor</SortableTableHead>
+                    <SortableTableHead sort={histSort} column="metodo">Método</SortableTableHead>
+                    <SortableTableHead sort={histSort} column="status">Status</SortableTableHead>
                     {canEdit && <TableHead />}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {histPayments.map((pay) => (
+                  {histSort.apply(histPayments).map((pay) => (
                     <TableRow key={pay.id} className={pay.status === "estornado" ? "opacity-50 line-through" : ""}>
                       <TableCell className="text-sm">{format(new Date(pay.paid_at), "dd/MM/yyyy HH:mm")}</TableCell>
                       <TableCell>{brl(pay.amount)}</TableCell>

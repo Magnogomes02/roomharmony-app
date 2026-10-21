@@ -7,9 +7,12 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
+import { SortableTableHead } from "@/components/SortableTableHead";
+import { useTableSort } from "@/hooks/useTableSort";
 import {
   loadAnnualFinancialSummary,
   type AnnualFinancialResult,
+  type MonthlyFinancialSummary,
 } from "@/lib/financeAnalytics";
 
 function brl(v: number | null | undefined) {
@@ -25,6 +28,20 @@ export function FinancialAnalysisPanel() {
   const [year, setYear] = useState<number>(currentYear);
   const [data, setData] = useState<AnnualFinancialResult | null>(null);
   const [loading, setLoading] = useState(true);
+  const tableSort = useTableSort<MonthlyFinancialSummary>("financeiro.analise", {
+    mes: (m) => m.month,
+    previsto: (m) => m.expected,
+    recebido: (m) => m.received,
+    areceber: (m) => m.receivable,
+    atraso: (m) => m.overdue,
+    perda: (m) => m.lost,
+    despesas: (m) => m.expensesPaid,
+    resultado: (m) => m.resultado,
+    precebido: (m) => m.receivedRate,
+    patraso: (m) => m.overdueRate,
+    pperda: (m) => m.lossRate,
+    acumulado: (m) => m.accumulatedReceived,
+  });
 
   const years = useMemo(() => {
     const arr: number[] = [];
@@ -128,24 +145,24 @@ export function FinancialAnalysisPanel() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Mês</TableHead>
-                  <TableHead className="text-right">Previsto</TableHead>
-                  <TableHead className="text-right">Recebido</TableHead>
-                  <TableHead className="text-right">A receber</TableHead>
-                  <TableHead className="text-right">Em atraso</TableHead>
-                  <TableHead className="text-right">Perda</TableHead>
-                  <TableHead className="text-right">Despesas</TableHead>
-                  <TableHead className="text-right">Resultado</TableHead>
-                  <TableHead className="text-right">% Recebido</TableHead>
-                  <TableHead className="text-right">% Atraso</TableHead>
-                  <TableHead className="text-right">% Perda</TableHead>
-                  <TableHead className="text-right">Acumulado recebido</TableHead>
+                  <SortableTableHead sort={tableSort} column="mes">Mês</SortableTableHead>
+                  <SortableTableHead sort={tableSort} column="previsto" align="right">Previsto</SortableTableHead>
+                  <SortableTableHead sort={tableSort} column="recebido" align="right">Recebido</SortableTableHead>
+                  <SortableTableHead sort={tableSort} column="areceber" align="right">A receber</SortableTableHead>
+                  <SortableTableHead sort={tableSort} column="atraso" align="right">Em atraso</SortableTableHead>
+                  <SortableTableHead sort={tableSort} column="perda" align="right">Perda</SortableTableHead>
+                  <SortableTableHead sort={tableSort} column="despesas" align="right">Despesas</SortableTableHead>
+                  <SortableTableHead sort={tableSort} column="resultado" align="right">Resultado</SortableTableHead>
+                  <SortableTableHead sort={tableSort} column="precebido" align="right">% Recebido</SortableTableHead>
+                  <SortableTableHead sort={tableSort} column="patraso" align="right">% Atraso</SortableTableHead>
+                  <SortableTableHead sort={tableSort} column="pperda" align="right">% Perda</SortableTableHead>
+                  <SortableTableHead sort={tableSort} column="acumulado" align="right">Acumulado recebido</SortableTableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow><TableCell colSpan={12} className="py-8 text-center text-muted-foreground">Carregando...</TableCell></TableRow>
-                ) : (data?.monthlyRows ?? []).map((m) => (
+                ) : tableSort.apply(data?.monthlyRows ?? []).map((m) => (
                   <TableRow key={m.month}>
                     <TableCell className="font-medium capitalize">{m.monthLabel}</TableCell>
                     <TableCell className="text-right">{brl(m.expected)}</TableCell>

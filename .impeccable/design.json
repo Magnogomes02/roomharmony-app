@@ -419,6 +419,14 @@
       "description": "Reserva na grade semanal: borda esquerda na cor do profissional, fundo translúcido.",
       "html": "<div class=\"ds-booking\" style=\"--ent:#6F8F72\"><b>Sala 3 · Turno manhã</b><span>Dra. Ana Lima</span></div>",
       "css": ".ds-booking{width:140px;display:flex;flex-direction:column;padding:4px 6px;border-left:2px solid var(--ent);border-radius:4px;background:color-mix(in srgb,var(--ent) 13%,transparent);font:400 10px/1.25 Inter,system-ui,sans-serif;color:var(--foreground,oklch(0.18 0.005 90));transition:opacity .15s}.ds-booking b{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ds-booking span{opacity:.8}.ds-booking:hover{opacity:.9}"
+    },
+    {
+      "name": "Título de coluna ordenável",
+      "kind": "custom",
+      "refersTo": "",
+      "description": "Título de tabela clicável: crescente → decrescente → original; seta em Dourado Tinta na coluna ativa.",
+      "html": "<table class=\"ds-sort-table\"><thead><tr><th aria-sort=\"none\"><button class=\"ds-sort\">Profissional <span class=\"ds-sort-i\">⇅</span></button></th><th aria-sort=\"ascending\"><button class=\"ds-sort ds-on\">Valor <span class=\"ds-sort-i\">↑</span></button></th></tr></thead></table>",
+      "css": ".ds-sort-table{border-collapse:collapse;font:500 14px/1.4 Inter,system-ui,sans-serif}.ds-sort-table th{padding:0 16px;text-align:left}.ds-sort{display:inline-flex;align-items:center;gap:4px;min-height:32px;padding:0 8px;margin:0 -8px;border:none;border-radius:8px;background:none;font:inherit;color:var(--muted-foreground,oklch(0.50 0.01 85));cursor:pointer}.ds-sort:hover{color:var(--foreground,oklch(0.18 0.005 90))}.ds-sort:focus-visible{outline:none;box-shadow:0 0 0 2px var(--ring,oklch(0.50 0.10 80))}.ds-sort .ds-sort-i{opacity:.4;font-size:12px}.ds-sort.ds-on{color:var(--foreground,oklch(0.18 0.005 90))}.ds-sort.ds-on .ds-sort-i{opacity:1;color:var(--primary-ink,oklch(0.50 0.10 80))}"
     }
   ],
   "narrative": {

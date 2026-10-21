@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format, parseISO, startOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { AlertTriangle, CalendarIcon, CheckCircle2, Ban, ArrowRightLeft, Clock } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, CalendarIcon, CheckCircle2, Ban, ArrowRightLeft, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import { BOOKING_SOURCE_LABELS, BOOKING_STATUS_LABELS, CONFLICT_STATUS_LABELS, labelOf } from "@/lib/labels";
 import { countPendingConflicts, findOverlappingBookings, registerBookingConflicts } from "@/lib/scheduleConflicts";
 import { useConfirm } from "@/components/ConfirmDialog";
+import { useTableSort } from "@/hooks/useTableSort";
 
 export const Route = createFileRoute("/_app/conflitos")({
   component: ConflitosPage,
@@ -128,7 +129,15 @@ function ConflitosPage() {
   const profMap = useMemo(() => new Map(professionals.map((p) => [p.id, p])), [professionals]);
   const roomMap = useMemo(() => new Map(rooms.map((r) => [r.id, r])), [rooms]);
 
-  const visible = conflicts.filter((c) => (showResolved ? true : c.status === "pendente"));
+  const cardSort = useTableSort<EnrichedConflict>("conflitos", {
+    data: (c) => [c.a?.start_at, c.b?.start_at].filter(Boolean).sort()[0],
+    sala: (c) => roomMap.get(c.room_id)?.name,
+    status: (c) => (c.status === "pendente" ? 0 : 1),
+    registro: (c) => c.created_at,
+  });
+  const visible = cardSort.apply(
+    conflicts.filter((c) => (showResolved ? true : c.status === "pendente")),
+  );
 
   async function audit(action: string, entity_id: string | null, metadata: Record<string, unknown>) {
     const { data: { user } } = await supabase.auth.getUser();
@@ -349,9 +358,45 @@ function ConflitosPage() {
             Reservas com sobreposição de horário na mesma sala. Ajuste dia, horário ou sala para resolver.
           </p>
         </div>
-        <Button variant="outline" onClick={() => setShowResolved((v) => !v)}>
-          {showResolved ? "Ocultar resolvidos" : "Mostrar resolvidos"}
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* mesma ordenação padrão das tabelas, em forma de seletor para os cards */}
+          <Select
+            value={cardSort.state?.column ?? "padrao"}
+            onValueChange={(v) =>
+              cardSort.set(v === "padrao" ? null : { column: v, direction: cardSort.state?.direction ?? "asc" })
+            }
+          >
+            <SelectTrigger className="w-[190px]" aria-label="Ordenar conflitos por">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="padrao">Ordem padrão</SelectItem>
+              <SelectItem value="data">Ordenar por data da reserva</SelectItem>
+              <SelectItem value="sala">Ordenar por sala</SelectItem>
+              <SelectItem value="status">Ordenar por status</SelectItem>
+              <SelectItem value="registro">Ordenar por data de registro</SelectItem>
+            </SelectContent>
+          </Select>
+          {cardSort.state && (
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() =>
+                cardSort.set({
+                  column: cardSort.state!.column,
+                  direction: cardSort.state!.direction === "asc" ? "desc" : "asc",
+                })
+              }
+              aria-label={cardSort.state.direction === "asc" ? "Ordem crescente; inverter" : "Ordem decrescente; inverter"}
+              title={cardSort.state.direction === "asc" ? "Crescente" : "Decrescente"}
+            >
+              {cardSort.state.direction === "asc" ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
+            </Button>
+          )}
+          <Button variant="outline" onClick={() => setShowResolved((v) => !v)}>
+            {showResolved ? "Ocultar resolvidos" : "Mostrar resolvidos"}
+          </Button>
+        </div>
       </div>
 
       {loading ? (
