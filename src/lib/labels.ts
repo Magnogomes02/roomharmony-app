@@ -65,6 +65,7 @@ const AUDIT_ACTION_LABELS: Record<string, string> = {
   "conflict.adjust": "Conflito ajustado",
   "conflict.cancel_occurrence": "Conflito resolvido com cancelamento",
   "conflict.manual_resolve": "Conflito marcado como resolvido",
+  "ai.contract_assist": "Assistente de contratos usado",
   "contract.attachment_delete": "Anexo de contrato excluído",
   "contract.attachment_upload": "Anexo de contrato enviado",
   "contract.cancel": "Contrato cancelado",

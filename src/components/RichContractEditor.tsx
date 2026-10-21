@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import {
   Bold, Italic, Underline as UIcon, List, ListOrdered, Minus,
   AlignLeft, AlignCenter, AlignRight, AlignJustify, FileSignature, Variable, Eye,
-  CornerDownRight,
+  CornerDownRight, Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import { CONTRACT_TEMPLATE_VARIABLE_GROUPS, PAGE_BREAK_MARKER } from "@/lib/contractTemplates";
 import { cn } from "@/lib/utils";
+import { ContractAssistantPanel } from "@/components/ContractAssistantPanel";
 
 interface Props {
   value: string;
@@ -70,6 +71,27 @@ export function RichContractEditor({ value, onChange, onPreview }: Props) {
   }, [value, editor]);
 
   const [blockStyle, setBlockStyle] = useState<string>("paragraph");
+
+  // Assistente de contratos: a seleção é guardada ao abrir o painel
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  const [assistantRange, setAssistantRange] = useState<{ from: number; to: number }>({ from: 0, to: 0 });
+  const [assistantSelection, setAssistantSelection] = useState("");
+
+  function openAssistant() {
+    if (!editor) return;
+    const { from, to } = editor.state.selection;
+    setAssistantRange({ from, to });
+    setAssistantSelection(from === to ? "" : editor.state.doc.textBetween(from, to, "\n\n", " "));
+    setAssistantOpen(true);
+  }
+
+  // uma transação só: um Ctrl+Z desfaz a inserção inteira
+  function applyAssistant(html: string, replace: boolean) {
+    if (!editor) return;
+    const { from, to } = assistantRange;
+    const target = replace ? { from, to } : to;
+    editor.chain().focus().insertContentAt(target, html).run();
+  }
 
   function applyBlock(v: string) {
     if (!editor) return;
@@ -170,6 +192,17 @@ export function RichContractEditor({ value, onChange, onPreview }: Props) {
           <FileSignature className="mr-1 h-4 w-4" /> Assinaturas
         </ToolbarBtn>
 
+        <div className="mx-1 h-5 w-px bg-border" />
+
+        <Button
+          type="button" size="sm" variant="ghost"
+          className="h-8 px-2 font-medium text-primary-ink"
+          title="Assistente de contratos (IA)"
+          onClick={openAssistant}
+        >
+          <Sparkles className="mr-1 h-4 w-4" aria-hidden="true" /> Assistente
+        </Button>
+
         {onPreview && (
           <>
             <div className="ml-auto" />
@@ -181,6 +214,14 @@ export function RichContractEditor({ value, onChange, onPreview }: Props) {
       </div>
 
       <EditorContent editor={editor} className={cn("max-h-[60vh] overflow-y-auto")} />
+
+      <ContractAssistantPanel
+        open={assistantOpen}
+        onOpenChange={setAssistantOpen}
+        selectionText={assistantSelection}
+        onInsert={(html) => applyAssistant(html, false)}
+        onReplace={(html) => applyAssistant(html, true)}
+      />
     </div>
   );
 }

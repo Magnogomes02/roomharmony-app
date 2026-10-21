@@ -248,6 +248,11 @@ Os componentes são táteis e confiantes: respondem a cada toque, têm contraste
 - **Regras de comparação:** texto em ordem alfabética do português (sem diferenciar maiúsculas e acentos, números dentro do texto em ordem numérica), valores e datas pelo valor real, status em ordem de urgência, vazios sempre por último. Empates mantêm a ordem original.
 - **Listas em cards** (ex.: Conflitos) usam o mesmo hook com um seletor "Ordenar por" e um botão para inverter o sentido.
 
+### Assistente de contratos (IA)
+- **Onde:** botão "Assistente" (ícone de brilho, em Dourado Tinta) na barra do editor de contratos. Abre um painel lateral à direita; no celular, uma gaveta de baixo para cima.
+- **Estrutura do painel:** aviso de privacidade e contador de uso no topo; abas "Redigir cláusula" e "Aprimorar seleção"; prévia em papel branco com as variáveis destacadas (conhecidas em Dourado Pálido, desconhecidas em vermelho); aviso jurídico fixo; ações no rodapé ("Inserir no cursor", "Substituir seleção", "Gerar outra versão").
+- **Regras:** nada da IA entra no editor sem passar pela prévia; variáveis desconhecidas bloqueiam a inserção até virarem campo a preencher; a inserção é uma transação só (um Ctrl+Z desfaz).
+
 ### Navigation
 - **Sidebar:** é o balcão em Nogueira Noturna, com texto Junta de Areia e ícones de 16px ao lado de rótulos em 14px. No hover e no item ativo, o fundo vira Nogueira Realce. No topo fica a marca (quadrado dourado de 36px com cantos de 12px e o nome em serifa). No rodapé ficam o e-mail do usuário, o papel em dourado e caixa alta e o botão Sair.
 - **Mobile:** abaixo de 768px a sidebar vira gaveta de 18rem, aberta pelo gatilho no cabeçalho fixo.
