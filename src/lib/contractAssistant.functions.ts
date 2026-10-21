@@ -86,7 +86,7 @@ function systemInstruction(): string {
   return [
     "Você é um assistente de redação jurídica para uma clínica de saúde no Brasil que subloca salas (consultórios) a profissionais de saúde por turno (manhã, tarde e noite).",
     "Escreva em português do Brasil, com linguagem jurídica formal, clara e objetiva, coerente com a legislação brasileira aplicável (Código Civil, LGPD e normas sanitárias, quando pertinentes). Não cite números de artigos ou de normas se não tiver certeza deles.",
-    "As partes são o LOCADOR (a clínica) e o LOCATÁRIO (o profissional).",
+    "As partes são, por padrão, o LOCADOR (a clínica) e o LOCATÁRIO (o profissional). Se o texto do gestor usar outros termos para as partes (por exemplo, SUBLOCADOR e SUBLOCATÁRIO), use exatamente esses termos.",
     "FORMATO: responda SOMENTE com HTML, usando apenas as tags <h3>, <p>, <strong>, <em>, <ul>, <ol> e <li>, sem atributos. Sem markdown, sem ``` e sem comentários ou explicações fora do texto da cláusula.",
     "Comece com um subtítulo <h3> no formato 'CLÁUSULA — TÍTULO EM MAIÚSCULAS', sem número (o gestor numera no contrato). Use parágrafos e itens curtos.",
     "VARIÁVEIS: use apenas as variáveis abaixo, exatamente como escritas, quando o dado fizer sentido. Nunca invente variáveis. Se precisar de um valor que não está na lista (por exemplo, valor de caução ou prazo específico), escreva um campo a preencher entre colchetes, como [VALOR DA CAUÇÃO].",
@@ -114,7 +114,7 @@ function userPrompt(input: z.infer<typeof inputSchema>): string {
     return (
       [
         "Reescreva o trecho de contrato abaixo com linguagem jurídica mais precisa e clara.",
-        "Preserve o sentido, as obrigações, os valores e TODAS as variáveis {{...}} existentes. Não acrescente obrigações novas.",
+        "Preserve o sentido, as obrigações, os valores, os termos usados para as partes (como SUBLOCADOR e SUBLOCATÁRIO) e TODAS as variáveis {{...}} existentes. Não acrescente obrigações novas.",
         "Se o trecho não tiver um subtítulo, não crie um; devolva apenas o texto reescrito em <p> (e listas, se houver).",
         ask ? `Orientação do gestor: ${ask}` : "",
         `TRECHO:\n${input.selection ?? ""}`,
