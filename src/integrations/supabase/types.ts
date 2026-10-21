@@ -1238,36 +1238,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      apply_pending_credits: { Args: { _module: string }; Returns: number }
-      cancel_receivable: {
-        Args: { _cancel_type: string; _reason: string; _receivable_id: string }
-        Returns: Json
-      }
-      clinic_today: { Args: never; Returns: string }
-      contract_delete_impact: { Args: { _contract_id: string }; Returns: Json }
-      delete_contract: { Args: { _contract_id: string }; Returns: Json }
-      recompute_receivable_summary: {
-        Args: { _receivable_id: string }
-        Returns: string
-      }
-      register_receivable_payment: {
-        Args: {
-          _amount: number
-          _attachment_path?: string
-          _notes?: string
-          _overpayment_action?: string
-          _paid_at: string
-          _payment_method: string
-          _receivable_id: string
-          _remaining_due_date?: string
-          _remaining_due_reason?: string
-        }
-        Returns: Json
-      }
-      reverse_receivable_payment: {
-        Args: { _payment_id: string; _reason: string }
-        Returns: Json
-      }
       cancel_contract: {
         Args: {
           _contract_id: string
