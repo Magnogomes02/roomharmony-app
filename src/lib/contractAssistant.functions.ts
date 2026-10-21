@@ -215,7 +215,8 @@ type GeminiCall =
 /**
  * Chama o Gemini tentando os modelos em ordem. Passa ao próximo quando o
  * modelo não existe para a chave (404) ou não tem cota gratuita ("limit: 0");
- * repete duas vezes, com espera, quando o Google está sobrecarregado (500/503).
+ * tenta mais uma vez, após 1 s, quando o modelo está sobrecarregado (500/503) e, se
+ * continuar, passa ao próximo modelo, que costuma estar livre.
  */
 async function callGemini(
   apiKey: string,
@@ -225,7 +226,7 @@ async function callGemini(
   const models = await candidateModels(apiKey);
   let last: GeminiCall | null = null;
   for (const model of models) {
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 0; attempt < 2; attempt++) {
       const res = await fetch(
         `${apiBase()}/v1beta/models/${encodeURIComponent(model)}:generateContent`,
         {
@@ -245,8 +246,8 @@ async function callGemini(
       const error = parseGoogleError(res.status, body);
       last = { ok: false, status: res.status, error, model };
       console.error("[contractAssistant] Gemini", describe(error, model));
-      if ((res.status === 500 || res.status === 503) && attempt < 2) {
-        await wait(attempt === 0 ? 800 : 2000);
+      if ((res.status === 500 || res.status === 503) && attempt < 1) {
+        await wait(1000);
         continue;
       }
       break;
