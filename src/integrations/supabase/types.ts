@@ -1238,6 +1238,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      apply_pending_credits: { Args: { _module: string }; Returns: number }
       cancel_contract: {
         Args: {
           _contract_id: string
@@ -1247,6 +1248,13 @@ export type Database = {
         }
         Returns: Json
       }
+      cancel_receivable: {
+        Args: { _cancel_type: string; _reason: string; _receivable_id: string }
+        Returns: Json
+      }
+      clinic_today: { Args: never; Returns: string }
+      contract_delete_impact: { Args: { _contract_id: string }; Returns: Json }
+      delete_contract: { Args: { _contract_id: string }; Returns: Json }
       ensure_owner_access: { Args: never; Returns: Json }
       generate_contract_receivables: {
         Args: { _contract_id: string }
@@ -1261,9 +1269,56 @@ export type Database = {
       }
       is_owner_admin: { Args: never; Returns: boolean }
       mark_overdue_receivables: { Args: never; Returns: number }
+      receivable_effective_status: {
+        Args: {
+          _amount_due: number
+          _amount_paid: number
+          _credit_applied: number
+          _due_date: string
+          _remaining_due_date: string
+          _status: string
+        }
+        Returns: string
+      }
+      recompute_receivable_summary: {
+        Args: { _receivable_id: string }
+        Returns: string
+      }
       regenerate_contract_receivables: {
         Args: { _contract_id: string }
         Returns: number
+      }
+      register_receivable_payment: {
+        Args: {
+          _amount: number
+          _attachment_path?: string
+          _notes?: string
+          _overpayment_action?: string
+          _paid_at: string
+          _payment_method: string
+          _receivable_id: string
+          _remaining_due_date?: string
+          _remaining_due_reason?: string
+        }
+        Returns: Json
+      }
+      require_gestor: { Args: never; Returns: undefined }
+      reverse_receivable_payment: {
+        Args: { _payment_id: string; _reason: string }
+        Returns: Json
+      }
+      reverse_receivable_payment_core: {
+        Args: { _payment_id: string; _reason: string; _receipt_reason: string }
+        Returns: string[]
+      }
+      write_audit: {
+        Args: {
+          _action: string
+          _entity_id: string
+          _entity_type: string
+          _metadata: Json
+        }
+        Returns: undefined
       }
     }
     Enums: {
