@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, Loader2, RefreshCw, Sparkles } from "lucide-react";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -46,14 +52,22 @@ function highlightPlaceholders(html: string, unknown: string[]): string {
   );
 }
 
-export function ContractAssistantPanel({ open, onOpenChange, selectionText, onInsert, onReplace }: Props) {
+export function ContractAssistantPanel({
+  open,
+  onOpenChange,
+  selectionText,
+  onInsert,
+  onReplace,
+}: Props) {
   const isMobile = useIsMobile();
   const hasSelection = selectionText.trim().length > 0;
   const [mode, setMode] = useState<AssistantMode>("draft");
   const [request, setRequest] = useState("");
   const [usage, setUsage] = useState<AssistantUsage | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<{ message: string; retry: boolean } | null>(null);
+  const [error, setError] = useState<{ message: string; detail?: string; retry: boolean } | null>(
+    null,
+  );
   const [html, setHtml] = useState("");
   const [last, setLast] = useState<Pending | null>(null);
   // pedido em andamento; "Cancelar" descarta a resposta que chegar depois
@@ -102,12 +116,26 @@ export function ContractAssistantPanel({ open, onOpenChange, selectionText, onIn
         setHtml(sanitizeAssistantHtml(res.html));
         setUsage((u) => (u ? { ...u, used: res.used } : u));
       } else {
-        setError({ message: res.message, retry: !["forbidden", "limit", "not_configured", "provider_key"].includes(res.code) });
+        setError({
+          message: res.message,
+          detail: res.detail,
+          retry: ![
+            "forbidden",
+            "limit",
+            "not_configured",
+            "provider_key",
+            "provider_region",
+            "provider_model",
+          ].includes(res.code),
+        });
         if (res.used !== undefined) setUsage((u) => (u ? { ...u, used: res.used! } : u));
       }
     } catch {
       if (seq !== requestSeq.current) return;
-      setError({ message: "Não foi possível falar com o servidor. Verifique a conexão e tente de novo.", retry: true });
+      setError({
+        message: "Não foi possível falar com o servidor. Verifique a conexão e tente de novo.",
+        retry: true,
+      });
     } finally {
       if (seq === requestSeq.current) setLoading(false);
     }
@@ -139,7 +167,8 @@ export function ContractAssistantPanel({ open, onOpenChange, selectionText, onIn
       >
         <SheetHeader className="border-b p-4 pr-12 text-left">
           <SheetTitle className="flex items-center gap-2 font-serif text-xl">
-            <Sparkles className="h-5 w-5 text-primary-ink" aria-hidden="true" /> Assistente de contratos
+            <Sparkles className="h-5 w-5 text-primary-ink" aria-hidden="true" /> Assistente de
+            contratos
           </SheetTitle>
           <SheetDescription>
             Use só variáveis como {"{{LOCATARIO_NOME}}"}; não cole nomes, CPF ou outros dados reais.
@@ -152,7 +181,14 @@ export function ContractAssistantPanel({ open, onOpenChange, selectionText, onIn
         </SheetHeader>
 
         <div className="flex-1 space-y-4 overflow-y-auto p-4">
-          <Tabs value={mode} onValueChange={(v) => { setMode(v as AssistantMode); setHtml(""); setError(null); }}>
+          <Tabs
+            value={mode}
+            onValueChange={(v) => {
+              setMode(v as AssistantMode);
+              setHtml("");
+              setError(null);
+            }}
+          >
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="draft">Redigir cláusula</TabsTrigger>
               <TabsTrigger value="improve" disabled={!hasSelection}>
@@ -167,7 +203,10 @@ export function ContractAssistantPanel({ open, onOpenChange, selectionText, onIn
           )}
 
           {blockedReason && (
-            <p role="status" className="rounded-md border border-warning/50 bg-warning/10 px-3 py-2 text-sm text-warning-ink">
+            <p
+              role="status"
+              className="rounded-md border border-warning/50 bg-warning/10 px-3 py-2 text-sm text-warning-ink"
+            >
               {blockedReason}
             </p>
           )}
@@ -184,7 +223,9 @@ export function ContractAssistantPanel({ open, onOpenChange, selectionText, onIn
                       variant="outline"
                       size="sm"
                       disabled={loading || !!blockedReason}
-                      onClick={() => run({ mode: "draft", request: "", shortcutId: s.id, variation: 0 })}
+                      onClick={() =>
+                        run({ mode: "draft", request: "", shortcutId: s.id, variation: 0 })
+                      }
                     >
                       {s.label}
                     </Button>
@@ -258,10 +299,22 @@ export function ContractAssistantPanel({ open, onOpenChange, selectionText, onIn
           )}
 
           {error && !loading && (
-            <div role="alert" className="space-y-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm">
+            <div
+              role="alert"
+              className="space-y-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm"
+            >
               <p className="flex items-start gap-2 text-destructive">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /> {error.message}
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />{" "}
+                {error.message}
               </p>
+              {error.detail && (
+                <details className="text-xs text-muted-foreground">
+                  <summary className="cursor-pointer select-none font-medium">
+                    Detalhes técnicos
+                  </summary>
+                  <p className="mt-1 break-words font-mono">{error.detail}</p>
+                </details>
+              )}
               {error.retry && last && (
                 <Button type="button" variant="outline" size="sm" onClick={() => run(last)}>
                   Tentar de novo
@@ -279,12 +332,24 @@ export function ContractAssistantPanel({ open, onOpenChange, selectionText, onIn
                 dangerouslySetInnerHTML={{ __html: highlightPlaceholders(html, unknown) }}
               />
               {unknown.length > 0 && (
-                <div role="alert" className="space-y-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm">
+                <div
+                  role="alert"
+                  className="space-y-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm"
+                >
                   <p className="text-destructive">
-                    O texto usa {unknown.length === 1 ? "uma variável que não existe" : "variáveis que não existem"} no
-                    sistema ({unknown.map((u) => `{{${u}}}`).join(", ")}); no PDF {unknown.length === 1 ? "ela sairia vazia" : "elas sairiam vazias"}.
+                    O texto usa{" "}
+                    {unknown.length === 1
+                      ? "uma variável que não existe"
+                      : "variáveis que não existem"}{" "}
+                    no sistema ({unknown.map((u) => `{{${u}}}`).join(", ")}); no PDF{" "}
+                    {unknown.length === 1 ? "ela sairia vazia" : "elas sairiam vazias"}.
                   </p>
-                  <Button type="button" variant="outline" size="sm" onClick={() => setHtml(replaceUnknownPlaceholders(html))}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setHtml(replaceUnknownPlaceholders(html))}
+                  >
                     Trocar por campo a preencher
                   </Button>
                 </div>
@@ -302,7 +367,12 @@ export function ContractAssistantPanel({ open, onOpenChange, selectionText, onIn
               Inserir no cursor
             </Button>
             {hasSelection && (
-              <Button type="button" variant="outline" onClick={() => apply("replace")} disabled={unknown.length > 0}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => apply("replace")}
+                disabled={unknown.length > 0}
+              >
                 Substituir seleção
               </Button>
             )}

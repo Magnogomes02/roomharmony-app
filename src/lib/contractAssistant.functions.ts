@@ -26,12 +26,22 @@ export type AssistantErrorCode =
   | "provider_quota"
   | "provider_key"
   | "provider_blocked"
+  | "provider_region"
+  | "provider_model"
   | "provider_error"
   | "empty";
 
 export type AssistantResult =
   | { ok: true; html: string; used: number; limit: number }
-  | { ok: false; code: AssistantErrorCode; message: string; used?: number; limit?: number };
+  | {
+      ok: false;
+      code: AssistantErrorCode;
+      message: string;
+      /** motivo técnico devolvido pelo Google (status, código e mensagem), para diagnóstico */
+      detail?: string;
+      used?: number;
+      limit?: number;
+    };
 
 export interface AssistantUsage {
   used: number;
@@ -40,8 +50,12 @@ export interface AssistantUsage {
   isGestor: boolean;
 }
 
-// modelo estável atual; GEMINI_MODEL (segredo opcional) troca sem mexer no código
-const DEFAULT_MODELS = ["gemini-3.8-flash", "gemini-flash-latest"];
+// preferidos, nesta ordem; GEMINI_MODEL (segredo opcional) passa na frente de todos
+const DEFAULT_MODELS = ["gemini-3.8-flash", "gemini-flash-latest", "gemini-2.5-flash"];
+
+function apiBase(): string {
+  return process.env.GEMINI_API_BASE ?? "https://generativelanguage.googleapis.com";
+}
 
 function startOfClinicDayIso(): string {
   // Recife: UTC-3, sem horário de verão
@@ -96,45 +110,230 @@ function userPrompt(input: z.infer<typeof inputSchema>): string {
       ? "\n\nOfereça uma redação alternativa à anterior, com outra estrutura de parágrafos, mantendo o mesmo conteúdo jurídico."
       : "";
   if (input.mode === "improve") {
-    return [
-      "Reescreva o trecho de contrato abaixo com linguagem jurídica mais precisa e clara.",
-      "Preserve o sentido, as obrigações, os valores e TODAS as variáveis {{...}} existentes. Não acrescente obrigações novas.",
-      "Se o trecho não tiver um subtítulo, não crie um; devolva apenas o texto reescrito em <p> (e listas, se houver).",
-      ask ? `Orientação do gestor: ${ask}` : "",
-      `TRECHO:\n${input.selection ?? ""}`,
-    ]
-      .filter(Boolean)
-      .join("\n\n") + variation;
+    return (
+      [
+        "Reescreva o trecho de contrato abaixo com linguagem jurídica mais precisa e clara.",
+        "Preserve o sentido, as obrigações, os valores e TODAS as variáveis {{...}} existentes. Não acrescente obrigações novas.",
+        "Se o trecho não tiver um subtítulo, não crie um; devolva apenas o texto reescrito em <p> (e listas, se houver).",
+        ask ? `Orientação do gestor: ${ask}` : "",
+        `TRECHO:\n${input.selection ?? ""}`,
+      ]
+        .filter(Boolean)
+        .join("\n\n") + variation
+    );
   }
   return `Redija uma cláusula contratual para: ${ask}${variation}`;
 }
 
-async function callGemini(apiKey: string, prompt: string, temperature: number) {
-  const models = [process.env.GEMINI_MODEL, ...DEFAULT_MODELS].filter(Boolean) as string[];
-  let last: { status: number; body: string } = { status: 0, body: "" };
-  for (const model of models) {
-    const res = await fetch(
-      `${process.env.GEMINI_API_BASE ?? "https://generativelanguage.googleapis.com"}/v1beta/models/${encodeURIComponent(model)}:generateContent`,
-      {
-        method: "POST",
-        headers: { "content-type": "application/json", "x-goog-api-key": apiKey },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: systemInstruction() }] },
-          contents: [{ role: "user", parts: [{ text: prompt }] }],
-          generationConfig: { temperature, maxOutputTokens: 4096 },
-        }),
-        signal: AbortSignal.timeout(45_000),
-      },
-    );
-    const body = await res.text();
-    // modelo inexistente para esta chave: tenta o próximo da lista
-    if (res.status === 404) {
-      last = { status: res.status, body };
-      continue;
-    }
-    return { status: res.status, body };
+interface GoogleError {
+  code: number;
+  status: string;
+  message: string;
+  reason: string;
+}
+
+/** Lê o erro no formato do Google: { error: { code, status, message, details: [{ reason }] } }. */
+function parseGoogleError(httpStatus: number, body: string): GoogleError {
+  try {
+    const e = (
+      JSON.parse(body) as {
+        error?: {
+          code?: number;
+          status?: string;
+          message?: string;
+          details?: { reason?: string }[];
+        };
+      }
+    ).error;
+    return {
+      code: e?.code ?? httpStatus,
+      status: e?.status ?? "",
+      message: e?.message ?? body.slice(0, 300),
+      reason: e?.details?.find((d) => d.reason)?.reason ?? "",
+    };
+  } catch {
+    return { code: httpStatus, status: "", message: body.slice(0, 300), reason: "" };
   }
-  return last;
+}
+
+function describe(err: GoogleError, model: string): string {
+  const head = [`HTTP ${err.code}`, err.status, err.reason].filter(Boolean).join(" · ");
+  // nunca devolve a chave, mesmo se o Google a ecoar
+  const message = err.message.replace(/AIza[0-9A-Za-z_-]{20,}/g, "[chave]").slice(0, 400);
+  return `${head} — ${message} (modelo ${model})`;
+}
+
+// modelos disponíveis para a chave; guardado enquanto o servidor estiver de pé
+let discovered: { at: number; models: string[] } | null = null;
+
+/**
+ * Lista os modelos "flash" de texto que esta chave pode usar (ListModels).
+ * Estáveis antes de prévias; ignora variantes de imagem, áudio e "live".
+ */
+async function discoverModels(apiKey: string): Promise<string[]> {
+  if (discovered && Date.now() - discovered.at < 6 * 60 * 60 * 1000) return discovered.models;
+  try {
+    const res = await fetch(`${apiBase()}/v1beta/models?pageSize=200`, {
+      headers: { "x-goog-api-key": apiKey },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) return [];
+    const json = (await res.json()) as {
+      models?: { name?: string; supportedGenerationMethods?: string[] }[];
+    };
+    const models = (json.models ?? [])
+      .filter((m) => m.supportedGenerationMethods?.includes("generateContent"))
+      .map((m) => (m.name ?? "").replace(/^models\//, ""))
+      .filter((n) => /flash/.test(n) && !/image|audio|tts|live|embedding|exp/.test(n))
+      .sort((a, b) => rank(a) - rank(b) || b.localeCompare(a, "en", { numeric: true }));
+    discovered = { at: Date.now(), models };
+    return models;
+  } catch {
+    return [];
+  }
+}
+
+function rank(name: string): number {
+  return (/preview/.test(name) ? 2 : 0) + (/lite/.test(name) ? 1 : 0);
+}
+
+async function candidateModels(apiKey: string): Promise<string[]> {
+  const available = await discoverModels(apiKey);
+  const preferred = available.length
+    ? DEFAULT_MODELS.filter((m) => available.includes(m))
+    : DEFAULT_MODELS;
+  const list = [process.env.GEMINI_MODEL, ...preferred, ...available].filter(Boolean) as string[];
+  return [...new Set(list)].slice(0, 5);
+}
+
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+type GeminiCall =
+  | { ok: true; body: string; model: string }
+  | { ok: false; status: number; error: GoogleError; model: string };
+
+/**
+ * Chama o Gemini tentando os modelos em ordem. Passa ao próximo quando o
+ * modelo não existe para a chave (404) ou não tem cota gratuita ("limit: 0");
+ * repete duas vezes, com espera, quando o Google está sobrecarregado (500/503).
+ */
+async function callGemini(
+  apiKey: string,
+  prompt: string,
+  temperature: number,
+): Promise<GeminiCall> {
+  const models = await candidateModels(apiKey);
+  let last: GeminiCall | null = null;
+  for (const model of models) {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const res = await fetch(
+        `${apiBase()}/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-goog-api-key": apiKey },
+          body: JSON.stringify({
+            system_instruction: { parts: [{ text: systemInstruction() }] },
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            // os modelos "flash" atuais pensam antes de responder e isso conta neste teto
+            generationConfig: { temperature, maxOutputTokens: 8192 },
+          }),
+          signal: AbortSignal.timeout(45_000),
+        },
+      );
+      const body = await res.text();
+      if (res.ok) return { ok: true, body, model };
+      const error = parseGoogleError(res.status, body);
+      last = { ok: false, status: res.status, error, model };
+      console.error("[contractAssistant] Gemini", describe(error, model));
+      if ((res.status === 500 || res.status === 503) && attempt < 2) {
+        await wait(attempt === 0 ? 800 : 2000);
+        continue;
+      }
+      break;
+    }
+    if (!last || last.ok) break;
+    const noFreeQuota = last.status === 429 && /limit: 0|free_tier/i.test(last.error.message);
+    if (last.status === 404 || noFreeQuota || last.status === 500 || last.status === 503) continue;
+    break;
+  }
+  return (
+    last ?? {
+      ok: false,
+      status: 404,
+      error: {
+        code: 404,
+        status: "NOT_FOUND",
+        message: "nenhum modelo flash disponível",
+        reason: "",
+      },
+      model: "-",
+    }
+  );
+}
+
+function providerFailure(call: Extract<GeminiCall, { ok: false }>): AssistantResult {
+  const { status, error } = call;
+  const detail = describe(error, call.model);
+  const text = `${error.status} ${error.reason} ${error.message}`;
+  if (/API_KEY_INVALID|API key not valid|API_KEY_/i.test(text)) {
+    return {
+      ok: false,
+      code: "provider_key",
+      detail,
+      message: "A chave do Gemini não é válida. Confira o segredo GEMINI_API_KEY.",
+    };
+  }
+  if (/location is not supported|FAILED_PRECONDITION/i.test(text)) {
+    return {
+      ok: false,
+      code: "provider_region",
+      detail,
+      message:
+        "O Google não liberou o plano gratuito do Gemini para a região do servidor que fez o pedido. Veja os detalhes técnicos.",
+    };
+  }
+  if (status === 401 || status === 403) {
+    return {
+      ok: false,
+      code: "provider_key",
+      detail,
+      message: /SERVICE_DISABLED|has not been used|disabled/i.test(text)
+        ? "A API do Gemini está desativada no projeto da chave. Ative a Generative Language API no Google Cloud ou crie a chave pelo Google AI Studio."
+        : "A chave do Gemini foi recusada. Confira o segredo GEMINI_API_KEY.",
+    };
+  }
+  if (status === 429) {
+    return {
+      ok: false,
+      code: "provider_quota",
+      detail,
+      message: /limit: 0/i.test(text)
+        ? "Esta chave não tem cota gratuita para os modelos do Gemini disponíveis. Veja os detalhes técnicos."
+        : "O limite gratuito do Gemini foi atingido por agora. Tente de novo em alguns minutos.",
+    };
+  }
+  if (status === 404) {
+    return {
+      ok: false,
+      code: "provider_model",
+      detail,
+      message: "Nenhum modelo do Gemini está disponível para esta chave.",
+    };
+  }
+  if (status === 500 || status === 503) {
+    return {
+      ok: false,
+      code: "provider_error",
+      detail,
+      message: "O Gemini está sobrecarregado agora. Tente de novo em instantes.",
+    };
+  }
+  return {
+    ok: false,
+    code: "provider_error",
+    detail,
+    message: "O Gemini recusou o pedido. Veja os detalhes técnicos.",
+  };
 }
 
 export const askContractAssistant = createServerFn({ method: "POST" })
@@ -143,10 +342,18 @@ export const askContractAssistant = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<AssistantResult> => {
     const { supabase, userId } = context;
     if (!(await isGestor(supabase, userId))) {
-      return { ok: false, code: "forbidden", message: "O Assistente de contratos é exclusivo para gestores." };
+      return {
+        ok: false,
+        code: "forbidden",
+        message: "O Assistente de contratos é exclusivo para gestores.",
+      };
     }
     if (data.mode === "improve" && !data.selection?.trim()) {
-      return { ok: false, code: "empty", message: "Selecione no editor o trecho que deseja aprimorar." };
+      return {
+        ok: false,
+        code: "empty",
+        message: "Selecione no editor o trecho que deseja aprimorar.",
+      };
     }
     if (data.mode === "draft" && !data.request && !data.shortcutId) {
       return { ok: false, code: "empty", message: "Descreva a cláusula ou escolha um atalho." };
@@ -168,54 +375,57 @@ export const askContractAssistant = createServerFn({ method: "POST" })
       return {
         ok: false,
         code: "not_configured",
-        message: "O assistente ainda não está configurado: falta o segredo GEMINI_API_KEY no servidor.",
+        message:
+          "O assistente ainda não está configurado: falta o segredo GEMINI_API_KEY no servidor.",
       };
     }
 
-    let result: { status: number; body: string };
+    let call: GeminiCall;
     try {
-      result = await callGemini(apiKey, userPrompt(data), data.variation > 0 ? 0.8 : 0.4);
-    } catch {
-      return { ok: false, code: "provider_error", message: "O Gemini demorou demais para responder. Tente de novo." };
-    }
-
-    if (result.status === 429) {
+      call = await callGemini(apiKey, userPrompt(data), data.variation > 0 ? 0.8 : 0.4);
+    } catch (err) {
+      const timedOut = err instanceof Error && /timeout|abort/i.test(`${err.name} ${err.message}`);
+      console.error("[contractAssistant] fetch", err);
       return {
         ok: false,
-        code: "provider_quota",
-        message: "O limite gratuito do Gemini foi atingido por agora. Tente de novo em alguns minutos.",
+        code: "provider_error",
+        detail: err instanceof Error ? `${err.name}: ${err.message}` : String(err),
+        message: timedOut
+          ? "O Gemini demorou demais para responder. Tente de novo."
+          : "O servidor não conseguiu falar com o Gemini. Tente de novo.",
       };
     }
-    if (result.status === 400 && /API_KEY_INVALID|API key not valid/i.test(result.body)) {
-      return { ok: false, code: "provider_key", message: "A chave do Gemini não é válida. Confira o segredo GEMINI_API_KEY." };
-    }
-    if (result.status === 401 || result.status === 403) {
-      return { ok: false, code: "provider_key", message: "A chave do Gemini foi recusada. Confira o segredo GEMINI_API_KEY." };
-    }
-    if (result.status < 200 || result.status >= 300) {
-      console.error("[contractAssistant] Gemini", result.status, result.body.slice(0, 500));
-      return { ok: false, code: "provider_error", message: "O Gemini não conseguiu responder agora. Tente de novo." };
-    }
+    if (!call.ok) return providerFailure(call);
+    const result = { body: call.body };
 
     let html = "";
+    let finishReason = "";
     try {
       const json = JSON.parse(result.body) as {
         promptFeedback?: { blockReason?: string };
         candidates?: { finishReason?: string; content?: { parts?: { text?: string }[] } }[];
       };
-      if (json.promptFeedback?.blockReason || json.candidates?.[0]?.finishReason === "SAFETY") {
+      finishReason = json.candidates?.[0]?.finishReason ?? json.promptFeedback?.blockReason ?? "";
+      if (json.promptFeedback?.blockReason || /SAFETY|PROHIBITED|BLOCKLIST/.test(finishReason)) {
         return {
           ok: false,
           code: "provider_blocked",
           message: "O Gemini recusou este pedido. Reformule com outras palavras.",
         };
       }
-      html = stripCodeFences((json.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? "").join(""));
+      html = stripCodeFences(
+        (json.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? "").join(""),
+      );
     } catch {
       html = "";
     }
     if (!html) {
-      return { ok: false, code: "empty", message: "O Gemini devolveu uma resposta vazia. Tente de novo." };
+      return {
+        ok: false,
+        code: "empty",
+        detail: `finishReason ${finishReason || "-"} (modelo ${call.model})`,
+        message: "O Gemini devolveu uma resposta vazia. Tente de novo.",
+      };
     }
 
     // registra o uso (sem guardar o texto); é também o contador do limite diário
@@ -229,6 +439,7 @@ export const askContractAssistant = createServerFn({ method: "POST" })
         shortcut: data.shortcutId ?? null,
         variation: data.variation,
         chars: html.length,
+        model: call.model,
       },
     });
 
