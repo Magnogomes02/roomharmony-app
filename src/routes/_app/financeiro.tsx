@@ -61,6 +61,7 @@ import {
   RECEIVABLE_STATUS_LABELS,
 } from "@/lib/labels";
 import { useConfirm } from "@/components/ConfirmDialog";
+import { StatusToggleFilter, useVisibleStatuses, type StatusTone } from "@/components/finance/StatusToggleFilter";
 import {
   createReceiptForReceivable,
   cancelReceiptForReceivable,
@@ -158,6 +159,26 @@ const STATUS_VARIANT: Record<
     cancelado: "outline",
   };
 
+type ReceivableBucket = "a_receber" | "parcial" | "recebido" | "atrasado" | "perda" | "errada";
+
+const RECEIVABLE_BUCKETS: readonly ReceivableBucket[] = [
+  "a_receber",
+  "parcial",
+  "recebido",
+  "atrasado",
+  "perda",
+  "errada",
+];
+
+const RECEIVABLE_BUCKET_META: Record<ReceivableBucket, { label: string; tone: StatusTone }> = {
+  a_receber: { label: "A receber", tone: "warning" },
+  parcial: { label: "Parciais", tone: "primary" },
+  recebido: { label: "Recebidos", tone: "success" },
+  atrasado: { label: "Em atraso", tone: "destructive" },
+  perda: { label: "Perdas", tone: "muted" },
+  errada: { label: "Erradas", tone: "muted" },
+};
+
 function brl(v: number | null | undefined) {
   return (Number(v) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
@@ -176,7 +197,8 @@ function FinanceiroPage() {
   const [monthRef, setMonthRef] = useState<Date>(startOfMonth(new Date()));
   const [search, setSearch] = useState("");
   const [kindFilter, setKindFilter] = useState<"all" | "contrato" | "avulso">("all");
-  const [tab, setTab] = useState<EffectiveStatus | "perda" | "errada" | "todos">("a_receber");
+  // filtro de status: todos visíveis por padrão, seleção lembrada neste navegador
+  const statusFilter = useVisibleStatuses<ReceivableBucket>("financeiro.recebiveis.status", RECEIVABLE_BUCKETS);
   const [financeView, setFinanceView] = useState<"recebiveis" | "analise" | "contas_a_pagar">(
     "recebiveis",
   );
@@ -354,18 +376,16 @@ function FinanceiroPage() {
     });
   }
 
-  const filtered = useMemo(() => {
+  // em qual botão de status o recebível entra; cancelados sem tipo contam como perda
+  function bucketOf(row: Receivable): ReceivableBucket {
+    if (row.status === "cancelado") return row.cancel_type === "cobranca_errada" ? "errada" : "perda";
+    const effective = effectiveOf(row);
+    return effective === "cancelado" ? "perda" : effective;
+  }
+
+  // linhas que passam pela busca e pelo tipo (base das contagens de cada status)
+  const searched = useMemo(() => {
     return rows.filter((row) => {
-      const effective = effectiveOf(row);
-      if (tab === "perda") {
-        if (!(row.status === "cancelado" && row.cancel_type === "perda_contrato")) return false;
-      } else if (tab === "errada") {
-        if (!(row.status === "cancelado" && row.cancel_type === "cobranca_errada")) return false;
-      } else if (tab !== "todos") {
-        if (tab === "cancelado") {
-          if (effective !== "cancelado") return false;
-        } else if (effective !== tab) return false;
-      }
       if (kindFilter !== "all" && row.kind !== kindFilter) return false;
       if (search) {
         const q = search.toLowerCase();
@@ -374,7 +394,18 @@ function FinanceiroPage() {
       }
       return true;
     });
-  }, [rows, tab, kindFilter, search, profMap]);
+  }, [rows, kindFilter, search, profMap]);
+
+  const bucketCounts = useMemo(() => {
+    const c = Object.fromEntries(RECEIVABLE_BUCKETS.map((b) => [b, 0])) as Record<ReceivableBucket, number>;
+    for (const row of searched) c[bucketOf(row)] += 1;
+    return c;
+  }, [searched]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const filtered = useMemo(
+    () => searched.filter((row) => statusFilter.selected.has(bucketOf(row))),
+    [searched, statusFilter.selected], // eslint-disable-line react-hooks/exhaustive-deps
+  );
 
   const totals = useMemo(() => {
     // regra única de totais (Dashboard, Financeiro e Análise): src/lib/receivableTotals.ts
@@ -1188,18 +1219,14 @@ function FinanceiroPage() {
                 </Select>
               </div>
 
-              <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
-                <TabsList className="max-w-full justify-start overflow-x-auto">
-                  <TabsTrigger value="a_receber">A receber</TabsTrigger>
-                  <TabsTrigger value="parcial">Parciais</TabsTrigger>
-                  <TabsTrigger value="recebido">Recebidos</TabsTrigger>
-                  <TabsTrigger value="atrasado">Em atraso</TabsTrigger>
-                  <TabsTrigger value="perda">Perdas</TabsTrigger>
-                  <TabsTrigger value="errada">Erradas</TabsTrigger>
-                  <TabsTrigger value="todos">Todos</TabsTrigger>
-                </TabsList>
+              <div className="space-y-4">
+                <StatusToggleFilter
+                  options={RECEIVABLE_BUCKETS.map((b) => ({ ...RECEIVABLE_BUCKET_META[b], value: b, count: bucketCounts[b] }))}
+                  selected={statusFilter.selected}
+                  onToggle={statusFilter.toggle}
+                  label="Status exibidos"
+                />
 
-                <TabsContent value={tab} className="mt-4">
                   <div className="rounded-md border">
                     <Table>
                       <TableHeader>
@@ -1229,7 +1256,16 @@ function FinanceiroPage() {
                               colSpan={7}
                               className="py-8 text-center text-muted-foreground"
                             >
-                              Nenhum recebível.
+                              {statusFilter.selected.size === 0 ? (
+                                <span className="inline-flex flex-wrap items-center justify-center gap-2">
+                                  Nenhum status selecionado.
+                                  <Button variant="outline" size="sm" onClick={statusFilter.showAll}>
+                                    Mostrar todos
+                                  </Button>
+                                </span>
+                              ) : (
+                                "Nenhum recebível."
+                              )}
                             </TableCell>
                           </TableRow>
                         ) : (
@@ -1419,8 +1455,7 @@ function FinanceiroPage() {
                       </TableBody>
                     </Table>
                   </div>
-                </TabsContent>
-              </Tabs>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

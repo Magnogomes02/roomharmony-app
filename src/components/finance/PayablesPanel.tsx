@@ -65,6 +65,7 @@ import {
 } from "@/lib/installmentCredits";
 import type { Json } from "@/integrations/supabase/types";
 import { useConfirm } from "@/components/ConfirmDialog";
+import { StatusToggleFilter, useVisibleStatuses, type StatusTone } from "@/components/finance/StatusToggleFilter";
 
 interface Payable {
   id: string;
@@ -138,6 +139,16 @@ const STATUS_LABELS: Record<PayableStatus, string> = {
   cancelado: "Cancelado",
 };
 
+const PAYABLE_STATUSES: readonly PayableStatus[] = ["a_pagar", "parcial", "pago", "atrasado", "cancelado"];
+
+const PAYABLE_STATUS_TONE: Record<PayableStatus, StatusTone> = {
+  a_pagar: "warning",
+  parcial: "primary",
+  pago: "success",
+  atrasado: "destructive",
+  cancelado: "muted",
+};
+
 const STATUS_VARIANT: Record<
   PayableStatus,
   "default" | "secondary" | "destructive" | "outline" | "success" | "warning"
@@ -173,7 +184,8 @@ export function PayablesPanel() {
   const [items, setItems] = useState<Payable[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<PayableStatus | "all">("all");
+  // filtro de status: todos visíveis por padrão, seleção lembrada neste navegador
+  const statusFilter = useVisibleStatuses<PayableStatus>("financeiro.contas.status", PAYABLE_STATUSES);
 
   // Modals
   const [newOpen, setNewOpen] = useState(false);
@@ -248,19 +260,28 @@ export function PayablesPanel() {
 
   useEffect(() => { load(); }, [load]);
 
-  const filtered = useMemo(() => {
+  // linhas que passam pela busca (base das contagens de cada status)
+  const searched = useMemo(() => {
     const q = search.toLowerCase();
-    return items.filter((p) => {
-      const eff = computeEffectiveStatus(p);
-      if (statusFilter !== "all" && eff !== statusFilter) return false;
-      if (!q) return true;
-      return (
+    if (!q) return items;
+    return items.filter(
+      (p) =>
         p.description.toLowerCase().includes(q) ||
         (p.supplier ?? "").toLowerCase().includes(q) ||
-        (p.category ?? "").toLowerCase().includes(q)
-      );
-    });
-  }, [items, search, statusFilter]);
+        (p.category ?? "").toLowerCase().includes(q),
+    );
+  }, [items, search]);
+
+  const statusCounts = useMemo(() => {
+    const c = Object.fromEntries(PAYABLE_STATUSES.map((st) => [st, 0])) as Record<PayableStatus, number>;
+    for (const p of searched) c[computeEffectiveStatus(p)] += 1;
+    return c;
+  }, [searched]);
+
+  const filtered = useMemo(
+    () => searched.filter((p) => statusFilter.selected.has(computeEffectiveStatus(p))),
+    [searched, statusFilter.selected],
+  );
 
   const summary = useMemo(() => {
     let aPagar = 0, pago = 0, atrasado = 0;
@@ -1301,18 +1322,18 @@ export function PayablesPanel() {
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input placeholder="Buscar descrição, fornecedor..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
-            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as PayableStatus | "all")}>
-              <SelectTrigger className="w-[160px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os status</SelectItem>
-                {(Object.keys(STATUS_LABELS) as PayableStatus[]).map((s) => (
-                  <SelectItem key={s} value={s}>{STATUS_LABELS[s]}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
+          <StatusToggleFilter
+            options={PAYABLE_STATUSES.map((st) => ({
+              value: st,
+              label: STATUS_LABELS[st],
+              tone: PAYABLE_STATUS_TONE[st],
+              count: statusCounts[st],
+            }))}
+            selected={statusFilter.selected}
+            onToggle={statusFilter.toggle}
+            label="Status exibidos"
+          />
 
           <div className="rounded-md border">
             <Table>
@@ -1332,7 +1353,16 @@ export function PayablesPanel() {
                 {loading ? (
                   <TableRow><TableCell colSpan={canEdit ? 8 : 7} className="py-8 text-center text-muted-foreground">Carregando…</TableCell></TableRow>
                 ) : filtered.length === 0 ? (
-                  <TableRow><TableCell colSpan={canEdit ? 8 : 7} className="py-8 text-center text-muted-foreground">Nenhuma conta encontrada.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={canEdit ? 8 : 7} className="py-8 text-center text-muted-foreground">
+                    {statusFilter.selected.size === 0 ? (
+                      <span className="inline-flex flex-wrap items-center justify-center gap-2">
+                        Nenhum status selecionado.
+                        <Button variant="outline" size="sm" onClick={statusFilter.showAll}>Mostrar todos</Button>
+                      </span>
+                    ) : (
+                      "Nenhuma conta encontrada."
+                    )}
+                  </TableCell></TableRow>
                 ) : filtered.map((p) => {
                   const eff = computeEffectiveStatus(p);
                   return (
