@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { getClinicBranding } from "@/lib/contractPdf";
+import { dateOnlyToLocalNoonISOString, isDateOnly } from "@/lib/dateOnly";
 import { loadReceiptSettings, renderReceiptTemplate } from "@/lib/receiptSettings";
 import { createNotification } from "@/lib/notifications";
 import {
@@ -311,7 +312,11 @@ export async function createReceiptForReceivable(
     kind: rec.kind,
     reference_month: rec.reference_month,
     due_date: rec.due_date,
-    paid_at: snapshotPaid.paid_at as string,
+    // data pura (YYYY-MM-DD) vira meio-dia local: gravada como meia-noite UTC
+    // ela seria exibida como o dia anterior no horário do Brasil
+    paid_at: isDateOnly(snapshotPaid.paid_at as string)
+      ? dateOnlyToLocalNoonISOString(snapshotPaid.paid_at as string)
+      : (snapshotPaid.paid_at as string),
     payment_method: snapshotPaid.payment_method,
     amount_due: rec.amount_due,
     amount_paid: snapshotPaid.amount_paid,

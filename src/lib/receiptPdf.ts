@@ -31,6 +31,13 @@ function brl(v: number) {
 function fmtDate(d?: string | null) {
   return formatAnyDateBR(d);
 }
+// Recibos antigos gravaram a data do pagamento (só dia) como meia-noite UTC,
+// que no horário do Brasil cai no dia anterior. Esse instante exato só
+// aparece nesses casos, então é lido como a própria data.
+function fmtPaidDate(d?: string | null) {
+  const m = d?.match(/^(\d{4}-\d{2}-\d{2})[T ]00:00:00(?:\.0+)?(?:Z|\+00(?::?00)?)$/);
+  return fmtDate(m ? m[1] : d);
+}
 function fmtMonth(d: string) {
   const x = isDateOnly(d) ? parseDateOnlyLocal(d) : new Date(d);
   return `${String(x.getMonth() + 1).padStart(2, "0")}/${x.getFullYear()}`;
@@ -183,7 +190,7 @@ export async function renderReceiptPdf(
     ["E-mail", d.professional_email || "—"],
     ["Telefone", d.professional_phone || "—"],
     ["Forma de pagamento", d.payment_method || "—"],
-    ["Data do pagamento", fmtDate(d.paid_at)],
+    ["Data do pagamento", fmtPaidDate(d.paid_at)],
     ["Tipo", d.kind === "contrato" ? "Contrato" : "Avulso"],
     ["Sala(s)", d.room_name || "—"],
     ["Mês de referência", fmtMonth(d.reference_month)],
@@ -243,7 +250,7 @@ export async function renderReceiptPdf(
     PAGADOR_TELEFONE: d.professional_phone ?? "",
     VALOR_PAGO: brl(d.amount_paid),
     VALOR_PREVISTO: brl(d.amount_due),
-    DATA_PAGAMENTO: fmtDate(d.paid_at),
+    DATA_PAGAMENTO: fmtPaidDate(d.paid_at),
     FORMA_PAGAMENTO: d.payment_method ?? "",
     DATA_EMISSAO: fmtDate(d.issued_at),
     NUMERO_RECIBO: d.receipt_number,
