@@ -1239,6 +1239,15 @@ export type Database = {
     }
     Functions: {
       apply_pending_credits: { Args: { _module: string }; Returns: number }
+      cancel_contract: {
+        Args: {
+          _contract_id: string
+          _effective_month: string
+          _reason?: string
+          _termination_fee?: number
+        }
+        Returns: Json
+      }
       cancel_receivable: {
         Args: { _cancel_type: string; _reason: string; _receivable_id: string }
         Returns: Json
@@ -1246,9 +1255,38 @@ export type Database = {
       clinic_today: { Args: never; Returns: string }
       contract_delete_impact: { Args: { _contract_id: string }; Returns: Json }
       delete_contract: { Args: { _contract_id: string }; Returns: Json }
+      ensure_owner_access: { Args: never; Returns: Json }
+      generate_contract_receivables: {
+        Args: { _contract_id: string }
+        Returns: number
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_owner_admin: { Args: never; Returns: boolean }
+      mark_overdue_receivables: { Args: never; Returns: number }
+      receivable_effective_status: {
+        Args: {
+          _amount_due: number
+          _amount_paid: number
+          _credit_applied: number
+          _due_date: string
+          _remaining_due_date: string
+          _status: string
+        }
+        Returns: string
+      }
       recompute_receivable_summary: {
         Args: { _receivable_id: string }
         Returns: string
+      }
+      regenerate_contract_receivables: {
+        Args: { _contract_id: string }
+        Returns: number
       }
       register_receivable_payment: {
         Args: {
@@ -1264,36 +1302,23 @@ export type Database = {
         }
         Returns: Json
       }
+      require_gestor: { Args: never; Returns: undefined }
       reverse_receivable_payment: {
         Args: { _payment_id: string; _reason: string }
         Returns: Json
       }
-      cancel_contract: {
+      reverse_receivable_payment_core: {
+        Args: { _payment_id: string; _reason: string; _receipt_reason: string }
+        Returns: string[]
+      }
+      write_audit: {
         Args: {
-          _contract_id: string
-          _effective_month: string
-          _reason?: string
-          _termination_fee?: number
+          _action: string
+          _entity_id: string
+          _entity_type: string
+          _metadata: Json
         }
-        Returns: Json
-      }
-      ensure_owner_access: { Args: never; Returns: Json }
-      generate_contract_receivables: {
-        Args: { _contract_id: string }
-        Returns: number
-      }
-      has_role: {
-        Args: {
-          _role: Database["public"]["Enums"]["app_role"]
-          _user_id: string
-        }
-        Returns: boolean
-      }
-      is_owner_admin: { Args: never; Returns: boolean }
-      mark_overdue_receivables: { Args: never; Returns: number }
-      regenerate_contract_receivables: {
-        Args: { _contract_id: string }
-        Returns: number
+        Returns: undefined
       }
     }
     Enums: {
