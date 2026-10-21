@@ -50,8 +50,9 @@ export interface AssistantUsage {
   isGestor: boolean;
 }
 
-// preferidos, nesta ordem; GEMINI_MODEL (segredo opcional) passa na frente de todos
-const DEFAULT_MODELS = ["gemini-3.8-flash", "gemini-flash-latest", "gemini-2.5-flash"];
+// preferidos, nesta ordem; GEMINI_MODEL (segredo opcional) passa na frente de todos.
+// O "lite" entra cedo: costuma ficar livre quando os "flash" estão sobrecarregados.
+const DEFAULT_MODELS = ["gemini-3.8-flash", "gemini-flash-latest", "gemini-flash-lite-latest"];
 
 function apiBase(): string {
   return process.env.GEMINI_API_BASE ?? "https://generativelanguage.googleapis.com";
@@ -197,20 +198,27 @@ function rank(name: string): number {
   return (/preview/.test(name) ? 2 : 0) + (/lite/.test(name) ? 1 : 0);
 }
 
+// modelos a pular por um tempo: descontinuados (404) ou sem cota gratuita (429 "limit: 0")
+const skipUntil = new Map<string, number>();
+
 async function candidateModels(apiKey: string): Promise<string[]> {
   const available = await discoverModels(apiKey);
   const preferred = available.length
     ? DEFAULT_MODELS.filter((m) => available.includes(m))
     : DEFAULT_MODELS;
-  const list = [process.env.GEMINI_MODEL, ...preferred, ...available].filter(Boolean) as string[];
-  return [...new Set(list)].slice(0, 5);
+  // primeiro lite disponível logo depois dos preferidos, caso nenhum alias lite exista
+  const lite = available.find((m) => /lite/.test(m) && !/preview/.test(m));
+  const list = [process.env.GEMINI_MODEL, ...preferred, lite, ...available].filter(
+    (m): m is string => Boolean(m) && (skipUntil.get(m!) ?? 0) < Date.now(),
+  );
+  return [...new Set(list)].slice(0, 6);
 }
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 type GeminiCall =
   | { ok: true; body: string; model: string }
-  | { ok: false; status: number; error: GoogleError; model: string };
+  | { ok: false; status: number; error: GoogleError; model: string; tried: string[] };
 
 /**
  * Chama o Gemini tentando os modelos em ordem. Passa ao próximo quando o
@@ -224,7 +232,8 @@ async function callGemini(
   temperature: number,
 ): Promise<GeminiCall> {
   const models = await candidateModels(apiKey);
-  let last: GeminiCall | null = null;
+  let last: Extract<GeminiCall, { ok: false }> | null = null;
+  const tried: string[] = [];
   for (const model of models) {
     for (let attempt = 0; attempt < 2; attempt++) {
       const res = await fetch(
@@ -244,7 +253,7 @@ async function callGemini(
       const body = await res.text();
       if (res.ok) return { ok: true, body, model };
       const error = parseGoogleError(res.status, body);
-      last = { ok: false, status: res.status, error, model };
+      last = { ok: false, status: res.status, error, model, tried };
       console.error("[contractAssistant] Gemini", describe(error, model));
       if ((res.status === 500 || res.status === 503) && attempt < 1) {
         await wait(1000);
@@ -252,8 +261,11 @@ async function callGemini(
       }
       break;
     }
-    if (!last || last.ok) break;
+    if (!last) break;
+    tried.push(`${model} ${last.status}`);
     const noFreeQuota = last.status === 429 && /limit: 0|free_tier/i.test(last.error.message);
+    if (last.status === 404) skipUntil.set(model, Date.now() + 24 * 60 * 60 * 1000);
+    if (noFreeQuota) skipUntil.set(model, Date.now() + 60 * 60 * 1000);
     if (last.status === 404 || noFreeQuota || last.status === 500 || last.status === 503) continue;
     break;
   }
@@ -268,13 +280,17 @@ async function callGemini(
         reason: "",
       },
       model: "-",
+      tried,
     }
   );
 }
 
 function providerFailure(call: Extract<GeminiCall, { ok: false }>): AssistantResult {
-  const { status, error } = call;
-  const detail = describe(error, call.model);
+  const detail = `${describe(call.error, call.model)}${call.tried.length > 1 ? ` · modelos tentados: ${call.tried.join(", ")}` : ""}`;
+  // vale o motivo mais informativo: se algum modelo só estava sobrecarregado, é isso que importa
+  const overloaded = call.tried.some((t) => / 50[03]$/.test(t));
+  const { error } = call;
+  const status = overloaded && call.status !== 400 ? 503 : call.status;
   const text = `${error.status} ${error.reason} ${error.message}`;
   if (/API_KEY_INVALID|API key not valid|API_KEY_/i.test(text)) {
     return {
@@ -326,7 +342,10 @@ function providerFailure(call: Extract<GeminiCall, { ok: false }>): AssistantRes
       ok: false,
       code: "provider_error",
       detail,
-      message: "O Gemini está sobrecarregado agora. Tente de novo em instantes.",
+      message:
+        call.tried.length > 1
+          ? `Os modelos gratuitos do Gemini estão sobrecarregados agora (tentamos ${call.tried.length}). Isso costuma passar em alguns minutos.`
+          : "O Gemini está sobrecarregado agora. Tente de novo em instantes.",
     };
   }
   return {
