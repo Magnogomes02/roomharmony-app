@@ -122,7 +122,7 @@ export function WeekScheduleByRoomCard() {
         </CardTitle>
         <div className="flex items-center gap-1">
           <WeekNavigator value={weekStart} onChange={setWeekStart} buttonVariant="ghost" />
-          <Link to="/calendario" className="ml-2 text-xs text-primary hover:underline">
+          <Link to="/calendario" className="ml-2 text-xs font-medium text-primary-ink underline-offset-4 hover:underline">
             Ver completo →
           </Link>
         </div>
@@ -249,7 +249,7 @@ export function WeekScheduleByRoomCard() {
                         <div
                           key={dayKey}
                           className={`mb-1 text-center text-[10px] uppercase ${
-                            isToday ? "font-semibold text-primary" : "text-muted-foreground"
+                            isToday ? "font-semibold text-primary-ink" : "text-muted-foreground"
                           }`}
                         >
                           {WEEKDAYS[di]} {format(d, "dd/MM")}

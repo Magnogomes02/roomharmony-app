@@ -68,24 +68,24 @@ export function FinancialAnalysisPanel() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Previsto no ano</CardTitle></CardHeader>
-          <CardContent><div className="font-serif text-2xl">{brl(totals?.expected ?? 0)}</div></CardContent>
+          <CardContent><div className="font-sans font-semibold tabular-nums tracking-tight text-2xl">{brl(totals?.expected ?? 0)}</div></CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Recebido no ano</CardTitle></CardHeader>
-          <CardContent><div className="font-serif text-2xl text-success">{brl(totals?.received ?? 0)}</div></CardContent>
+          <CardContent><div className="font-sans font-semibold tabular-nums tracking-tight text-2xl text-success-ink">{brl(totals?.received ?? 0)}</div></CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">A receber no ano</CardTitle></CardHeader>
-          <CardContent><div className="font-serif text-2xl text-warning">{brl(totals?.receivable ?? 0)}</div></CardContent>
+          <CardContent><div className="font-sans font-semibold tabular-nums tracking-tight text-2xl text-warning-ink">{brl(totals?.receivable ?? 0)}</div></CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Em atraso no ano</CardTitle></CardHeader>
-          <CardContent><div className="font-serif text-2xl text-destructive">{brl(totals?.overdue ?? 0)}</div></CardContent>
+          <CardContent><div className="font-sans font-semibold tabular-nums tracking-tight text-2xl text-destructive">{brl(totals?.overdue ?? 0)}</div></CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Taxa de recebimento</CardTitle></CardHeader>
           <CardContent>
-            <div className="font-serif text-2xl">{pct(totals?.receivedRate ?? 0)}</div>
+            <div className="font-sans font-semibold tabular-nums tracking-tight text-2xl">{pct(totals?.receivedRate ?? 0)}</div>
             {totals?.bestMonth && (
               <p className="mt-1 text-xs text-muted-foreground capitalize">Melhor mês: {totals.bestMonth}</p>
             )}
@@ -93,26 +93,26 @@ export function FinancialAnalysisPanel() {
         </Card>
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Taxa de inadimplência</CardTitle></CardHeader>
-          <CardContent><div className="font-serif text-2xl text-destructive">{pct(totals?.overdueRate ?? 0)}</div></CardContent>
+          <CardContent><div className="font-sans font-semibold tabular-nums tracking-tight text-2xl text-destructive">{pct(totals?.overdueRate ?? 0)}</div></CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Perda no ano</CardTitle></CardHeader>
           <CardContent>
-            <div className="font-serif text-2xl text-destructive">{brl(totals?.lost ?? 0)}</div>
+            <div className="font-sans font-semibold tabular-nums tracking-tight text-2xl text-destructive">{brl(totals?.lost ?? 0)}</div>
             <p className="mt-1 text-xs text-muted-foreground">Taxa de perda: {pct(totals?.lossRate ?? 0)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Despesas pagas</CardTitle></CardHeader>
           <CardContent>
-            <div className="font-serif text-2xl text-destructive">{brl(totals?.expensesPaid ?? 0)}</div>
+            <div className="font-sans font-semibold tabular-nums tracking-tight text-2xl text-destructive">{brl(totals?.expensesPaid ?? 0)}</div>
             <p className="mt-1 text-xs text-muted-foreground">Previsto: {brl(totals?.expensesPlanned ?? 0)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Resultado (receitas − despesas)</CardTitle></CardHeader>
           <CardContent>
-            <div className={`font-serif text-2xl ${(totals?.resultado ?? 0) >= 0 ? "text-success" : "text-destructive"}`}>
+            <div className={`font-sans font-semibold tabular-nums tracking-tight text-2xl ${(totals?.resultado ?? 0) >= 0 ? "text-success-ink" : "text-destructive"}`}>
               {brl(totals?.resultado ?? 0)}
             </div>
           </CardContent>
@@ -149,12 +149,12 @@ export function FinancialAnalysisPanel() {
                   <TableRow key={m.month}>
                     <TableCell className="font-medium capitalize">{m.monthLabel}</TableCell>
                     <TableCell className="text-right">{brl(m.expected)}</TableCell>
-                    <TableCell className="text-right text-success">{brl(m.received)}</TableCell>
-                    <TableCell className="text-right text-warning">{brl(m.receivable)}</TableCell>
+                    <TableCell className="text-right text-success-ink">{brl(m.received)}</TableCell>
+                    <TableCell className="text-right text-warning-ink">{brl(m.receivable)}</TableCell>
                     <TableCell className="text-right text-destructive">{brl(m.overdue)}</TableCell>
                     <TableCell className="text-right text-destructive">{brl(m.lost)}</TableCell>
                     <TableCell className="text-right text-destructive">{brl(m.expensesPaid)}</TableCell>
-                    <TableCell className={`text-right font-medium ${m.resultado >= 0 ? "text-success" : "text-destructive"}`}>{brl(m.resultado)}</TableCell>
+                    <TableCell className={`text-right font-medium ${m.resultado >= 0 ? "text-success-ink" : "text-destructive"}`}>{brl(m.resultado)}</TableCell>
                     <TableCell className="text-right">{pct(m.receivedRate)}</TableCell>
                     <TableCell className="text-right">{pct(m.overdueRate)}</TableCell>
                     <TableCell className="text-right">{pct(m.lossRate)}</TableCell>

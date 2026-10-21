@@ -15,6 +15,7 @@ import { computeEffectiveStatus as computePayableEffectiveStatus, generateRecurr
 import { createNotification } from "@/lib/notifications";
 import { applyPendingCredits } from "@/lib/creditApplications";
 import { summarizeReceivables, type ReceivableTotalsRow } from "@/lib/receivableTotals";
+import { auditActionLabel, auditEntityLabel } from "@/lib/labels";
 
 export const Route = createFileRoute("/_app/dashboard")({
   component: DashboardPage,
@@ -223,7 +224,7 @@ function DashboardPage() {
           <CardTitle className="flex items-center gap-2 font-serif text-xl">
             <DollarSign className="h-5 w-5 text-primary" /> Financeiro do mês
           </CardTitle>
-          <Link to="/financeiro" className="text-xs text-primary hover:underline">Ver tudo →</Link>
+          <Link to="/financeiro" className="text-xs font-medium text-primary-ink underline-offset-4 hover:underline">Ver tudo →</Link>
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 sm:grid-cols-3">
@@ -252,7 +253,7 @@ function DashboardPage() {
               <c.icon className={`h-5 w-5 ${c.color}`} />
             </CardHeader>
             <CardContent>
-              <div className="font-serif text-4xl">
+              <div className="font-sans font-semibold tabular-nums tracking-tight text-4xl">
                 {isLoading ? <span className="text-muted-foreground/40">—</span> : c.value ?? 0}
               </div>
               {"hint" in c && c.hint && !isLoading && (
@@ -269,7 +270,7 @@ function DashboardPage() {
             <AlertTriangle className={`h-5 w-5 ${stats?.expiring && stats.expiring.length > 0 ? "text-warning" : "text-muted-foreground"}`} />
             Contratos próximos do vencimento
           </CardTitle>
-          <Link to="/contratos" className="text-xs text-primary hover:underline">Ver tudo →</Link>
+          <Link to="/contratos" className="text-xs font-medium text-primary-ink underline-offset-4 hover:underline">Ver tudo →</Link>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -293,7 +294,7 @@ function DashboardPage() {
                     </div>
                     <div className="ml-3 text-right">
                       <p className="text-xs">{formatDateOnlyBR(c.end_date)}</p>
-                      <p className="text-xs text-warning">
+                      <p className="text-xs text-warning-ink">
                         {c.days_left === 0 ? "vence hoje" : `${c.days_left} dia${c.days_left === 1 ? "" : "s"}`}
                       </p>
                     </div>
@@ -323,11 +324,11 @@ function DashboardPage() {
               {stats.audits.map((a) => (
                 <li key={a.id} className="flex items-center justify-between py-3 text-sm">
                   <div>
-                    <span className="font-medium">{a.action}</span>
-                    <span className="ml-2 text-muted-foreground">· {a.entity_type}</span>
+                    <span className="font-medium">{auditActionLabel(a.action)}</span>
+                    <span className="ml-2 text-muted-foreground">· {auditEntityLabel(a.entity_type)}</span>
                   </div>
                   <span className="text-xs text-muted-foreground">
-                    {new Date(a.created_at).toLocaleString("pt-BR")}
+                    {new Date(a.created_at).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}
                   </span>
                 </li>
               ))}
@@ -344,12 +345,12 @@ function FinBlock({ label, total, item1, item2, breakdownLabels = ["Contratos", 
   breakdownLabels?: [string, string];
   tone: "warning" | "success" | "destructive"; loading: boolean;
 }) {
-  const toneClass = tone === "warning" ? "text-warning" : tone === "success" ? "text-success" : "text-destructive";
+  const toneClass = tone === "warning" ? "text-warning-ink" : tone === "success" ? "text-success-ink" : "text-destructive";
   const [label1, label2] = breakdownLabels;
   return (
     <div className="rounded-lg border bg-card/50 p-4">
       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className={`mt-1 font-serif text-2xl ${toneClass}`}>
+      <p className={`mt-1 font-sans font-semibold tabular-nums tracking-tight text-2xl ${toneClass}`}>
         {loading ? "—" : brl(total)}
       </p>
       <div className="mt-2 space-y-0.5 text-xs text-muted-foreground">

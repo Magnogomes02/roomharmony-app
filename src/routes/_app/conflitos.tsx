@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { BOOKING_SOURCE_LABELS, BOOKING_STATUS_LABELS, CONFLICT_STATUS_LABELS, labelOf } from "@/lib/labels";
 import { countPendingConflicts, findOverlappingBookings, registerBookingConflicts } from "@/lib/scheduleConflicts";
 
 export const Route = createFileRoute("/_app/conflitos")({
@@ -300,14 +301,14 @@ function ConflitosPage() {
       <div className="space-y-2 rounded-md border p-3 text-sm">
         <div className="flex items-center justify-between">
           <span className="text-xs uppercase tracking-wide text-muted-foreground">{label}</span>
-          <Badge variant="outline" className="capitalize">{b.source}</Badge>
+          <Badge variant="outline">{labelOf(BOOKING_SOURCE_LABELS, b.source)}</Badge>
         </div>
         <div className="font-medium">{prof}</div>
         <div className="text-muted-foreground">Sala: {room}</div>
         <div className="text-muted-foreground">
           {format(s, "dd/MM/yyyy")} • {toTimeStr(s)} – {toTimeStr(e)}
         </div>
-        <div><Badge variant={b.status === "conflito" ? "destructive" : "secondary"} className="capitalize">{b.status}</Badge></div>
+        <div><Badge variant={b.status === "conflito" ? "destructive" : "secondary"} >{labelOf(BOOKING_STATUS_LABELS, b.status)}</Badge></div>
         {canEdit && conflict.status === "pendente" && (
           <div className="flex flex-wrap gap-2 pt-1">
             <Button size="sm" variant="outline" onClick={() => openAdjust(conflict, b, "reagendar")}>
@@ -343,19 +344,19 @@ function ConflitosPage() {
         <Card><CardContent className="p-6 text-center text-muted-foreground">Carregando...</CardContent></Card>
       ) : visible.length === 0 ? (
         <Card><CardContent className="p-8 text-center text-muted-foreground">
-          <CheckCircle2 className="mx-auto mb-2 h-8 w-8 text-emerald-500" />
+          <CheckCircle2 className="mx-auto mb-2 h-8 w-8 text-success-ink" />
           Nenhum conflito {showResolved ? "registrado" : "pendente"}.
         </CardContent></Card>
       ) : (
         <div className="space-y-4">
           {visible.map((c) => (
-            <Card key={c.id} className={cn(c.status === "pendente" ? "border-amber-500/50" : "opacity-70")}>
+            <Card key={c.id} className={cn(c.status === "pendente" ? "border-warning/60" : "opacity-70")}>
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 font-serif text-lg">
-                  <AlertTriangle className={cn("h-5 w-5", c.status === "pendente" ? "text-amber-500" : "text-muted-foreground")} />
+                  <AlertTriangle className={cn("h-5 w-5", c.status === "pendente" ? "text-warning-ink" : "text-muted-foreground")} />
                   Conflito na sala {roomMap.get(c.room_id)?.name ?? "—"}
-                  <Badge variant={c.status === "pendente" ? "destructive" : "secondary"} className="ml-2 capitalize">
-                    {c.status}
+                  <Badge variant={c.status === "pendente" ? "destructive" : "secondary"} className="ml-2">
+                    {labelOf(CONFLICT_STATUS_LABELS, c.status)}
                   </Badge>
                 </CardTitle>
                 <p className="text-xs text-muted-foreground">

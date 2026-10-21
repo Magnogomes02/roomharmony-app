@@ -53,6 +53,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { toast } from "sonner";
+import { CONTRACT_STATUS_LABELS, labelOf, PAYMENT_STATUS_LABELS, RECEIVABLE_KIND_LABELS } from "@/lib/labels";
 import {
   createReceiptForReceivable,
   cancelReceiptForReceivable,
@@ -80,7 +81,7 @@ import {
 } from "@/lib/paymentsService";
 import { applyPendingCredits } from "@/lib/creditApplications";
 import { summarizeReceivables } from "@/lib/receivableTotals";
-import { toDateOnlyString } from "@/lib/dateOnly";
+import { formatDateOnlyBR, toDateOnlyString } from "@/lib/dateOnly";
 
 export const Route = createFileRoute("/_app/financeiro")({
   component: FinanceiroPage,
@@ -138,11 +139,14 @@ const STATUS_LABEL: Record<EffectiveStatus, string> = {
   cancelado: "Cancelado",
 };
 
-const STATUS_VARIANT: Record<EffectiveStatus, "default" | "secondary" | "destructive" | "outline"> =
+const STATUS_VARIANT: Record<
+  EffectiveStatus,
+  "default" | "secondary" | "destructive" | "outline" | "success" | "warning"
+> =
   {
     a_receber: "secondary",
-    parcial: "secondary",
-    recebido: "default",
+    parcial: "warning",
+    recebido: "success",
     atrasado: "destructive",
     cancelado: "outline",
   };
@@ -1055,7 +1059,7 @@ function FinanceiroPage() {
         <TabsContent value="recebiveis" className="mt-4 space-y-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <p className="text-muted-foreground capitalize">
+              <p className="text-muted-foreground">
                 Recebíveis por vencimento · {format(monthRef, "MMMM 'de' yyyy", { locale: ptBR })}
               </p>
             </div>
@@ -1078,7 +1082,7 @@ function FinanceiroPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="font-serif text-3xl text-warning">{brl(totals.a_receber)}</div>
+                <div className="font-sans font-semibold tabular-nums tracking-tight text-3xl text-warning-ink">{brl(totals.a_receber)}</div>
               </CardContent>
             </Card>
             <Card>
@@ -1088,7 +1092,7 @@ function FinanceiroPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="font-serif text-3xl text-success">{brl(totals.recebido)}</div>
+                <div className="font-sans font-semibold tabular-nums tracking-tight text-3xl text-success-ink">{brl(totals.recebido)}</div>
               </CardContent>
             </Card>
             <Card>
@@ -1098,7 +1102,7 @@ function FinanceiroPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="font-serif text-3xl text-destructive">{brl(totals.atrasado)}</div>
+                <div className="font-sans font-semibold tabular-nums tracking-tight text-3xl text-destructive">{brl(totals.atrasado)}</div>
               </CardContent>
             </Card>
             <Card>
@@ -1108,7 +1112,7 @@ function FinanceiroPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="font-serif text-3xl text-destructive">{brl(totals.lost)}</div>
+                <div className="font-sans font-semibold tabular-nums tracking-tight text-3xl text-destructive">{brl(totals.lost)}</div>
               </CardContent>
             </Card>
           </div>
@@ -1212,8 +1216,8 @@ function FinanceiroPage() {
                                   {profMap.get(r.professional_id) ?? "—"}
                                 </TableCell>
                                 <TableCell>
-                                  <Badge variant="outline" className="capitalize">
-                                    {r.kind}
+                                  <Badge variant="outline">
+                                    {labelOf(RECEIVABLE_KIND_LABELS, r.kind)}
                                   </Badge>
                                 </TableCell>
                                 <TableCell className="text-sm">
@@ -1279,7 +1283,7 @@ function FinanceiroPage() {
                                         title="Dar baixa"
                                         onClick={() => openPay(r)}
                                       >
-                                        <Check className="h-4 w-4 text-success" />
+                                        <Check className="h-4 w-4 text-success-ink" />
                                       </Button>
                                     )}
                                     {canEdit && paid > 0 && r.status !== "cancelado" && (
@@ -1299,7 +1303,7 @@ function FinanceiroPage() {
                                         title="Gerar recibo"
                                         onClick={() => handleGenerateReceipt(r)}
                                       >
-                                        <FileText className="h-4 w-4 text-primary" />
+                                        <FileText className="h-4 w-4 text-primary-ink" />
                                       </Button>
                                     )}
                                     {hasReceiptForRec && (
@@ -1309,7 +1313,7 @@ function FinanceiroPage() {
                                         title="Baixar recibo"
                                         onClick={() => handleDownloadReceipt(r)}
                                       >
-                                        <FileText className="h-4 w-4 text-success" />
+                                        <FileText className="h-4 w-4 text-success-ink" />
                                       </Button>
                                     )}
                                     {canEdit && hasReceiptForRec && (
@@ -1689,7 +1693,7 @@ function FinanceiroPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
-                    <Badge variant={p.status === "ativo" ? "default" : "outline"}>{p.status}</Badge>
+                    <Badge variant={p.status === "ativo" ? "success" : "outline"}>{labelOf(PAYMENT_STATUS_LABELS, p.status)}</Badge>
                     {rc && (
                       <Button
                         size="icon"
@@ -1697,7 +1701,7 @@ function FinanceiroPage() {
                         title="Baixar recibo"
                         onClick={() => downloadReceiptForPayment(p.id)}
                       >
-                        <Download className="h-4 w-4 text-success" />
+                        <Download className="h-4 w-4 text-success-ink" />
                       </Button>
                     )}
                     {canEdit && p.status === "ativo" && !rc && histRow && (
@@ -1707,7 +1711,7 @@ function FinanceiroPage() {
                         title="Gerar recibo deste pagamento"
                         onClick={() => generateReceiptForPayment(histRow, p.id)}
                       >
-                        <FileText className="h-4 w-4 text-primary" />
+                        <FileText className="h-4 w-4 text-primary-ink" />
                       </Button>
                     )}
                     {canEdit && rc && histRow && (
@@ -1834,8 +1838,8 @@ function FinanceiroPage() {
                     <SelectItem value="none">Sem contrato (avulso)</SelectItem>
                     {contractsForProf.map((c) => (
                       <SelectItem key={c.id} value={c.id}>
-                        {c.status} · {c.start_date}
-                        {c.end_date ? ` → ${c.end_date}` : ""} · {brl(c.monthly_value)}
+                        {labelOf(CONTRACT_STATUS_LABELS, c.status)} · {formatDateOnlyBR(c.start_date)}
+                        {c.end_date ? ` a ${formatDateOnlyBR(c.end_date)}` : ""} · {brl(c.monthly_value)}
                       </SelectItem>
                     ))}
                   </SelectContent>

@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
+import { CONTRACT_STATUS_LABELS, labelOf } from "@/lib/labels";
 import {
   planContractBookings, commitGenerationPlan, WEEKDAY_LABELS,
   type ScheduleRow, type GenerationPlan,
@@ -108,8 +109,8 @@ const emptyForm = {
 
 
 
-const statusVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-  rascunho: "secondary", ativo: "default", encerrado: "outline", cancelado: "destructive",
+const statusVariant: Record<string, "default" | "secondary" | "destructive" | "outline" | "success"> = {
+  rascunho: "secondary", ativo: "success", encerrado: "outline", cancelado: "destructive",
 };
 
 interface ContractDeleteImpact {
@@ -1038,7 +1039,7 @@ function ContratosPage() {
                       {Number(c.monthly_value).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={statusVariant[c.status] ?? "secondary"}>{c.status}</Badge>
+                      <Badge variant={statusVariant[c.status] ?? "secondary"}>{labelOf(CONTRACT_STATUS_LABELS, c.status)}</Badge>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
@@ -1175,7 +1176,7 @@ function ContratosPage() {
                     "rounded-md border px-3 py-2 text-xs",
                     totalRowConflicts > 0
                       ? "border-destructive/40 bg-destructive/5 text-destructive"
-                      : "border-emerald-500/30 bg-emerald-500/5 text-emerald-700 dark:text-emerald-400",
+                      : "border-success/40 bg-success/10 text-success-ink",
                   )}
                 >
                   {loadingBusy

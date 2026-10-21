@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { ChevronLeft, ChevronRight, Plus, RefreshCw, Move, CalendarIcon, Ban } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, RefreshCw, Move, CalendarIcon, Ban, Wrench } from "lucide-react";
 import { format, addDays, startOfDay, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
@@ -28,7 +28,8 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { entityColor, isValidHex, sortRooms } from "@/lib/entityColors";
+import { BOOKING_SOURCE_LABELS, BOOKING_STATUS_LABELS, capitalizeFirst, labelOf } from "@/lib/labels";
+import { entityColor, sortRooms } from "@/lib/entityColors";
 import { toDateOnlyString } from "@/lib/dateOnly";
 import { findOverlappingBookings, registerBookingConflicts } from "@/lib/scheduleConflicts";
 
@@ -79,27 +80,8 @@ const STATUS_COLORS: Record<string, string> = {
   ativa: "bg-primary/15 border-primary text-foreground",
   cancelada: "bg-destructive/10 border-destructive/40 text-muted-foreground line-through",
   realocada: "bg-muted border-border text-muted-foreground",
-  conflito: "bg-amber-500/20 border-amber-600 text-foreground",
+  conflito: "bg-warning/20 border-warning text-foreground",
 };
-
-// Paletas determinísticas
-const PALETTE = [
-  "bg-amber-200/40 border-amber-500",
-  "bg-emerald-200/40 border-emerald-600",
-  "bg-sky-200/40 border-sky-600",
-  "bg-rose-200/40 border-rose-500",
-  "bg-violet-200/40 border-violet-600",
-  "bg-orange-200/40 border-orange-600",
-  "bg-teal-200/40 border-teal-600",
-  "bg-indigo-200/40 border-indigo-600",
-];
-
-function colorFromId(id: string, mode: ColorMode, status: string): string {
-  if (mode === "status") return STATUS_COLORS[status] ?? STATUS_COLORS.ativa;
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
-  return PALETTE[hash % PALETTE.length];
-}
 
 function toTimeStr(d: Date) {
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
@@ -487,8 +469,8 @@ function CalendarioPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="font-serif text-3xl">Calendário</h1>
-          <p className="text-muted-foreground capitalize">
-            {format(date, "EEEE, dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+          <p className="text-muted-foreground">
+            {capitalizeFirst(format(date, "EEEE, dd 'de' MMMM 'de' yyyy", { locale: ptBR }))}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -551,9 +533,9 @@ function CalendarioPage() {
             <div className="space-y-2">
               <Label className="text-xs uppercase tracking-wide text-muted-foreground">Status</Label>
               {["ativa", "conflito", "realocada", "cancelada"].map((s) => (
-                <label key={s} className="flex items-center gap-2 text-sm capitalize">
+                <label key={s} className="flex items-center gap-2 text-sm">
                   <Checkbox checked={statusFilter.has(s)} onCheckedChange={() => setStatusFilter((p) => toggleSet(p, s))} />
-                  {s}
+                  {labelOf(BOOKING_STATUS_LABELS, s)}
                 </label>
               ))}
             </div>
@@ -646,21 +628,18 @@ function CalendarioPage() {
                           {/* reservas */}
                           {roomBookings.map((b) => {
                             const { top, height } = bookingStyle(b);
-                            const colorClass = colorFromId(b.room_id, colorMode, b.status);
                             const prof = profMap.get(b.professional_id);
-                            // cor cadastrada (style inline) sobrepõe paleta determinística quando aplicável
+                            // modo "status": cor do estado; modos "sala"/"profissional": cor
+                            // cadastrada da entidade ou a paleta terrosa de reserva (entityColor)
+                            const colorClass = colorMode === "status"
+                              ? STATUS_COLORS[b.status] ?? STATUS_COLORS.ativa
+                              : "text-foreground";
                             let inlineStyle: React.CSSProperties = { top, height, left: 2, right: 2 };
-                            if (colorMode === "sala") {
-                              const r = roomMap.get(b.room_id);
-                              if (isValidHex(r?.color_hex)) {
-                                const c = entityColor(r!.color_hex, b.room_id);
-                                inlineStyle = { ...inlineStyle, borderLeftColor: c, backgroundColor: `${c}22` };
-                              }
-                            } else if (colorMode === "profissional") {
-                              if (isValidHex(prof?.color_hex)) {
-                                const c = entityColor(prof!.color_hex, b.professional_id);
-                                inlineStyle = { ...inlineStyle, borderLeftColor: c, backgroundColor: `${c}22` };
-                              }
+                            if (colorMode !== "status") {
+                              const c = colorMode === "sala"
+                                ? entityColor(roomMap.get(b.room_id)?.color_hex, b.room_id)
+                                : entityColor(prof?.color_hex, b.professional_id);
+                              inlineStyle = { ...inlineStyle, borderLeftColor: c, backgroundColor: `${c}22` };
                             }
                             return (
                               <button
@@ -671,18 +650,22 @@ function CalendarioPage() {
                                 className={cn(
                                   "absolute overflow-hidden rounded-md border-l-4 px-2 py-1 text-left text-xs shadow-sm transition hover:shadow-md",
                                   b.is_maintenance
-                                    ? "border-orange-400 bg-orange-100/60 text-orange-900 dark:bg-orange-900/20 dark:text-orange-200"
+                                    ? "border-muted-foreground/50 bg-muted text-muted-foreground"
                                     : colorClass,
                                 )}
                               >
                                 <div className="truncate font-medium">
-                                  {b.is_maintenance ? "🔧 Manutenção" : (prof?.full_name ?? "—")}
+                                  {b.is_maintenance ? (
+                                    <span className="inline-flex items-center gap-1">
+                                      <Wrench className="h-3 w-3" aria-hidden="true" /> Manutenção
+                                    </span>
+                                  ) : (prof?.full_name ?? "—")}
                                 </div>
                                 <div className="truncate opacity-70">
                                   {toTimeStr(parseISO(b.start_at))} – {toTimeStr(parseISO(b.end_at))}
                                 </div>
                                 {!b.is_maintenance && b.source !== "recorrencia" && (
-                                  <Badge variant="outline" className="mt-0.5 h-4 px-1 text-[9px]">{b.source}</Badge>
+                                  <Badge variant="outline" className="mt-0.5 h-4 px-1 text-[10px]">{labelOf(BOOKING_SOURCE_LABELS, b.source)}</Badge>
                                 )}
                               </button>
                             );
@@ -706,7 +689,7 @@ function CalendarioPage() {
             <DialogDescription>{format(date, "dd/MM/yyyy")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
-            <label className="flex items-center gap-2 rounded-md border border-orange-200 bg-orange-50/50 px-3 py-2 text-sm dark:border-orange-900/40 dark:bg-orange-900/10">
+            <label className="flex items-center gap-2 rounded-md border border-border bg-muted px-3 py-2 text-sm">
               <Checkbox
                 checked={newForm.is_maintenance}
                 onCheckedChange={(v) => setNewForm({ ...newForm, is_maintenance: !!v, avulso_amount: "", avulso_paid: false })}
@@ -791,8 +774,8 @@ function CalendarioPage() {
                   {format(parseISO(detailBooking.start_at), "dd/MM/yyyy HH:mm")} – {toTimeStr(parseISO(detailBooking.end_at))}
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="capitalize">{detailBooking.status}</Badge>
-                  <Badge variant="outline" className="capitalize">{detailBooking.source}</Badge>
+                  <Badge variant="outline">{labelOf(BOOKING_STATUS_LABELS, detailBooking.status)}</Badge>
+                  <Badge variant="outline">{labelOf(BOOKING_SOURCE_LABELS, detailBooking.source)}</Badge>
                 </div>
               </div>
               <DialogFooter className="flex-wrap gap-2">

@@ -18,9 +18,9 @@ interface BookingRow {
 }
 
 const ROOM_COLORS = [
-  "bg-primary/15 text-primary border-primary/40",
-  "bg-success/15 text-success border-success/40",
-  "bg-warning/15 text-warning border-warning/40",
+  "bg-primary/15 text-primary-ink border-primary/40",
+  "bg-success/15 text-success-ink border-success/40",
+  "bg-warning/15 text-warning-ink border-warning/40",
   "bg-destructive/15 text-destructive border-destructive/40",
   "bg-accent text-accent-foreground border-border",
   "bg-secondary text-secondary-foreground border-border",
@@ -142,7 +142,7 @@ export function WeekScheduleCard() {
           <Button variant="ghost" size="icon" onClick={() => setOffset((o) => o + 1)}>
             <ChevronRight className="h-4 w-4" />
           </Button>
-          <Link to="/calendario" className="ml-2 text-xs text-primary hover:underline">
+          <Link to="/calendario" className="ml-2 text-xs font-medium text-primary-ink underline-offset-4 hover:underline">
             Ver completo →
           </Link>
         </div>
@@ -175,7 +175,7 @@ export function WeekScheduleCard() {
                         <div
                           key={d.toISOString()}
                           className={`border-b border-border px-2 pb-2 text-center text-xs ${
-                            isToday ? "font-semibold text-primary" : "text-muted-foreground"
+                            isToday ? "font-semibold text-primary-ink" : "text-muted-foreground"
                           }`}
                         >
                           <div className="uppercase">{format(d, "EEE", { locale: ptBR })}</div>

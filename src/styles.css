@@ -24,6 +24,9 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-ink: var(--primary-ink);
+  --color-success-ink: var(--success-ink);
+  --color-warning-ink: var(--warning-ink);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
@@ -71,6 +74,12 @@
   /* Dourado principal */
   --primary: oklch(0.78 0.14 85);               /* #E8BF2F dourado */
   --primary-foreground: oklch(0.18 0.005 90);
+  /* Tintas: versões escurecidas para TEXTO sobre fundos claros (≥4.5:1 no
+     bege, no branco, no muted e no hover Linho Dourado). Os preenchimentos
+     continuam com as cores base. */
+  --primary-ink: oklch(0.50 0.10 80);
+  --success-ink: oklch(0.50 0.08 145);
+  --warning-ink: oklch(0.52 0.12 60);
 
   --secondary: oklch(0.95 0.015 85);            /* dourado pálido */
   --secondary-foreground: oklch(0.30 0.05 85);
@@ -120,6 +129,9 @@
   --popover-foreground: oklch(0.95 0.01 85);
   --primary: oklch(0.78 0.14 85);
   --primary-foreground: oklch(0.18 0 0);
+  --primary-ink: oklch(0.78 0.14 85);
+  --success-ink: oklch(0.70 0.09 145);
+  --warning-ink: oklch(0.80 0.13 70);
   --secondary: oklch(0.25 0.015 85);
   --secondary-foreground: oklch(0.95 0.01 85);
   --muted: oklch(0.25 0.015 85);
@@ -158,5 +170,13 @@
   h1, h2, h3, h4 {
     font-family: 'Cormorant Garamond', 'Inter', serif;
     letter-spacing: -0.01em;
+  }
+  /* valores e horários alinham na vertical em tabelas */
+  table {
+    font-variant-numeric: tabular-nums;
+  }
+  ::selection {
+    background-color: var(--color-accent);
+    color: var(--color-accent-foreground);
   }
 }

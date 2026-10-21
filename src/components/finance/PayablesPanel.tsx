@@ -137,10 +137,13 @@ const STATUS_LABELS: Record<PayableStatus, string> = {
   cancelado: "Cancelado",
 };
 
-const STATUS_VARIANT: Record<PayableStatus, "default" | "secondary" | "destructive" | "outline"> = {
+const STATUS_VARIANT: Record<
+  PayableStatus,
+  "default" | "secondary" | "destructive" | "outline" | "success" | "warning"
+> = {
   a_pagar: "outline",
-  parcial: "secondary",
-  pago: "default",
+  parcial: "warning",
+  pago: "success",
   atrasado: "destructive",
   cancelado: "secondary",
 };
@@ -1259,7 +1262,7 @@ export function PayablesPanel() {
             <CardTitle className="text-sm font-medium text-muted-foreground">A pagar</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="font-serif text-2xl text-warning">{loading ? "—" : brl(summary.aPagar)}</p>
+            <p className="font-sans font-semibold tabular-nums tracking-tight text-2xl text-warning-ink">{loading ? "—" : brl(summary.aPagar)}</p>
           </CardContent>
         </Card>
         <Card className="border-border/60">
@@ -1267,7 +1270,7 @@ export function PayablesPanel() {
             <CardTitle className="text-sm font-medium text-muted-foreground">Pago</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="font-serif text-2xl text-success">{loading ? "—" : brl(summary.pago)}</p>
+            <p className="font-sans font-semibold tabular-nums tracking-tight text-2xl text-success-ink">{loading ? "—" : brl(summary.pago)}</p>
           </CardContent>
         </Card>
         <Card className="border-border/60">
@@ -1277,7 +1280,7 @@ export function PayablesPanel() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="font-serif text-2xl text-destructive">{loading ? "—" : brl(summary.atrasado)}</p>
+            <p className="font-sans font-semibold tabular-nums tracking-tight text-2xl text-destructive">{loading ? "—" : brl(summary.atrasado)}</p>
           </CardContent>
         </Card>
       </div>
@@ -1364,7 +1367,7 @@ export function PayablesPanel() {
                                 title="Registrar pagamento"
                                 onClick={() => openPay(p)}
                               >
-                                <Check className="h-4 w-4 text-success" />
+                                <Check className="h-4 w-4 text-success-ink" />
                               </Button>
                             )}
                             {eff !== "cancelado" && (
@@ -1628,7 +1631,7 @@ export function PayablesPanel() {
                       <TableCell>{brl(pay.amount)}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{pay.payment_method ?? "—"}</TableCell>
                       <TableCell>
-                        <Badge variant={pay.status === "estornado" ? "secondary" : "default"}>
+                        <Badge variant={pay.status === "estornado" ? "secondary" : "success"}>
                           {pay.status === "estornado" ? "Estornado" : "Ativo"}
                         </Badge>
                       </TableCell>

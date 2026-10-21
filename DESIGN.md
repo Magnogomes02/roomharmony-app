@@ -5,6 +5,7 @@ colors:
   dourado-acolhida: "oklch(0.78 0.14 85)"
   dourado-palido: "oklch(0.95 0.015 85)"
   dourado-sombra: "oklch(0.30 0.05 85)"
+  dourado-tinta: "oklch(0.50 0.10 80)"
   linho-dourado: "oklch(0.92 0.04 85)"
   nogueira-noturna: "oklch(0.22 0.01 85)"
   nogueira-realce: "oklch(0.28 0.015 85)"
@@ -16,7 +17,9 @@ colors:
   tinta-quente: "oklch(0.18 0.005 90)"
   cinza-recado: "oklch(0.50 0.01 85)"
   verde-saude: "oklch(0.62 0.08 145)"
+  verde-tinta: "oklch(0.50 0.08 145)"
   ambar-aviso: "oklch(0.78 0.14 70)"
+  ambar-tinta: "oklch(0.52 0.12 60)"
   vermelho-alerta: "oklch(0.58 0.22 27)"
 typography:
   display:
@@ -136,6 +139,7 @@ Uma paleta de recepção: madeira escura, paredes de linho, papel branco e um ú
 - **Dourado Pálido** (`dourado-palido`): fundo do botão e do badge secundários. É o dourado diluído para ações de segunda ordem.
 - **Linho Dourado** (`linho-dourado`): fundo de hover em botões outline e ghost e em itens de menu. É o "toque" que confirma que o elemento responde.
 - **Dourado Sombra** (`dourado-sombra`): texto sobre Linho Dourado e Dourado Pálido. É o dourado escurecido o bastante para ser lido como texto.
+- **Dourado Tinta** (`dourado-tinta`, classe `text-primary-ink`): links, destaques e ícones com significado em dourado sobre fundos claros. Tem contraste de 4,8:1 a 6,1:1 no Bege Recepção, no Papel Branco, na Areia Suave e no Linho Dourado.
 
 ### Neutral
 - **Bege Recepção** (`bege-recepcao`): fundo da aplicação inteira. A parede quente da sala.
@@ -147,8 +151,8 @@ Uma paleta de recepção: madeira escura, paredes de linho, papel branco e um ú
 - **Nogueira Noturna** (`nogueira-noturna`): o balcão, ou seja, o fundo da sidebar. **Nogueira Realce** (`nogueira-realce`) marca o hover e o item ativo nela, e **Nogueira Veio** (`nogueira-veio`) faz as divisórias.
 
 ### Semânticas
-- **Verde Saúde** (`verde-saude`): recebido, ativo, concluído. É um verde dessaturado, nunca o verde-neon de sucesso.
-- **Âmbar Aviso** (`ambar-aviso`): atenção e prazo próximo. Fica perto do dourado, mas puxado para o laranja (hue 70).
+- **Verde Saúde** (`verde-saude`): recebido, ativo, concluído. É um verde dessaturado, nunca o verde-neon de sucesso. Como preenchimento ou borda; para texto, use **Verde Tinta** (`verde-tinta`, `text-success-ink`).
+- **Âmbar Aviso** (`ambar-aviso`): atenção e prazo próximo. Fica perto do dourado, mas puxado para o laranja (hue 70). Como preenchimento ou borda; para texto, use **Âmbar Tinta** (`ambar-tinta`, `text-warning-ink`).
 - **Vermelho Alerta** (`vermelho-alerta`): conflito, atraso e ações destrutivas.
 
 ### Cores de entidade
@@ -157,7 +161,7 @@ Salas e profissionais têm uma cor própria, cadastrada em `color_hex`. Quando a
 ### Named Rules
 **A Regra do Gesto Único.** O dourado é o único acento e marca o que pede ação ou o que está ativo. Se uma tela tem dourado em tudo, ele não aponta para nada.
 
-**A Regra do Ouro como Preenchimento.** O Dourado Acolhida tem luminosidade alta (0.78) e não tem contraste para texto pequeno sobre o Bege Recepção ou o Papel Branco. Use-o como fundo, borda ou ícone. Quando precisar de texto dourado, use o Dourado Sombra. O código atual ainda tem links em `text-primary` que violam esta regra.
+**A Regra do Ouro como Preenchimento.** O Dourado Acolhida tem luminosidade alta (0.78) e não tem contraste para texto pequeno sobre o Bege Recepção ou o Papel Branco (cerca de 2:1). Use-o como fundo, borda ou ícone decorativo. Para texto dourado, use o Dourado Tinta; o mesmo vale para verde e âmbar, que têm suas tintas. Sobre a sidebar escura, o Dourado Acolhida continua valendo como texto.
 
 **A Regra do Neutro Quente.** Nenhum neutro é cinza puro. Todo cinza novo carrega croma de 0.005 a 0.015 no hue 85–90. Cinza-azulado é a assinatura do SaaS genérico que este sistema rejeita.
 
@@ -178,7 +182,7 @@ Salas e profissionais têm uma cor própria, cadastrada em `color_hex`. Quando a
 ### Named Rules
 **A Regra da Cortesia nos Títulos.** A serifa aparece em `h1` a `h4` e em títulos de card, nunca em números, valores em BRL, botões ou células de tabela. Dinheiro e horários são sempre Inter.
 
-**A Regra dos Números Alinhados.** Colunas de valores e horários devem usar `tabular-nums`, para que somas e turnos se alinhem verticalmente.
+**A Regra dos Números Alinhados.** Valores e horários usam algarismos tabulares: toda `table` já aplica `tabular-nums`, e os valores em destaque (cards de totais) usam Inter seminegrito com `tabular-nums`.
 
 ## Layout
 
@@ -224,7 +228,7 @@ Os componentes são táteis e confiantes: respondem a cada toque, têm contraste
 
 ### Chips (Badges)
 - **Style:** cantos de 10px, padding de 2px × 10px e rótulo de 12px em peso 600. O badge padrão é dourado com texto Tinta Quente. O secundário usa Dourado Pálido com Dourado Sombra.
-- **Estado:** os status financeiros e de reserva usam o badge outline com borda e texto na cor semântica (por exemplo, borda Vermelho Alerta a 60% para conflito). O ícone de alerta acompanha o rótulo, nunca o substitui.
+- **Estado:** os status usam as variantes semânticas: `success` (borda Verde Saúde a 40%, fundo a 10%, texto Verde Tinta) para recebido, pago e ativo; `warning` (Âmbar) para parcial; `destructive` para atrasado e conflito; `secondary` e `outline` para os neutros. O badge dourado cheio (`default`) fica para seleção e passo atual, não para estado. O ícone de alerta acompanha o rótulo, nunca o substitui. Os rótulos vêm de `src/lib/labels.ts`, nunca o código interno (`recorrencia`, `ativo`).
 
 ### Cards / Containers
 - **Corner Style:** 16px.
@@ -257,8 +261,9 @@ Os componentes são táteis e confiantes: respondem a cada toque, têm contraste
 - **Do** garantir alvos de toque generosos nos fluxos que o gestor usa no celular: conflitos, baixas e agenda.
 
 ### Don't:
-- **Don't** usar texto em Dourado Acolhida sobre fundo claro. Use o Dourado Sombra.
+- **Don't** usar texto em Dourado Acolhida, Verde Saúde ou Âmbar Aviso sobre fundo claro. Use as tintas (`text-primary-ink`, `text-success-ink`, `text-warning-ink`).
 - **Don't** introduzir azul-e-branco clínico ou superfícies frias e estéreis (anti-referência confirmada: hospital frio).
 - **Don't** usar o cinza-azulado neutro do template shadcn padrão. Todo neutro é quente (anti-referência confirmada: SaaS genérico).
 - **Don't** usar a borda esquerda colorida para indicar estado. Ela identifica a entidade.
 - **Don't** criar um segundo acento colorido para competir com o dourado. As cores semânticas (verde, âmbar, vermelho) só comunicam estado.
+- **Don't** usar a paleta padrão do Tailwind (`sky-*`, `indigo-*`, `emerald-*`, `orange-*`…) nem emoji como ícone. Cores vêm dos tokens e da paleta de entidades; ícones, do lucide.

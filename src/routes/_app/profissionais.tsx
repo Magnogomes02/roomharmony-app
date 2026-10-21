@@ -348,7 +348,7 @@ function ProfissionaisPage() {
                       {!p.email && !p.phone && "—"}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={p.active ? "default" : "secondary"}>
+                      <Badge variant={p.active ? "success" : "secondary"}>
                         {p.active ? "Ativo" : "Inativo"}
                       </Badge>
                     </TableCell>

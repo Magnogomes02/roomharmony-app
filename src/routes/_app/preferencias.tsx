@@ -496,7 +496,7 @@ function PreferenciasPage() {
                   {canEdit && (
                     <div className="flex flex-wrap items-center gap-1">
                       <Button size="icon" variant="ghost" onClick={() => makeDefault(t)} title={t.is_default ? "Já é o padrão" : "Definir como padrão"} disabled={t.is_default}>
-                        {t.is_default ? <Star className="h-4 w-4 text-primary" /> : <StarOff className="h-4 w-4" />}
+                        {t.is_default ? <Star className="h-4 w-4 text-primary-ink" /> : <StarOff className="h-4 w-4" />}
                       </Button>
                       <Button size="sm" variant="ghost" onClick={() => toggleActive(t)}>
                         {t.active ? "Inativar" : "Ativar"}
@@ -726,7 +726,7 @@ function PreferenciasPage() {
               dangerouslySetInnerHTML={{ __html: tplForm.body_html || "<p><em>(modelo vazio)</em></p>" }}
             />
             <div
-              className="mt-10 border-t border-dashed border-gray-400 pt-3 text-center text-[10px] text-gray-500"
+              className="mt-10 border-t border-dashed border-muted-foreground/50 pt-3 text-center text-xs text-muted-foreground"
               style={{ minHeight: `${sigSettings.reserved_height_mm}mm` }}
             >
               Espaço reservado para o bloco de assinaturas ({sigSettings.layout === "side_by_side" ? "lado a lado" : "empilhado"} · {sigSettings.reserved_height_mm}mm)

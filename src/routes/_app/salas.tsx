@@ -208,7 +208,7 @@ function SalasPage() {
                     <TableCell>{r.capacity}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{r.sort_order ?? "—"}</TableCell>
                     <TableCell>
-                      <Badge variant={r.active ? "default" : "secondary"}>
+                      <Badge variant={r.active ? "success" : "secondary"}>
                         {r.active ? "Ativa" : "Inativa"}
                       </Badge>
                     </TableCell>

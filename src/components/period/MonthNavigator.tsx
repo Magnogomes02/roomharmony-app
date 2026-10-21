@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
 import { addMonths, format, startOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { capitalizeFirst } from "@/lib/labels";
 import { Button, type ButtonProps } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -46,8 +47,8 @@ export function MonthNavigator({ value, onChange, buttonVariant = "outline", cla
       </Button>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <Button variant={buttonVariant} className="min-w-[170px] justify-between capitalize">
-            {format(value, "MMMM 'de' yyyy", { locale: ptBR })}
+          <Button variant={buttonVariant} className="min-w-[170px] justify-between">
+            {capitalizeFirst(format(value, "MMMM 'de' yyyy", { locale: ptBR }))}
             <ChevronDown className="ml-2 h-4 w-4 opacity-50" />
           </Button>
         </PopoverTrigger>
