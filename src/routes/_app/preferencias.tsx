@@ -43,6 +43,7 @@ import {
   saveReceiptSettings,
   type ReceiptSettings,
 } from "@/lib/receiptSettings";
+import { useConfirm } from "@/components/ConfirmDialog";
 
 export const Route = createFileRoute("/_app/preferencias")({
   component: PreferenciasPage,
@@ -57,6 +58,7 @@ interface ClinicBranding {
 }
 
 function PreferenciasPage() {
+  const { confirm: ask } = useConfirm();
   const { role } = useAuth();
   const canEdit = role === "gestor";
 
@@ -163,7 +165,13 @@ function PreferenciasPage() {
 
   async function removeLogo() {
     if (!branding.logo_path) return;
-    if (!confirm("Remover a logomarca atual?")) return;
+    const ok = await ask({
+      title: "Remover a logomarca atual?",
+      description: "Recibos e contratos novos sairão sem logomarca até você enviar outra.",
+      confirmLabel: "Remover",
+      destructive: true,
+    });
+    if (!ok) return;
     await supabase.storage.from("clinic-assets").remove([branding.logo_path]);
     await save({ ...branding, logo_path: undefined, logo_url: undefined });
   }

@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/table";
 import { toast } from "sonner";
 import { entityColor } from "@/lib/entityColors";
+import { useConfirm } from "@/components/ConfirmDialog";
 
 export const Route = createFileRoute("/_app/profissionais")({
   component: ProfissionaisPage,
@@ -70,6 +71,7 @@ function newPending(): PendingAttachment {
 }
 
 function ProfissionaisPage() {
+  const { confirm: ask } = useConfirm();
   const { role } = useAuth();
   const canEdit = role === "gestor";
   const [items, setItems] = useState<Professional[]>([]);
@@ -184,7 +186,13 @@ function ProfissionaisPage() {
   }
 
   async function deleteExisting(att: Attachment) {
-    if (!confirm(`Remover anexo "${att.file_name}"?`)) return;
+    const ok = await ask({
+      title: "Remover este anexo?",
+      description: `O arquivo "${att.file_name}" será apagado do cadastro.`,
+      confirmLabel: "Remover",
+      destructive: true,
+    });
+    if (!ok) return;
     const rm = await supabase.storage.from("professional-attachments").remove([att.file_path]);
     if (rm.error) toast.error("Erro ao remover arquivo", { description: rm.error.message });
     const del = await supabase.from("professional_attachments").delete().eq("id", att.id);

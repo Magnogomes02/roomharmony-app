@@ -55,6 +55,7 @@ import {
 import { MONTHS_PT } from "@/lib/paymentsService";
 import { buildReceiptAuthenticationCode } from "@/lib/receiptPdf";
 import { createNotification } from "@/lib/notifications";
+import { useConfirm } from "@/components/ConfirmDialog";
 
 
 
@@ -185,6 +186,7 @@ function ScheduleTimeline({
 }
 
 function ContratosPage() {
+  const { confirm: ask } = useConfirm();
   const { role, user } = useAuth();
   const canEdit = role === "gestor";
 
@@ -787,7 +789,13 @@ function ContratosPage() {
     window.open(data.signedUrl, "_blank");
   }
   async function deleteAttachment(a: Attachment) {
-    if (!confirm(`Remover "${a.file_name}"?`)) return;
+    const ok = await ask({
+      title: "Remover este anexo?",
+      description: `O arquivo "${a.file_name}" será apagado do contrato.`,
+      confirmLabel: "Remover",
+      destructive: true,
+    });
+    if (!ok) return;
     const s = await supabase.storage.from("contract-attachments").remove([a.file_path]);
     if (s.error) return toast.error("Erro ao remover arquivo", { description: s.error.message });
     const d = await supabase.from("contract_attachments").delete().eq("id", a.id);

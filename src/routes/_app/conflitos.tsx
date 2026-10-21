@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { BOOKING_SOURCE_LABELS, BOOKING_STATUS_LABELS, CONFLICT_STATUS_LABELS, labelOf } from "@/lib/labels";
 import { countPendingConflicts, findOverlappingBookings, registerBookingConflicts } from "@/lib/scheduleConflicts";
+import { useConfirm } from "@/components/ConfirmDialog";
 
 export const Route = createFileRoute("/_app/conflitos")({
   component: ConflitosPage,
@@ -65,6 +66,7 @@ function fromTimeStr(date: Date, t: string) {
 }
 
 function ConflitosPage() {
+  const { confirm: ask } = useConfirm();
   const { role } = useAuth();
   const canEdit = role === "gestor";
 
@@ -189,7 +191,12 @@ function ConflitosPage() {
         .lt("start_at", newEnd.toISOString())
         .gt("end_at", newStart.toISOString());
       if ((candidates ?? []).length > 0) {
-        if (!confirm(`O novo horário ainda gera ${candidates!.length} conflito(s). Salvar mesmo assim?`)) return;
+        const ok = await ask({
+          title: "O novo horário ainda tem conflito",
+          description: `Ele se sobrepõe a ${candidates!.length} reserva(s) nesta sala. Se salvar, o conflito continua pendente.`,
+          confirmLabel: "Salvar mesmo assim",
+        });
+        if (!ok) return;
       }
     }
 
@@ -249,7 +256,14 @@ function ConflitosPage() {
   }
 
   async function cancelOccurrence(conflict: EnrichedConflict, b: Booking) {
-    if (!confirm("Cancelar esta ocorrência? A recorrência do contrato continua.")) return;
+    const ok = await ask({
+      title: "Cancelar esta ocorrência?",
+      description: `Reserva de ${format(parseISO(b.start_at), "dd/MM 'às' HH:mm")}. Só esta data é cancelada; a recorrência do contrato continua.`,
+      confirmLabel: "Cancelar ocorrência",
+      cancelLabel: "Voltar",
+      destructive: true,
+    });
+    if (!ok) return;
     const { error } = await supabase.from("bookings").update({ status: "cancelada" }).eq("id", b.id);
     if (error) { toast.error("Erro", { description: error.message }); return; }
 

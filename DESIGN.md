@@ -259,6 +259,7 @@ Os componentes são táteis e confiantes: respondem a cada toque, têm contraste
 - **Do** reservar a Cormorant Garamond para `h1`–`h4` e títulos de card. Números, BRL, horários e botões são Inter.
 - **Do** usar as cores de entidade como borda forte com fundo translúcido (cerca de 13%) para identificar salas e profissionais.
 - **Do** garantir alvos de toque generosos nos fluxos que o gestor usa no celular: conflitos, baixas e agenda.
+- **Do** pedir confirmação com o diálogo do app (`useConfirm`, em `src/components/ConfirmDialog.tsx`), nunca com `confirm`/`prompt`/`alert` do navegador. O texto nomeia o que será afetado (quem, valor, data) e o botão nomeia a ação ("Excluir", "Estornar").
 
 ### Don't:
 - **Don't** usar texto em Dourado Acolhida, Verde Saúde ou Âmbar Aviso sobre fundo claro. Use as tintas (`text-primary-ink`, `text-success-ink`, `text-warning-ink`).

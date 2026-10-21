@@ -53,7 +53,14 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { toast } from "sonner";
-import { CONTRACT_STATUS_LABELS, labelOf, PAYMENT_STATUS_LABELS, RECEIVABLE_KIND_LABELS } from "@/lib/labels";
+import {
+  CONTRACT_STATUS_LABELS,
+  labelOf,
+  PAYMENT_STATUS_LABELS,
+  RECEIVABLE_KIND_LABELS,
+  RECEIVABLE_STATUS_LABELS,
+} from "@/lib/labels";
+import { useConfirm } from "@/components/ConfirmDialog";
 import {
   createReceiptForReceivable,
   cancelReceiptForReceivable,
@@ -157,6 +164,7 @@ function brl(v: number | null | undefined) {
 
 function FinanceiroPage() {
   const { role } = useAuth();
+  const { confirm: ask, prompt: askText, notice } = useConfirm();
   const canEdit = role === "gestor";
 
   const [rows, setRows] = useState<Receivable[]>([]);
@@ -512,7 +520,13 @@ function FinanceiroPage() {
     const actives = paymentsByRec.get(r.id)?.filter((p) => p.status === "ativo") ?? [];
     if (actives.length === 0) {
       // legacy: paid via old flow (no payment row)
-      if (!confirm("Estornar este pagamento? O recibo emitido (se houver) será cancelado.")) return;
+      const ok = await ask({
+        title: "Estornar este pagamento?",
+        description: "O recebível volta a ficar em aberto e o recibo emitido, se houver, será cancelado.",
+        confirmLabel: "Estornar",
+        destructive: true,
+      });
+      if (!ok) return;
       try {
         await cancelReceiptForReceivable(r.id, "Pagamento estornado");
       } catch (e) {
@@ -626,8 +640,15 @@ function FinanceiroPage() {
   async function cancelReceiptForPayment(r: Receivable, paymentId: string) {
     const rc = histReceipts.get(paymentId);
     if (!rc) return;
-    const reason = prompt("Motivo do cancelamento do recibo:");
-    if (!reason || !reason.trim()) return;
+    const reason = await askText({
+      title: `Cancelar o recibo ${rc.receipt_number}?`,
+      description: "O pagamento continua registrado; só o recibo deixa de valer.",
+      inputLabel: "Motivo do cancelamento",
+      confirmLabel: "Cancelar recibo",
+      cancelLabel: "Voltar",
+      destructive: true,
+    });
+    if (!reason) return;
     try {
       await cancelReceiptById(rc.id, reason.trim());
       toast.success("Recibo cancelado");
@@ -650,11 +671,13 @@ function FinanceiroPage() {
     return payments.some((p) => receiptsByPayment.has(p.id));
   }
 
-  function openEdit(r: Receivable) {
+  async function openEdit(r: Receivable) {
     if (hasAnyReceipt(r)) {
-      alert(
-        "Este recebível possui recibo emitido. Alterar valor/vencimento não altera o recibo já emitido.",
-      );
+      await notice({
+        title: "Este recebível já tem recibo emitido",
+        description: "Alterar o valor ou o vencimento não muda o recibo que já foi emitido.",
+        confirmLabel: "Continuar para a edição",
+      });
     }
     setEditRow(r);
     setEditForm({
@@ -697,7 +720,13 @@ function FinanceiroPage() {
       );
       return;
     }
-    if (!confirm("Excluir esta parcela? Esta ação não pode ser desfeita.")) return;
+    const ok = await ask({
+      title: "Excluir esta parcela?",
+      description: `${profMap.get(r.professional_id) ?? "Profissional"} · ${brl(Number(r.amount_due))} · vencimento ${formatDateOnlyBR(r.due_date)}. Esta ação não pode ser desfeita.`,
+      confirmLabel: "Excluir",
+      destructive: true,
+    });
+    if (!ok) return;
     const { error } = await supabase.from("receivables").delete().eq("id", r.id);
     if (error) return toast.error("Erro", { description: error.message });
     await audit("receivable.delete", r.id, {});
@@ -753,8 +782,15 @@ function FinanceiroPage() {
   async function handleCancelReceipt(r: Receivable) {
     const rc = receiptsByRec.get(r.id);
     if (!rc) return;
-    const reason = prompt("Motivo do cancelamento do recibo:");
-    if (!reason || !reason.trim()) return;
+    const reason = await askText({
+      title: `Cancelar o recibo ${rc.receipt_number}?`,
+      description: "O pagamento continua registrado; só o recibo deixa de valer.",
+      inputLabel: "Motivo do cancelamento",
+      confirmLabel: "Cancelar recibo",
+      cancelLabel: "Voltar",
+      destructive: true,
+    });
+    if (!reason) return;
     try {
       await cancelReceiptById(rc.id, reason.trim());
       toast.success("Recibo cancelado");
@@ -971,9 +1007,14 @@ function FinanceiroPage() {
           reference_month: `${newForm.year}-${String(newForm.month + 1).padStart(2, "0")}-01`,
         });
         const det = dups
-          .map((d) => `${brl(d.amount_due)} · venc. ${d.due_date} · ${d.status}`)
+          .map((d) => `${brl(d.amount_due)} · vencimento ${formatDateOnlyBR(d.due_date)} · ${labelOf(RECEIVABLE_STATUS_LABELS, d.status)}`)
           .join("\n");
-        if (!confirm(`Já existe recebível para este mês:\n\n${det}\n\nGerar mesmo assim?`)) {
+        const ok = await ask({
+          title: "Já existe recebível para este mês",
+          description: `${det}\n\nGerar outro mesmo assim?`,
+          confirmLabel: "Gerar mesmo assim",
+        });
+        if (!ok) {
           setSavingNew(false);
           return;
         }
@@ -1013,17 +1054,20 @@ function FinanceiroPage() {
         if (dups.length > 0) {
           dupMonths.push(m);
           for (const d of dups) {
-            dupDetails.push(`${MONTHS_PT[m]}: ${brl(d.amount_due)} · venc. ${d.due_date} · ${d.status}`);
+            dupDetails.push(
+              `${MONTHS_PT[m]}: ${brl(d.amount_due)} · vencimento ${formatDateOnlyBR(d.due_date)} · ${labelOf(RECEIVABLE_STATUS_LABELS, d.status)}`,
+            );
           }
         }
       }
       let allowDup = false;
       if (dupMonths.length > 0) {
-        if (
-          !confirm(
-            `Já existem recebíveis para os meses marcados:\n\n${dupDetails.join("\n")}\n\nGerar mesmo assim para todos os meses marcados?`,
-          )
-        ) {
+        const ok = await ask({
+          title: "Já existem recebíveis nos meses marcados",
+          description: `${dupDetails.join("\n")}\n\nGerar mesmo assim para todos os meses marcados?`,
+          confirmLabel: "Gerar mesmo assim",
+        });
+        if (!ok) {
           setSavingNew(false);
           return;
         }

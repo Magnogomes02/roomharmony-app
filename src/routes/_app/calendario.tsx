@@ -32,6 +32,7 @@ import { BOOKING_SOURCE_LABELS, BOOKING_STATUS_LABELS, capitalizeFirst, labelOf 
 import { entityColor, sortRooms } from "@/lib/entityColors";
 import { toDateOnlyString } from "@/lib/dateOnly";
 import { findOverlappingBookings, registerBookingConflicts } from "@/lib/scheduleConflicts";
+import { useConfirm } from "@/components/ConfirmDialog";
 
 export const Route = createFileRoute("/_app/calendario")({
   component: CalendarioPage,
@@ -94,6 +95,7 @@ function fromTimeStr(date: Date, t: string) {
 }
 
 function CalendarioPage() {
+  const { confirm: ask } = useConfirm();
   const { role, user } = useAuth();
   const canEdit = role === "gestor";
 
@@ -318,7 +320,14 @@ function CalendarioPage() {
   }
 
   async function cancelOccurrence(b: Booking) {
-    if (!confirm("Cancelar esta ocorrência? A recorrência do contrato continua.")) return;
+    const ok = await ask({
+      title: "Cancelar esta ocorrência?",
+      description: `Reserva de ${format(parseISO(b.start_at), "dd/MM 'às' HH:mm")}. Só esta data é cancelada; a recorrência do contrato continua.`,
+      confirmLabel: "Cancelar ocorrência",
+      cancelLabel: "Voltar",
+      destructive: true,
+    });
+    if (!ok) return;
     const { error } = await supabase.from("bookings").update({ status: "cancelada" }).eq("id", b.id);
     if (error) { toast.error("Erro ao cancelar", { description: error.message }); return; }
     await audit("booking.cancel", b.id, { date: b.start_at });

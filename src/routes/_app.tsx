@@ -4,6 +4,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { NotificationBell } from "@/components/NotificationBell";
 import { useAuth } from "@/hooks/useAuth";
+import { ConfirmDialogProvider } from "@/components/ConfirmDialog";
 
 export const Route = createFileRoute("/_app")({
   component: AppLayout,
@@ -36,7 +37,9 @@ function AppLayout() {
             <NotificationBell />
           </header>
           <main className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">
-            <Outlet />
+            <ConfirmDialogProvider>
+              <Outlet />
+            </ConfirmDialogProvider>
           </main>
         </div>
       </div>

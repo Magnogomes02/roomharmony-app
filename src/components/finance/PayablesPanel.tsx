@@ -64,6 +64,7 @@ import {
   type ApplyInstallmentCreditResult,
 } from "@/lib/installmentCredits";
 import type { Json } from "@/integrations/supabase/types";
+import { useConfirm } from "@/components/ConfirmDialog";
 
 interface Payable {
   id: string;
@@ -164,6 +165,7 @@ const emptyForm = {
 };
 
 export function PayablesPanel() {
+  const { prompt: askText } = useConfirm();
   const { role } = useAuth();
   const canEdit = role === "gestor";
 
@@ -709,8 +711,14 @@ export function PayablesPanel() {
       );
       return;
     }
-    const reason = window.prompt("Motivo do estorno:");
-    if (reason === null) return;
+    const reason = await askText({
+      title: "Estornar este pagamento?",
+      description: "A conta volta a ficar em aberto pelo valor estornado.",
+      inputLabel: "Motivo do estorno",
+      confirmLabel: "Estornar",
+      destructive: true,
+    });
+    if (!reason) return;
     const { data: { user } } = await supabase.auth.getUser();
     const { error } = await supabase
       .from("payable_payments")

@@ -32,6 +32,14 @@ export const PAYMENT_STATUS_LABELS: Record<string, string> = {
   cancelado: "Cancelado",
 };
 
+export const RECEIVABLE_STATUS_LABELS: Record<string, string> = {
+  a_receber: "A receber",
+  parcial: "Parcial",
+  recebido: "Recebido",
+  atrasado: "Em atraso",
+  cancelado: "Cancelado",
+};
+
 export const RECEIVABLE_KIND_LABELS: Record<string, string> = {
   contrato: "Contrato",
   avulso: "Avulso",
