@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { ChevronLeft, ChevronRight, Plus, RefreshCw, Move, CalendarIcon, Ban } from "lucide-react";
 import { format, addDays, startOfDay, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -218,7 +218,30 @@ function CalendarioPage() {
     setNewOpen(true);
   }
 
-  async function saveNew(force = false) {
+  // trava síncrona: dois toques antes do re-render não podem criar duas reservas
+  const savingRef = useRef(false);
+  const [saving, setSaving] = useState(false);
+  async function runGuarded(fn: () => Promise<void>) {
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
+    try {
+      await fn();
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
+  }
+
+  function saveNew(force = false) {
+    return runGuarded(() => saveNewInner(force));
+  }
+
+  function saveRealloc(force = false) {
+    return runGuarded(() => saveReallocInner(force));
+  }
+
+  async function saveNewInner(force: boolean) {
     if (!newForm.room_id || !newForm.professional_id) {
       toast.error("Selecione sala e profissional");
       return;
@@ -270,7 +293,12 @@ function CalendarioPage() {
         paid_at: newForm.avulso_paid ? new Date().toISOString() : null,
         payment_method: newForm.avulso_paid ? "PIX" : null,
       };
-      await supabase.from("receivables").insert(recPayload);
+      const { error: recErr } = await supabase.from("receivables").insert(recPayload);
+      if (recErr) {
+        toast.warning("Reserva criada, mas a cobrança avulsa não foi gerada", {
+          description: `Lance a cobrança manualmente no Financeiro. (${recErr.message})`,
+        });
+      }
     }
 
     await audit("booking.create", data?.id ?? null, { source: newForm.is_maintenance ? "manutencao" : "avulsa", is_maintenance: newForm.is_maintenance, forced_conflict: force, amount: amountNum });
@@ -306,7 +334,7 @@ function CalendarioPage() {
     setReallocOpen(true);
   }
 
-  async function saveRealloc(force = false) {
+  async function saveReallocInner(force: boolean) {
     if (!detailBooking) return;
     const start = fromTimeStr(reallocForm.date, reallocForm.start);
     const end = fromTimeStr(reallocForm.date, reallocForm.end);
@@ -713,7 +741,9 @@ function CalendarioPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setNewOpen(false)}>Cancelar</Button>
-            <Button onClick={() => saveNew(false)}>Criar reserva</Button>
+            <Button onClick={() => saveNew(false)} disabled={saving}>
+              {saving ? "Criando…" : "Criar reserva"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -799,7 +829,9 @@ function CalendarioPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setReallocOpen(false)}>Cancelar</Button>
-            <Button onClick={() => saveRealloc(false)}>Confirmar realocação</Button>
+            <Button onClick={() => saveRealloc(false)} disabled={saving}>
+              {saving ? "Realocando…" : "Confirmar realocação"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

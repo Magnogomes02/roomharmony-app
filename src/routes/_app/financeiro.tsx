@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format, parseISO, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -66,9 +66,9 @@ import { FinancialAnalysisPanel } from "@/components/finance/FinancialAnalysisPa
 import { PayablesPanel } from "@/components/finance/PayablesPanel";
 import {
   computeEffectiveStatus,
-  createPayment,
-  setRemainingDue,
+  registerPayment,
   reversePayment,
+  cancelReceivable,
   recomputeReceivableSummary,
   getActivePaymentsForReceivables,
   getAllPaymentsForReceivable,
@@ -78,11 +78,7 @@ import {
   type ReceivablePayment,
   type EffectiveStatus,
 } from "@/lib/paymentsService";
-import {
-  createCreditApplication,
-  applyPendingCredits,
-  paymentHasOverpaymentTreatment,
-} from "@/lib/creditApplications";
+import { applyPendingCredits } from "@/lib/creditApplications";
 import { toDateOnlyString } from "@/lib/dateOnly";
 
 export const Route = createFileRoute("/_app/financeiro")({
@@ -194,12 +190,15 @@ function FinanceiroPage() {
   const [payOverpaymentAction, setPayOverpaymentAction] = useState<"credit" | "fee" | "">("");
   const [payFile, setPayFile] = useState<File | null>(null);
   const [paying, setPaying] = useState(false);
+  // trava síncrona: dois toques antes do re-render não podem gerar duas baixas
+  const payingRef = useRef(false);
   const [generateReceiptAfterPay, setGenerateReceiptAfterPay] = useState(true);
 
   // edit dialog
   const [editOpen, setEditOpen] = useState(false);
   const [editRow, setEditRow] = useState<Receivable | null>(null);
   const [editForm, setEditForm] = useState({ amount_due: "", due_date: "", notes: "" });
+  const [editSaving, setEditSaving] = useState(false);
 
   // estorno dialog
   const [revOpen, setRevOpen] = useState(false);
@@ -207,6 +206,7 @@ function FinanceiroPage() {
   const [revPayments, setRevPayments] = useState<ReceivablePayment[]>([]);
   const [revSelected, setRevSelected] = useState<string>("");
   const [revReason, setRevReason] = useState("");
+  const [revSaving, setRevSaving] = useState(false);
 
   // cancel-typed dialog
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -215,6 +215,7 @@ function FinanceiroPage() {
     "perda_contrato",
   );
   const [cancelReason, setCancelReason] = useState("");
+  const [cancelSaving, setCancelSaving] = useState(false);
 
   // history dialog
   const [histOpen, setHistOpen] = useState(false);
@@ -438,7 +439,7 @@ function FinanceiroPage() {
   }
 
   async function confirmPay() {
-    if (!payRow) return;
+    if (!payRow || payingRef.current) return;
     const amount = Number(payForm.amount_paid);
     if (!(amount > 0)) {
       toast.error("Valor pago deve ser maior que zero.");
@@ -461,119 +462,59 @@ function FinanceiroPage() {
       toast.error("Selecione o destino do excedente.");
       return;
     }
+    payingRef.current = true;
     setPaying(true);
     let attachment_path: string | null = null;
     if (payFile) {
       const path = `receivables/${payRow.id}/${Date.now()}-${payFile.name}`;
       const up = await supabase.storage.from("contract-attachments").upload(path, payFile);
       if (up.error) {
+        payingRef.current = false;
         setPaying(false);
         toast.error("Erro no upload do comprovante", { description: up.error.message });
         return;
       }
       attachment_path = path;
     }
+    let paymentId: string;
     try {
-      const payment = await createPayment({
+      ({ paymentId } = await registerPayment({
         receivableId: payRow.id,
         amount,
         paidAt: payForm.paid_at,
         paymentMethod: payForm.payment_method,
         attachmentPath: attachment_path,
         notes: payForm.notes || null,
+        remainingDueDate: isPartial ? payForm.remaining_due_date : null,
+        remainingDueReason: isPartial ? payForm.remaining_due_reason || null : null,
+        overpaymentAction: overpaymentAction || null,
+      }));
+    } catch (e) {
+      // nada foi gravado: a baixa roda em uma única transação no banco
+      toast.error("Pagamento não registrado", {
+        description: e instanceof Error ? e.message : String(e),
       });
-      const auditOkCreate = await audit("receivable.payment_create", payRow.id, {
-        payment_id: payment.id,
-        amount,
-        method: payForm.payment_method,
-      });
-      let overpaymentWarning: string | null = null;
-      if (overpaymentAction === "credit") {
-        await setRemainingDue(payRow.id, { remainingDueDate: null, reason: null });
-        const { data: { user } } = await supabase.auth.getUser();
-        let creditOk = true;
-        try {
-          await createCreditApplication({
-            module: "receivable",
-            sourceItemId: payRow.id,
-            sourcePaymentId: payment.id,
-            amount: overpaidAmount,
-            reason: payForm.notes || null,
-            createdBy: user?.id ?? null,
-          });
-        } catch (err) {
-          creditOk = false;
-          console.error("createCreditApplication falhou", err);
-        }
-        if (creditOk) {
-          try {
-            await applyPendingCredits("receivable");
-          } catch (e) {
-            console.warn("applyPendingCredits(receivable) falhou", e);
-          }
-        }
-        const auditOkCredit = await audit("receivable.overpayment_credit_next", payRow.id, {
-          payment_id: payment.id, amount_due_before: due, payment_amount: amount,
-          amount_paid_after: newPaid, overpaid_amount: overpaidAmount, overpayment_action: "credit",
-        });
-        if (!creditOk) {
-          overpaymentWarning =
-            "Pagamento registrado, mas falhou ao registrar o crédito para a próxima cobrança. Verifique manualmente e ajuste o saldo da próxima cobrança.";
-        } else if (!auditOkCreate || !auditOkCredit) {
-          overpaymentWarning =
-            "Pagamento e crédito registrados, mas a auditoria deste excedente falhou. O crédito já protege este pagamento contra estorno automático, mas registre o ocorrido manualmente se necessário.";
-        }
-      } else if (overpaymentAction === "fee") {
-        const newAmountDue = due + overpaidAmount;
-        const { error: feeErr } = await supabase
-          .from("receivables")
-          .update({ amount_due: newAmountDue, status: "recebido" })
-          .eq("id", payRow.id);
-        if (feeErr) throw feeErr;
-        await setRemainingDue(payRow.id, { remainingDueDate: null, reason: null });
-        const auditOkFee = await audit("receivable.overpayment_current_fee", payRow.id, {
-          payment_id: payment.id, amount_due_before: due, amount_due_after: newAmountDue, payment_amount: amount,
-          amount_paid_after: newPaid, overpaid_amount: overpaidAmount, overpayment_action: "fee",
-        });
-        if (!auditOkCreate || !auditOkFee) {
-          overpaymentWarning =
-            "Pagamento registrado e taxa aplicada, mas a auditoria deste excedente falhou. O estorno automático deste pagamento pode não ficar bloqueado — verifique manualmente se necessário.";
-        }
-      } else if (isPartial) {
-        await setRemainingDue(payRow.id, {
-          remainingDueDate: payForm.remaining_due_date,
-          reason: payForm.remaining_due_reason || null,
-        });
-        await audit("receivable.partial_remaining_due_set", payRow.id, {
-          payment_id: payment.id,
-          remaining_due_date: payForm.remaining_due_date,
-          reason: payForm.remaining_due_reason || null,
-        });
-      } else {
-        await setRemainingDue(payRow.id, { remainingDueDate: null, reason: null });
-      }
+      payingRef.current = false;
+      setPaying(false);
+      return;
+    }
+    try {
       if (generateReceiptAfterPay) {
         try {
-          await createReceiptForReceivable(payRow.id, payment.id);
-          if (!overpaymentWarning) toast.success("Pagamento registrado e recibo gerado");
+          await createReceiptForReceivable(payRow.id, paymentId);
+          toast.success("Pagamento registrado e recibo gerado");
         } catch (e) {
           toast.warning("Pagamento registrado, mas não foi possível gerar o recibo", {
             description: e instanceof Error ? e.message : String(e),
           });
         }
-      } else if (!overpaymentWarning) {
+      } else {
         toast.success("Pagamento registrado");
-      }
-      if (overpaymentWarning) {
-        toast.warning(overpaymentWarning);
       }
       setPayOpen(false);
       load();
-    } catch (e) {
-      toast.error("Erro ao registrar pagamento", {
-        description: e instanceof Error ? e.message : String(e),
-      });
     } finally {
+      payingRef.current = false;
       setPaying(false);
     }
   }
@@ -606,32 +547,22 @@ function FinanceiroPage() {
   }
 
   async function confirmRevert() {
+    if (revSaving) return;
     if (!revRow || !revSelected || !revReason.trim()) {
       toast.error("Selecione um pagamento e informe o motivo.");
       return;
     }
-    if (await paymentHasOverpaymentTreatment("receivable", revSelected)) {
-      toast.error(
-        "Este pagamento possui tratamento de excedente. Estorne manualmente o crédito/ajuste antes de estornar o pagamento.",
-      );
-      return;
-    }
+    setRevSaving(true);
     try {
-      const recibo = receiptsByPayment.get(revSelected);
-      if (recibo) {
-        await cancelReceiptById(recibo.id, `Estorno do pagamento: ${revReason.trim()}`);
-      }
+      // estorno + cancelamento do recibo + auditoria em uma única transação
       await reversePayment(revSelected, revReason.trim());
-      await audit("receivable.payment_reverse", revRow.id, {
-        payment_id: revSelected,
-        reason: revReason.trim(),
-        receipt_id: recibo?.id ?? null,
-      });
       toast.success("Pagamento estornado");
       setRevOpen(false);
       load();
     } catch (e) {
       toast.error("Erro ao estornar", { description: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setRevSaving(false);
     }
   }
 
@@ -643,51 +574,22 @@ function FinanceiroPage() {
   }
 
   async function confirmCancel() {
+    if (cancelSaving) return;
     if (!cancelRow || !cancelReason.trim()) {
       toast.error("Informe o motivo do cancelamento.");
       return;
     }
+    setCancelSaving(true);
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      // cancel all active payments + receipts when "cobranca_errada"
-      if (cancelType === "cobranca_errada") {
-        const actives = paymentsByRec.get(cancelRow.id)?.filter((p) => p.status === "ativo") ?? [];
-        for (const p of actives) {
-          const r = receiptsByPayment.get(p.id);
-          if (r) await cancelReceiptById(r.id, `Cobrança errada: ${cancelReason.trim()}`);
-          await reversePayment(p.id, `Cobrança errada: ${cancelReason.trim()}`);
-        }
-        // legacy receipt at receivable level
-        const legacy = receiptsByRec.get(cancelRow.id);
-        if (legacy && !legacy.payment_id) {
-          await cancelReceiptById(legacy.id, `Cobrança errada: ${cancelReason.trim()}`);
-        }
-      }
-      const { error } = await supabase
-        .from("receivables")
-        .update({
-          status: "cancelado",
-          cancel_type: cancelType,
-          cancel_reason: cancelReason.trim(),
-          cancelled_at: new Date().toISOString(),
-          cancelled_by: user?.id ?? null,
-        })
-        .eq("id", cancelRow.id);
-      if (error) throw error;
-      await audit(
-        cancelType === "perda_contrato"
-          ? "receivable.cancel_as_loss"
-          : "receivable.cancel_as_wrong_charge",
-        cancelRow.id,
-        { cancel_type: cancelType, reason: cancelReason.trim() },
-      );
+      // estornos, recibos, cancelamento e auditoria em uma única transação
+      await cancelReceivable(cancelRow.id, cancelType, cancelReason.trim());
       toast.success("Recebível cancelado");
       setCancelOpen(false);
       load();
     } catch (e) {
       toast.error("Erro ao cancelar", { description: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setCancelSaving(false);
     }
   }
 
@@ -775,21 +677,28 @@ function FinanceiroPage() {
   }
 
   async function saveEdit() {
-    if (!editRow) return;
-    const { error } = await supabase
-      .from("receivables")
-      .update({
-        amount_due: Number(editForm.amount_due),
-        due_date: editForm.due_date,
-        notes: editForm.notes || null,
-      })
-      .eq("id", editRow.id);
-    if (error) return toast.error("Erro", { description: error.message });
-    await recomputeReceivableSummary(editRow.id);
-    await audit("receivable.edit", editRow.id, {});
-    toast.success("Parcela atualizada");
-    setEditOpen(false);
-    load();
+    if (!editRow || editSaving) return;
+    setEditSaving(true);
+    try {
+      const { error } = await supabase
+        .from("receivables")
+        .update({
+          amount_due: Number(editForm.amount_due),
+          due_date: editForm.due_date,
+          notes: editForm.notes || null,
+        })
+        .eq("id", editRow.id);
+      if (error) throw error;
+      await recomputeReceivableSummary(editRow.id);
+      await audit("receivable.edit", editRow.id, {});
+      toast.success("Parcela atualizada");
+      setEditOpen(false);
+      load();
+    } catch (e) {
+      toast.error("Erro ao salvar", { description: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setEditSaving(false);
+    }
   }
 
   async function removeRow(r: Receivable) {
@@ -1696,8 +1605,8 @@ function FinanceiroPage() {
             <Button variant="outline" onClick={() => setRevOpen(false)}>
               Cancelar
             </Button>
-            <Button variant="destructive" onClick={confirmRevert}>
-              Confirmar estorno
+            <Button variant="destructive" onClick={confirmRevert} disabled={revSaving}>
+              {revSaving ? "Estornando…" : "Confirmar estorno"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1752,8 +1661,8 @@ function FinanceiroPage() {
             <Button variant="outline" onClick={() => setCancelOpen(false)}>
               Voltar
             </Button>
-            <Button variant="destructive" onClick={confirmCancel}>
-              Confirmar cancelamento
+            <Button variant="destructive" onClick={confirmCancel} disabled={cancelSaving}>
+              {cancelSaving ? "Cancelando…" : "Confirmar cancelamento"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1879,7 +1788,9 @@ function FinanceiroPage() {
             <Button variant="outline" onClick={() => setEditOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={saveEdit}>Salvar</Button>
+            <Button onClick={saveEdit} disabled={editSaving}>
+              {editSaving ? "Salvando…" : "Salvar"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

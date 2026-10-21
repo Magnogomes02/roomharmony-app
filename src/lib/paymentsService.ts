@@ -86,134 +86,80 @@ export async function getAllPaymentsForReceivable(
 
 /**
  * Recalcula campos resumo do recebível (amount_paid, paid_at, payment_method, status)
- * a partir dos pagamentos ativos. Não toca em recebíveis cancelados.
+ * a partir dos pagamentos ativos, no banco (recompute_receivable_summary).
  */
 export async function recomputeReceivableSummary(receivableId: string): Promise<void> {
-  const { data: rec, error: recErr } = await supabase
-    .from("receivables")
-    .select("amount_due, status, due_date, cancel_type, credit_applied_amount, remaining_due_date")
-    .eq("id", receivableId)
-    .single();
-  if (recErr || !rec) throw recErr ?? new Error("Recebível não encontrado");
-
-  const { data: payments, error: payErr } = await supabase
-    .from("receivable_payments")
-    .select("amount, paid_at, payment_method, status")
-    .eq("receivable_id", receivableId)
-    .eq("status", "ativo")
-    .order("paid_at", { ascending: false });
-  if (payErr) throw payErr;
-
-  const actives = (payments ?? []) as Pick<
-    ReceivablePayment,
-    "amount" | "paid_at" | "payment_method" | "status"
-  >[];
-  const totalPaid = actives.reduce((s, p) => s + Number(p.amount), 0);
-  const last = actives[0] ?? null;
-
-  // se cancelado, preserva status cancelado mas ainda atualiza amount_paid
-  let newStatus: string = rec.status;
-  if (rec.status !== "cancelado") {
-    newStatus = computeEffectiveStatus({
-      status: "a_receber",
-      due_date: rec.due_date,
-      amount_due: rec.amount_due,
-      amount_paid: totalPaid,
-      cancel_type: rec.cancel_type,
-      credit_applied_amount: rec.credit_applied_amount,
-      remaining_due_date: rec.remaining_due_date,
-    });
-  }
-
-  await supabase
-    .from("receivables")
-    .update({
-      amount_paid: totalPaid > 0 ? totalPaid : null,
-      paid_at: last ? new Date(last.paid_at).toISOString() : null,
-      payment_method: last?.payment_method ?? null,
-      status: newStatus as "a_receber" | "parcial" | "recebido" | "atrasado" | "cancelado",
-    })
-    .eq("id", receivableId);
+  const { error } = await supabase.rpc("recompute_receivable_summary", {
+    _receivable_id: receivableId,
+  });
+  if (error) throw error;
 }
 
-
-export interface CreatePaymentInput {
+export interface RegisterPaymentInput {
   receivableId: string;
   amount: number;
   paidAt: string; // YYYY-MM-DD
-  paymentMethod: string | null;
+  paymentMethod: string;
   attachmentPath?: string | null;
   notes?: string | null;
+  /** Obrigatória quando o pagamento não quita o saldo. */
+  remainingDueDate?: string | null;
+  remainingDueReason?: string | null;
+  /** Destino do excedente em cobranças de contrato; avulsos sempre viram taxa. */
+  overpaymentAction?: "credit" | "fee" | null;
 }
 
 /**
- * Define (ou limpa) a nova data de vencimento do saldo restante de um
- * recebível após um pagamento parcial. due_date original nunca é alterado.
+ * Registra a baixa em uma única transação no banco (register_receivable_payment):
+ * pagamento, saldo restante ou excedente (crédito/taxa), status e auditoria.
+ * Se qualquer parte falhar, nada é gravado.
  */
-export async function setRemainingDue(
-  receivableId: string,
-  params: { remainingDueDate: string | null; reason: string | null },
-): Promise<void> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const { error } = await supabase
-    .from("receivables")
-    .update({
-      remaining_due_date: params.remainingDueDate,
-      remaining_due_updated_at: new Date().toISOString(),
-      remaining_due_updated_by: user?.id ?? null,
-      remaining_due_reason: params.reason,
-    })
-    .eq("id", receivableId);
+export async function registerPayment(input: RegisterPaymentInput): Promise<{ paymentId: string }> {
+  const { data, error } = await supabase.rpc("register_receivable_payment", {
+    _receivable_id: input.receivableId,
+    _amount: input.amount,
+    _paid_at: input.paidAt,
+    _payment_method: input.paymentMethod,
+    _attachment_path: input.attachmentPath ?? undefined,
+    _notes: input.notes ?? undefined,
+    _remaining_due_date: input.remainingDueDate ?? undefined,
+    _remaining_due_reason: input.remainingDueReason ?? undefined,
+    _overpayment_action: input.overpaymentAction ?? undefined,
+  });
   if (error) throw error;
+  const paymentId = (data as { payment_id?: string } | null)?.payment_id;
+  if (!paymentId) throw new Error("Falha ao registrar pagamento");
+  return { paymentId };
 }
 
-export async function createPayment(input: CreatePaymentInput): Promise<ReceivablePayment> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const { data, error } = await supabase
-    .from("receivable_payments")
-    .insert({
-      receivable_id: input.receivableId,
-      amount: input.amount,
-      paid_at: input.paidAt,
-      payment_method: input.paymentMethod,
-      attachment_path: input.attachmentPath ?? null,
-      notes: input.notes ?? null,
-      status: "ativo",
-      created_by: user?.id ?? null,
-    })
-    .select("*")
-    .single();
-  if (error || !data) throw error ?? new Error("Falha ao criar pagamento");
-  await recomputeReceivableSummary(input.receivableId);
-  return data as ReceivablePayment;
-}
-
+/**
+ * Estorna um pagamento e cancela o recibo emitido para ele, na mesma
+ * transação (reverse_receivable_payment). Pagamentos com crédito ou taxa de
+ * excedente continuam bloqueados.
+ */
 export async function reversePayment(paymentId: string, reason: string): Promise<void> {
-  const { data: pay, error: getErr } = await supabase
-    .from("receivable_payments")
-    .select("receivable_id, status")
-    .eq("id", paymentId)
-    .single();
-  if (getErr || !pay) throw getErr ?? new Error("Pagamento não encontrado");
-  if (pay.status !== "ativo") throw new Error("Pagamento não está ativo.");
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const { error } = await supabase
-    .from("receivable_payments")
-    .update({
-      status: "estornado",
-      reversed_at: new Date().toISOString(),
-      reversed_by: user?.id ?? null,
-      reverse_reason: reason,
-    })
-    .eq("id", paymentId);
+  const { error } = await supabase.rpc("reverse_receivable_payment", {
+    _payment_id: paymentId,
+    _reason: reason,
+  });
   if (error) throw error;
-  await recomputeReceivableSummary(pay.receivable_id);
+}
+
+/**
+ * Cancela o recebível. "cobranca_errada" estorna todos os pagamentos ativos e
+ * cancela os recibos; "perda_contrato" preserva o que já foi recebido.
+ */
+export async function cancelReceivable(
+  receivableId: string,
+  cancelType: "perda_contrato" | "cobranca_errada",
+  reason: string,
+): Promise<void> {
+  const { error } = await supabase.rpc("cancel_receivable", {
+    _receivable_id: receivableId,
+    _cancel_type: cancelType,
+    _reason: reason,
+  });
+  if (error) throw error;
 }
 
 /**

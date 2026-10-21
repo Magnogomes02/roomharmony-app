@@ -112,6 +112,19 @@ const statusVariant: Record<string, "default" | "secondary" | "destructive" | "o
   rascunho: "secondary", ativo: "default", encerrado: "outline", cancelado: "destructive",
 };
 
+interface ContractDeleteImpact {
+  receivables: number;
+  payments: number;
+  receipts: number;
+  bookings: number;
+  attachments: number;
+  blocked: boolean;
+}
+
+function plural(n: number, singular: string, pluralForm: string) {
+  return `${n} ${n === 1 ? singular : pluralForm}`;
+}
+
 function monthLabel(referenceMonth: string) {
   const idx = getMonthIndexFromDateOnly(referenceMonth);
   const year = getYearFromDateOnly(referenceMonth);
@@ -205,6 +218,7 @@ function ContratosPage() {
   const [deleteTarget, setDeleteTarget] = useState<Contract | null>(null);
   const [deletePassword, setDeletePassword] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const [deleteImpact, setDeleteImpact] = useState<ContractDeleteImpact | null>(null);
 
   const [cancelTarget, setCancelTarget] = useState<Contract | null>(null);
   const [cancelMonths, setCancelMonths] = useState<string[]>([]);
@@ -395,37 +409,43 @@ function ContratosPage() {
     });
   }
 
+  async function openDeleteContract(c: Contract) {
+    setDeleteTarget(c);
+    setDeletePassword("");
+    setDeleteImpact(null);
+    const { data, error } = await supabase.rpc("contract_delete_impact", { _contract_id: c.id });
+    if (error) {
+      toast.error("Não foi possível verificar o contrato", { description: error.message });
+      setDeleteTarget(null);
+      return;
+    }
+    setDeleteImpact(data as unknown as ContractDeleteImpact);
+  }
+
+  function closeDeleteContract() {
+    setDeleteTarget(null);
+    setDeletePassword("");
+    setDeleteImpact(null);
+  }
+
   async function confirmDeleteContract() {
-    if (!deleteTarget || !user?.email) return;
+    if (!deleteTarget || !user?.email || deleting) return;
+    if (!deleteImpact || deleteImpact.blocked) return;
     if (!deletePassword) { toast.error("Informe sua senha para confirmar."); return; }
     setDeleting(true);
     try {
       const { error: authErr } = await supabase.auth.signInWithPassword({
         email: user.email, password: deletePassword,
       });
-      if (authErr) { toast.error("Senha incorreta."); setDeleting(false); return; }
+      if (authErr) { toast.error("Senha incorreta."); return; }
 
-      const contractId = deleteTarget.id;
-      // coleta bookings do contrato para limpar conflitos
-      const { data: bks } = await supabase
-        .from("bookings").select("id").eq("contract_id", contractId);
-      const bookingIds = (bks ?? []).map((b) => b.id);
-      if (bookingIds.length > 0) {
-        await supabase.from("booking_conflicts").delete().or(
-          `booking_id_a.in.(${bookingIds.join(",")}),booking_id_b.in.(${bookingIds.join(",")})`,
-        );
-      }
-      await supabase.from("receivables").delete().eq("contract_id", contractId);
-      await supabase.from("bookings").delete().eq("contract_id", contractId);
-      await supabase.from("contract_schedules").delete().eq("contract_id", contractId);
-      await supabase.from("contract_attachments").delete().eq("contract_id", contractId);
-      const { error: delErr } = await supabase.from("contracts").delete().eq("id", contractId);
-      if (delErr) { toast.error("Erro ao excluir contrato", { description: delErr.message }); setDeleting(false); return; }
+      // exclusão em uma única transação no banco; recusada se houver
+      // pagamento ou recibo emitido (nesse caso, o caminho é cancelar)
+      const { error: delErr } = await supabase.rpc("delete_contract", { _contract_id: deleteTarget.id });
+      if (delErr) { toast.error("Contrato não excluído", { description: delErr.message }); return; }
 
-      await logAudit("contract.delete", contractId, { professional_id: deleteTarget.professional_id });
       toast.success("Contrato excluído permanentemente.");
-      setDeleteTarget(null);
-      setDeletePassword("");
+      closeDeleteContract();
       await load();
     } finally {
       setDeleting(false);
@@ -1077,7 +1097,7 @@ function ContratosPage() {
                         {canEdit && (
                           <Button
                             size="icon" variant="ghost"
-                            onClick={() => { setDeleteTarget(c); setDeletePassword(""); }}
+                            onClick={() => openDeleteContract(c)}
                             title="Excluir contrato"
                             className="text-destructive hover:text-destructive"
                           >
@@ -1526,38 +1546,85 @@ function ContratosPage() {
       </AlertDialog>
 
       {/* Delete contract confirmation */}
-      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => { if (!o) { setDeleteTarget(null); setDeletePassword(""); } }}>
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => { if (!o && !deleting) closeDeleteContract(); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="font-serif flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-destructive" /> Excluir contrato permanentemente
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              {deleteImpact?.blocked ? "Este contrato não pode ser excluído" : "Excluir contrato permanentemente"}
             </AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta ação é <strong>irreversível</strong>. Serão removidos do banco de dados:
-              o contrato, sua grade de horários, reservas geradas, recebíveis e anexos vinculados.
-              Para confirmar, digite a senha de login do gestor.
-            </AlertDialogDescription>
+            {!deleteImpact ? (
+              <AlertDialogDescription>Verificando o que está vinculado a este contrato…</AlertDialogDescription>
+            ) : deleteImpact.blocked ? (
+              <AlertDialogDescription>
+                Ele tem{" "}
+                <strong>
+                  {plural(deleteImpact.payments, "pagamento registrado", "pagamentos registrados")}
+                </strong>
+                {deleteImpact.receipts > 0 && (
+                  <>
+                    {" "}e <strong>{plural(deleteImpact.receipts, "recibo emitido", "recibos emitidos")}</strong>
+                  </>
+                )}
+                . Excluir apagaria esse histórico financeiro. Para encerrar o contrato mantendo o
+                histórico, use <strong>Cancelar contrato</strong>.
+              </AlertDialogDescription>
+            ) : (
+              <AlertDialogDescription asChild>
+                <div className="space-y-2">
+                  <p>
+                    Esta ação é <strong>irreversível</strong>. Serão apagados o contrato, a grade de
+                    horários e:
+                  </p>
+                  <ul className="list-disc space-y-0.5 pl-5">
+                    <li>{plural(deleteImpact.bookings, "reserva", "reservas")}</li>
+                    <li>{plural(deleteImpact.receivables, "recebível sem pagamento", "recebíveis sem pagamento")}</li>
+                    <li>{plural(deleteImpact.attachments, "anexo", "anexos")}</li>
+                  </ul>
+                  <p>Para confirmar, digite a senha de login do gestor.</p>
+                </div>
+              </AlertDialogDescription>
+            )}
           </AlertDialogHeader>
-          <div className="space-y-2">
-            <Label htmlFor="delete-pwd">Senha do gestor ({user?.email})</Label>
-            <Input
-              id="delete-pwd"
-              type="password"
-              autoComplete="current-password"
-              value={deletePassword}
-              onChange={(e) => setDeletePassword(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && !deleting) confirmDeleteContract(); }}
-            />
-          </div>
+          {deleteImpact && !deleteImpact.blocked && (
+            <div className="space-y-2">
+              <Label htmlFor="delete-pwd">Senha do gestor ({user?.email})</Label>
+              <Input
+                id="delete-pwd"
+                type="password"
+                autoComplete="current-password"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && !deleting) confirmDeleteContract(); }}
+              />
+            </div>
+          )}
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={deleting || !deletePassword}
-              onClick={(e) => { e.preventDefault(); confirmDeleteContract(); }}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {deleting ? "Excluindo..." : "Excluir definitivamente"}
-            </AlertDialogAction>
+            <AlertDialogCancel disabled={deleting}>
+              {deleteImpact?.blocked ? "Fechar" : "Cancelar"}
+            </AlertDialogCancel>
+            {deleteImpact?.blocked ? (
+              deleteTarget && deleteTarget.status !== "cancelado" && (
+                <AlertDialogAction
+                  onClick={(e) => {
+                    e.preventDefault();
+                    const target = deleteTarget;
+                    closeDeleteContract();
+                    openCancelContract(target);
+                  }}
+                >
+                  Cancelar contrato
+                </AlertDialogAction>
+              )
+            ) : (
+              <AlertDialogAction
+                disabled={deleting || !deletePassword || !deleteImpact}
+                onClick={(e) => { e.preventDefault(); confirmDeleteContract(); }}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {deleting ? "Excluindo…" : "Excluir definitivamente"}
+              </AlertDialogAction>
+            )}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

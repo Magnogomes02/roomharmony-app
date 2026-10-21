@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format, parseISO, startOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { AlertTriangle, CalendarIcon, CheckCircle2, Ban, ArrowRightLeft, Clock } from "lucide-react";
@@ -147,7 +147,30 @@ function ConflitosPage() {
     void mode;
   }
 
-  async function saveAdjust(force = false) {
+  // trava síncrona contra duplo clique nas ações dos diálogos
+  const savingRef = useRef(false);
+  const [saving, setSaving] = useState(false);
+  async function runGuarded(fn: () => Promise<void>) {
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
+    try {
+      await fn();
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
+  }
+
+  function saveAdjust(force = false) {
+    return runGuarded(() => saveAdjustInner(force));
+  }
+
+  function saveResolveNote() {
+    return runGuarded(saveResolveNoteInner);
+  }
+
+  async function saveAdjustInner(force: boolean) {
     const { conflict, target, room_id, date, start, end } = adjustForm;
     if (!conflict || !target) return;
     const newStart = fromTimeStr(date, start);
@@ -222,7 +245,7 @@ function ConflitosPage() {
     setResolveForm({ conflict, notes: "" });
     setResolveOpen(true);
   }
-  async function saveResolveNote() {
+  async function saveResolveNoteInner() {
     const { conflict, notes } = resolveForm;
     if (!conflict) return;
     const { error } = await supabase.from("booking_conflicts").update({
@@ -385,7 +408,9 @@ function ConflitosPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAdjustOpen(false)}>Cancelar</Button>
-            <Button onClick={() => saveAdjust(false)}>Salvar ajuste</Button>
+            <Button onClick={() => saveAdjust(false)} disabled={saving}>
+              {saving ? "Salvando…" : "Salvar ajuste"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -407,7 +432,9 @@ function ConflitosPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setResolveOpen(false)}>Cancelar</Button>
-            <Button onClick={saveResolveNote}>Marcar resolvido</Button>
+            <Button onClick={saveResolveNote} disabled={saving}>
+              {saving ? "Salvando…" : "Marcar resolvido"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
