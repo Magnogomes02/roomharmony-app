@@ -31,8 +31,20 @@ export type AssistantErrorCode =
   | "provider_error"
   | "empty";
 
+export type AssistantProvider = "gemini" | "groq";
+
+type Failure = Extract<AssistantResult, { ok: false }>;
+type Generated = { ok: true; html: string; model: string; provider: AssistantProvider };
+
 export type AssistantResult =
-  | { ok: true; html: string; used: number; limit: number }
+  | {
+      ok: true;
+      html: string;
+      used: number;
+      limit: number;
+      /** "groq" quando o Gemini falhou e o provedor reserva respondeu */
+      provider: AssistantProvider;
+    }
   | {
       ok: false;
       code: AssistantErrorCode;
@@ -356,6 +368,137 @@ function providerFailure(call: Extract<GeminiCall, { ok: false }>): AssistantRes
   };
 }
 
+async function runGemini(
+  apiKey: string,
+  prompt: string,
+  temperature: number,
+): Promise<Generated | Failure> {
+  let call: GeminiCall;
+  try {
+    call = await callGemini(apiKey, prompt, temperature);
+  } catch (err) {
+    const timedOut = err instanceof Error && /timeout|abort/i.test(`${err.name} ${err.message}`);
+    console.error("[contractAssistant] fetch", err);
+    return {
+      ok: false,
+      code: "provider_error",
+      detail: err instanceof Error ? `${err.name}: ${err.message}` : String(err),
+      message: timedOut
+        ? "O Gemini demorou demais para responder. Tente de novo."
+        : "O servidor não conseguiu falar com o Gemini. Tente de novo.",
+    };
+  }
+  if (!call.ok) return providerFailure(call) as Failure;
+
+  let html = "";
+  let finishReason = "";
+  try {
+    const json = JSON.parse(call.body) as {
+      promptFeedback?: { blockReason?: string };
+      candidates?: { finishReason?: string; content?: { parts?: { text?: string }[] } }[];
+    };
+    finishReason = json.candidates?.[0]?.finishReason ?? json.promptFeedback?.blockReason ?? "";
+    if (json.promptFeedback?.blockReason || /SAFETY|PROHIBITED|BLOCKLIST/.test(finishReason)) {
+      return {
+        ok: false,
+        code: "provider_blocked",
+        message: "O Gemini recusou este pedido. Reformule com outras palavras.",
+      };
+    }
+    html = stripCodeFences(
+      (json.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? "").join(""),
+    );
+  } catch {
+    html = "";
+  }
+  if (!html) {
+    return {
+      ok: false,
+      code: "empty",
+      detail: `finishReason ${finishReason || "-"} (modelo ${call.model})`,
+      message: "O Gemini devolveu uma resposta vazia. Tente de novo.",
+    };
+  }
+  return { ok: true, html, model: call.model, provider: "gemini" };
+}
+
+// Groq (API compatível com a da OpenAI): plano gratuito sem cartão; GROQ_MODEL troca o modelo
+const GROQ_MODELS = ["openai/gpt-oss-120b", "llama-3.3-70b-versatile"];
+
+/** Provedor reserva, usado quando o Gemini falha. Mesmas instruções e mesmo formato de saída. */
+async function runGroq(
+  apiKey: string,
+  prompt: string,
+  temperature: number,
+): Promise<Generated | Failure> {
+  const base = process.env.GROQ_API_BASE ?? "https://api.groq.com/openai";
+  const models = [...new Set([process.env.GROQ_MODEL, ...GROQ_MODELS].filter(Boolean))] as string[];
+  const tried: string[] = [];
+  for (const model of models) {
+    let res: Response;
+    try {
+      res = await fetch(`${base}/v1/chat/completions`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model,
+          temperature,
+          max_completion_tokens: 8192,
+          messages: [
+            { role: "system", content: systemInstruction() },
+            { role: "user", content: prompt },
+          ],
+        }),
+        signal: AbortSignal.timeout(45_000),
+      });
+    } catch (err) {
+      tried.push(`${model} ${err instanceof Error ? err.name : "erro"}`);
+      continue;
+    }
+    const body = await res.text();
+    if (!res.ok) {
+      const err = parseGroqError(res.status, body);
+      console.error("[contractAssistant] Groq", `HTTP ${res.status} — ${err} (modelo ${model})`);
+      tried.push(`${model} ${res.status}`);
+      if (res.status === 401 || res.status === 403) {
+        return {
+          ok: false,
+          code: "provider_key",
+          detail: `HTTP ${res.status} — ${err}`,
+          message: "A chave do Groq foi recusada. Confira o segredo GROQ_API_KEY.",
+        };
+      }
+      continue;
+    }
+    let text = "";
+    try {
+      const json = JSON.parse(body) as { choices?: { message?: { content?: string } }[] };
+      text = json.choices?.[0]?.message?.content ?? "";
+    } catch {
+      text = "";
+    }
+    // alguns modelos abertos devolvem o raciocínio entre <think>...</think>
+    const html = stripCodeFences(text.replace(/<think>[\s\S]*?<\/think>/gi, ""));
+    if (html) return { ok: true, html, model, provider: "groq" };
+    tried.push(`${model} vazio`);
+  }
+  return {
+    ok: false,
+    code: "provider_error",
+    detail: `modelos tentados: ${tried.join(", ")}`,
+    message: "O assistente não conseguiu resposta agora. Tente de novo em alguns minutos.",
+  };
+}
+
+function parseGroqError(status: number, body: string): string {
+  try {
+    const e = (JSON.parse(body) as { error?: { message?: string; code?: string } }).error;
+    return [e?.code, e?.message].filter(Boolean).join(" · ").slice(0, 300) || `HTTP ${status}`;
+  } catch {
+    return body.slice(0, 300);
+  }
+}
+
 export const askContractAssistant = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: unknown) => inputSchema.parse(data))
@@ -390,8 +533,9 @@ export const askContractAssistant = createServerFn({ method: "POST" })
       };
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
+    const geminiKey = process.env.GEMINI_API_KEY;
+    const groqKey = process.env.GROQ_API_KEY;
+    if (!geminiKey && !groqKey) {
       return {
         ok: false,
         code: "not_configured",
@@ -400,53 +544,28 @@ export const askContractAssistant = createServerFn({ method: "POST" })
       };
     }
 
-    let call: GeminiCall;
-    try {
-      call = await callGemini(apiKey, userPrompt(data), data.variation > 0 ? 0.8 : 0.4);
-    } catch (err) {
-      const timedOut = err instanceof Error && /timeout|abort/i.test(`${err.name} ${err.message}`);
-      console.error("[contractAssistant] fetch", err);
-      return {
-        ok: false,
-        code: "provider_error",
-        detail: err instanceof Error ? `${err.name}: ${err.message}` : String(err),
-        message: timedOut
-          ? "O Gemini demorou demais para responder. Tente de novo."
-          : "O servidor não conseguiu falar com o Gemini. Tente de novo.",
-      };
-    }
-    if (!call.ok) return providerFailure(call);
-    const result = { body: call.body };
-
-    let html = "";
-    let finishReason = "";
-    try {
-      const json = JSON.parse(result.body) as {
-        promptFeedback?: { blockReason?: string };
-        candidates?: { finishReason?: string; content?: { parts?: { text?: string }[] } }[];
-      };
-      finishReason = json.candidates?.[0]?.finishReason ?? json.promptFeedback?.blockReason ?? "";
-      if (json.promptFeedback?.blockReason || /SAFETY|PROHIBITED|BLOCKLIST/.test(finishReason)) {
-        return {
-          ok: false,
-          code: "provider_blocked",
-          message: "O Gemini recusou este pedido. Reformule com outras palavras.",
+    const prompt = userPrompt(data);
+    const temperature = data.variation > 0 ? 0.8 : 0.4;
+    let gen: Generated | Failure = geminiKey
+      ? await runGemini(geminiKey, prompt, temperature)
+      : { ok: false, code: "not_configured", message: "", detail: "GEMINI_API_KEY ausente" };
+    // provedor reserva: só entra quando o Gemini falha (sobrecarga, cota, modelo, rede)
+    if (!gen.ok && groqKey && gen.code !== "provider_blocked") {
+      const backup = await runGroq(groqKey, prompt, temperature);
+      if (backup.ok) gen = backup;
+      else if (gen.code === "not_configured") gen = backup;
+      else
+        gen = {
+          ...gen,
+          message:
+            backup.code === "provider_key"
+              ? backup.message
+              : "O Gemini e o provedor reserva estão ocupados agora. Tente de novo em alguns minutos.",
+          detail: `${gen.detail ?? ""} · Reserva (Groq): ${backup.detail ?? backup.message}`,
         };
-      }
-      html = stripCodeFences(
-        (json.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? "").join(""),
-      );
-    } catch {
-      html = "";
     }
-    if (!html) {
-      return {
-        ok: false,
-        code: "empty",
-        detail: `finishReason ${finishReason || "-"} (modelo ${call.model})`,
-        message: "O Gemini devolveu uma resposta vazia. Tente de novo.",
-      };
-    }
+    if (!gen.ok) return gen;
+    const { html } = gen;
 
     // registra o uso (sem guardar o texto); é também o contador do limite diário
     await supabase.from("audit_logs").insert({
@@ -459,11 +578,18 @@ export const askContractAssistant = createServerFn({ method: "POST" })
         shortcut: data.shortcutId ?? null,
         variation: data.variation,
         chars: html.length,
-        model: call.model,
+        provider: gen.provider,
+        model: gen.model,
       },
     });
 
-    return { ok: true, html, used: used + 1, limit: ASSISTANT_DAILY_LIMIT };
+    return {
+      ok: true,
+      html,
+      used: used + 1,
+      limit: ASSISTANT_DAILY_LIMIT,
+      provider: gen.provider,
+    };
   });
 
 export const getContractAssistantUsage = createServerFn({ method: "GET" })
@@ -474,7 +600,7 @@ export const getContractAssistantUsage = createServerFn({ method: "GET" })
     return {
       used: gestor ? await usedToday(supabase, userId) : 0,
       limit: ASSISTANT_DAILY_LIMIT,
-      configured: Boolean(process.env.GEMINI_API_KEY),
+      configured: Boolean(process.env.GEMINI_API_KEY || process.env.GROQ_API_KEY),
       isGestor: gestor,
     };
   });

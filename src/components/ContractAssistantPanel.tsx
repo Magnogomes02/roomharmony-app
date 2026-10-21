@@ -69,6 +69,7 @@ export function ContractAssistantPanel({
     null,
   );
   const [html, setHtml] = useState("");
+  const [viaBackup, setViaBackup] = useState(false);
   const [last, setLast] = useState<Pending | null>(null);
   // pedido em andamento; "Cancelar" descarta a resposta que chegar depois
   const requestSeq = useRef(0);
@@ -114,6 +115,7 @@ export function ContractAssistantPanel({
       if (seq !== requestSeq.current) return;
       if (res.ok) {
         setHtml(sanitizeAssistantHtml(res.html));
+        setViaBackup(res.provider === "groq");
         setUsage((u) => (u ? { ...u, used: res.used } : u));
       } else {
         setError({
@@ -356,6 +358,8 @@ export function ContractAssistantPanel({
               )}
               <p className="text-xs text-muted-foreground">
                 Texto sugerido por IA. Revise antes de usar; não substitui orientação jurídica.
+                {viaBackup &&
+                  " O Gemini estava ocupado; esta versão veio do provedor reserva (Groq)."}
               </p>
             </div>
           )}
