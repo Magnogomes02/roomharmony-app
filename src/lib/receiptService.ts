@@ -57,7 +57,34 @@ function generateReceiptNumber(): string {
   return `REC-${stamp}-${rand}`;
 }
 
-function toPdfData(row: ReceiptRow, overrides?: { cancelled?: boolean }): ReceiptPdfData {
+// Junta a observação do recebível (condições acordadas) com a do pagamento,
+// sem repetir quando forem iguais.
+function buildReceiptNotes(...parts: (string | null | undefined)[]): string | null {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const p of parts) {
+    const t = p?.trim();
+    if (!t || seen.has(t.toLowerCase())) continue;
+    seen.add(t.toLowerCase());
+    out.push(t);
+  }
+  return out.length ? out.join("\n") : null;
+}
+
+async function loadReceiptNotes(receivableId: string, paymentId: string | null): Promise<string | null> {
+  const [{ data: rec }, payQ] = await Promise.all([
+    supabase.from("receivables").select("notes").eq("id", receivableId).maybeSingle(),
+    paymentId
+      ? supabase.from("receivable_payments").select("notes").eq("id", paymentId).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+  return buildReceiptNotes(rec?.notes, payQ.data?.notes);
+}
+
+function toPdfData(
+  row: ReceiptRow,
+  overrides?: { cancelled?: boolean; notes?: string | null },
+): ReceiptPdfData {
   return {
     receipt_number: row.receipt_number,
     authentication_code:
@@ -78,7 +105,7 @@ function toPdfData(row: ReceiptRow, overrides?: { cancelled?: boolean }): Receip
     // PDF prefers room_names_snapshot (captures all rooms at issue time);
     // falls back to legacy room_name field for old receipts.
     room_name: row.room_names_snapshot ?? row.room_name,
-    notes: null,
+    notes: overrides?.notes ?? null,
   };
 }
 
@@ -207,13 +234,14 @@ export async function createReceiptForReceivable(
     paid_at: string;
     payment_method: string | null;
     status: string;
+    notes: string | null;
   };
   let paymentRow: PaymentSnap | null = null;
 
   if (paymentId) {
     const { data: pay, error: payErr } = await supabase
       .from("receivable_payments")
-      .select("id, amount, paid_at, payment_method, status, receivable_id")
+      .select("id, amount, paid_at, payment_method, status, notes, receivable_id")
       .eq("id", paymentId)
       .eq("receivable_id", receivableId)
       .maybeSingle();
@@ -305,7 +333,9 @@ export async function createReceiptForReceivable(
   const row = inserted as ReceiptRow;
 
   try {
-    const pdfData: ReceiptPdfData = toPdfData(row);
+    const pdfData: ReceiptPdfData = toPdfData(row, {
+      notes: buildReceiptNotes(rec.notes, paymentRow?.notes),
+    });
     const blob = await renderReceiptPdf(pdfData, branding, settings);
     const path = `receipts/${rec.id}/${row.receipt_number}.pdf`;
     const up = await supabase.storage.from(RECEIPTS_BUCKET).upload(path, blob, {
@@ -456,7 +486,8 @@ export async function downloadReceipt(receipt: ReceiptRow): Promise<void> {
     body: receipt.receipt_body ?? settings.body,
     footer: receipt.receipt_footer ?? settings.footer,
   };
-  const blob = await renderReceiptPdf(toPdfData(receipt), branding, snapshotSettings);
+  const notes = await loadReceiptNotes(receipt.receivable_id, receipt.payment_id);
+  const blob = await renderReceiptPdf(toPdfData(receipt, { notes }), branding, snapshotSettings);
   triggerBlobDownload(blob);
   await audit("receivable.receipt_download", receipt.receivable_id, {
     receipt_id: receipt.id,

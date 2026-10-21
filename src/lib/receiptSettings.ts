@@ -40,7 +40,7 @@ export const RECEIPT_TEMPLATE_VARIABLES: { key: string; description: string }[] 
   { key: "DATA_VENCIMENTO", description: "Data de vencimento original" },
   { key: "SALA", description: "Sala vinculada (se houver)" },
   { key: "REFERENCIA_DESCRICAO", description: "Descrição automática (ex.: sublocação de sala – mês/ano)" },
-  { key: "OBSERVACAO", description: "Observação do recebível" },
+  { key: "OBSERVACAO", description: "Observações do recebível e do pagamento" },
 ];
 
 export async function loadReceiptSettings(): Promise<ReceiptSettings> {
@@ -61,10 +61,19 @@ export async function saveReceiptSettings(s: ReceiptSettings): Promise<void> {
   if (error) throw error;
 }
 
+// Variáveis opcionais: quando vazias somem do texto em vez de virar "—".
+const OPTIONAL_PLACEHOLDERS = new Set(["OBSERVACAO"]);
+
 export function renderReceiptTemplate(text: string, data: Record<string, string | number | null | undefined>): string {
-  return text.replace(/\{\{([A-Z_]+)\}\}/g, (_m, key: string) => {
-    const v = data[key];
-    if (v === null || v === undefined || v === "") return "—";
-    return String(v);
-  });
+  return text
+    .replace(/\{\{([A-Z_]+)\}\}/g, (_m, key: string) => {
+      const v = data[key];
+      if (v === null || v === undefined || String(v).trim() === "") {
+        return OPTIONAL_PLACEHOLDERS.has(key) ? "" : "—";
+      }
+      return String(v);
+    })
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/[ \t]+$/gm, "")
+    .trim();
 }
