@@ -128,7 +128,7 @@ export function WeekScheduleCard() {
 
   return (
     <Card className="border-border/60">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0 pb-2">
         <CardTitle className="flex items-center gap-2 font-serif text-xl">
           <CalendarDays className="h-5 w-5 text-primary" /> Reservas da semana
         </CardTitle>
@@ -142,7 +142,7 @@ export function WeekScheduleCard() {
           <Button variant="ghost" size="icon" onClick={() => setOffset((o) => o + 1)} aria-label="Próxima semana">
             <ChevronRight className="h-4 w-4" />
           </Button>
-          <Link to="/calendario" className="ml-2 text-xs font-medium text-primary-ink underline-offset-4 hover:underline">
+          <Link to="/calendario" className="ml-2 inline-flex min-h-10 items-center text-xs font-medium text-primary-ink underline-offset-4 hover:underline md:min-h-0">
             Ver completo →
           </Link>
         </div>

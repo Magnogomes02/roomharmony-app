@@ -224,7 +224,7 @@ function DashboardPage() {
           <CardTitle className="flex items-center gap-2 font-serif text-xl">
             <DollarSign className="h-5 w-5 text-primary" /> Financeiro do mês
           </CardTitle>
-          <Link to="/financeiro" className="text-xs font-medium text-primary-ink underline-offset-4 hover:underline">Ver tudo →</Link>
+          <Link to="/financeiro" className="inline-flex min-h-10 items-center text-xs font-medium text-primary-ink underline-offset-4 hover:underline md:min-h-0">Ver tudo →</Link>
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 sm:grid-cols-3">
@@ -270,7 +270,7 @@ function DashboardPage() {
             <AlertTriangle className={`h-5 w-5 ${stats?.expiring && stats.expiring.length > 0 ? "text-warning" : "text-muted-foreground"}`} />
             Contratos próximos do vencimento
           </CardTitle>
-          <Link to="/contratos" className="text-xs font-medium text-primary-ink underline-offset-4 hover:underline">Ver tudo →</Link>
+          <Link to="/contratos" className="inline-flex min-h-10 items-center text-xs font-medium text-primary-ink underline-offset-4 hover:underline md:min-h-0">Ver tudo →</Link>
         </CardHeader>
         <CardContent>
           {isLoading ? (

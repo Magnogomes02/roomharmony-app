@@ -815,7 +815,7 @@ function PreferenciasPage() {
                       <div className="text-[10px] text-muted-foreground">{v.description}</div>
                     </div>
                     <Button
-                      type="button" size="icon" variant="ghost" className="h-6 w-6 shrink-0" title="Copiar"
+                      type="button" size="icon" variant="ghost" className="h-9 w-9 shrink-0 md:h-7 md:w-7" title="Copiar"
                       onClick={() => { navigator.clipboard.writeText(`{{${v.key}}}`); toast.success("Copiado"); }}
                     >
                       <CopyIcon className="h-3 w-3" />

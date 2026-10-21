@@ -27,7 +27,7 @@ export function WeekNavigator({ value, onChange, buttonVariant = "ghost", classN
   const weekEnd = addDays(value, 6);
 
   return (
-    <div className={`flex items-center gap-1 ${className ?? ""}`}>
+    <div className={`flex flex-wrap items-center gap-1 ${className ?? ""}`}>
       <Button
         variant={buttonVariant}
         size="icon"
@@ -39,7 +39,13 @@ export function WeekNavigator({ value, onChange, buttonVariant = "ghost", classN
       <Popover>
         <PopoverTrigger asChild>
           <Button variant={buttonVariant} size="sm" className="gap-1 whitespace-nowrap">
-            {format(value, "dd 'de' MMM", { locale: ptBR })} – {format(weekEnd, "dd 'de' MMM yyyy", { locale: ptBR })}
+            {/* no celular, rótulo curto para caber ao lado das setas */}
+            <span className="sm:hidden">
+              {format(value, "dd/MM")} – {format(weekEnd, "dd/MM")}
+            </span>
+            <span className="hidden sm:inline">
+              {format(value, "dd 'de' MMM", { locale: ptBR })} – {format(weekEnd, "dd 'de' MMM yyyy", { locale: ptBR })}
+            </span>
             <ChevronDown className="h-3.5 w-3.5 opacity-50" />
           </Button>
         </PopoverTrigger>

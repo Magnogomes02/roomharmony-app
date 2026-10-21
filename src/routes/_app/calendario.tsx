@@ -473,14 +473,14 @@ function CalendarioPage() {
             {capitalizeFirst(format(date, "EEEE, dd 'de' MMMM 'de' yyyy", { locale: ptBR }))}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="icon" onClick={() => setDate(addDays(date, -1))} aria-label="Dia anterior">
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <Button variant="outline" onClick={() => setDate(startOfDay(new Date()))}>Hoje</Button>
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" className="min-w-[160px] justify-start">
+              <Button variant="outline" className="justify-start sm:min-w-[160px]">
                 <CalendarIcon className="mr-2 h-4 w-4" />
                 {format(date, "dd/MM/yyyy")}
               </Button>
@@ -512,8 +512,8 @@ function CalendarioPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[260px_1fr]">
-        {/* Sidebar filtros */}
-        <Card>
+        {/* Sidebar filtros: no celular vem depois da agenda */}
+        <Card className="order-last lg:order-none">
           <CardHeader className="pb-3">
             <CardTitle className="font-serif text-base">Filtros</CardTitle>
           </CardHeader>
@@ -574,7 +574,7 @@ function CalendarioPage() {
         </Card>
 
         {/* Grade */}
-        <Card className="overflow-hidden">
+        <Card className="min-w-0 overflow-hidden">
           <CardContent className="p-0">
             {loading ? (
               <div className="p-8 text-center text-muted-foreground">Carregando...</div>

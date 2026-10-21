@@ -36,7 +36,7 @@ export function MonthNavigator({ value, onChange, buttonVariant = "outline", cla
   }
 
   return (
-    <div className={`flex items-center gap-2 ${className ?? ""}`}>
+    <div className={`flex flex-wrap items-center gap-2 ${className ?? ""}`}>
       <Button
         variant={buttonVariant}
         size="icon"
@@ -47,7 +47,7 @@ export function MonthNavigator({ value, onChange, buttonVariant = "outline", cla
       </Button>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <Button variant={buttonVariant} className="min-w-[170px] justify-between">
+          <Button variant={buttonVariant} className="justify-between sm:min-w-[170px]">
             {capitalizeFirst(format(value, "MMMM 'de' yyyy", { locale: ptBR }))}
             <ChevronDown className="ml-2 h-4 w-4 opacity-50" />
           </Button>

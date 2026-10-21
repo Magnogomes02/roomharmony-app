@@ -1046,14 +1046,14 @@ function FinanceiroPage() {
     <div className="space-y-6">
       <div>
         <h1 className="font-serif text-3xl">Financeiro</h1>
-        <p className="text-muted-foreground">Gestão de recebíveis e análise anual.</p>
+        <p className="text-muted-foreground">Recebíveis, contas a pagar e análise anual.</p>
       </div>
 
       <Tabs value={financeView} onValueChange={(v) => setFinanceView(v as typeof financeView)}>
-        <TabsList>
+        <TabsList className="max-w-full justify-start overflow-x-auto">
           <TabsTrigger value="recebiveis">Recebíveis</TabsTrigger>
-          <TabsTrigger value="contas_a_pagar">Contas a Pagar</TabsTrigger>
-          <TabsTrigger value="analise">Análise Financeira</TabsTrigger>
+          <TabsTrigger value="contas_a_pagar">Contas a pagar</TabsTrigger>
+          <TabsTrigger value="analise">Análise financeira</TabsTrigger>
         </TabsList>
 
         <TabsContent value="recebiveis" className="mt-4 space-y-6">
@@ -1063,7 +1063,7 @@ function FinanceiroPage() {
                 Recebíveis por vencimento · {format(monthRef, "MMMM 'de' yyyy", { locale: ptBR })}
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <MonthNavigator value={monthRef} onChange={setMonthRef} />
               {canEdit && (
                 <Button onClick={openNewReceivable}>
@@ -1145,7 +1145,7 @@ function FinanceiroPage() {
               </div>
 
               <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
-                <TabsList>
+                <TabsList className="max-w-full justify-start overflow-x-auto">
                   <TabsTrigger value="a_receber">A receber</TabsTrigger>
                   <TabsTrigger value="parcial">Parciais</TabsTrigger>
                   <TabsTrigger value="recebido">Recebidos</TabsTrigger>
@@ -1847,7 +1847,7 @@ function FinanceiroPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div className="space-y-2">
                 <Label htmlFor="f-ano">Ano</Label>
                 <Input id="f-ano"

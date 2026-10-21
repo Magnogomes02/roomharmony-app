@@ -29,13 +29,13 @@ function AppLayout() {
     <SidebarProvider>
       <div className="flex min-h-screen w-full bg-background">
         <AppSidebar />
-        <div className="flex flex-1 flex-col">
+        <div className="flex min-w-0 flex-1 flex-col">
           <header className="sticky top-0 z-10 flex h-14 items-center gap-2 border-b border-border bg-background/80 px-4 backdrop-blur">
-            <SidebarTrigger />
+            <SidebarTrigger className="h-11 w-11 md:h-8 md:w-8" />
             <div className="flex-1" />
             <NotificationBell />
           </header>
-          <main className="flex-1 p-6 lg:p-8">
+          <main className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">
             <Outlet />
           </main>
         </div>

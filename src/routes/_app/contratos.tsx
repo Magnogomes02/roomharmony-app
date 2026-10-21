@@ -1207,8 +1207,8 @@ function ContratosPage() {
                           hasConflict ? "border-destructive bg-destructive/5" : "",
                         )}
                       >
-                        <div className="grid grid-cols-12 items-end gap-2">
-                          <div className="col-span-2 space-y-1">
+                        <div className="grid grid-cols-2 items-end gap-2 sm:grid-cols-12">
+                          <div className="col-span-1 space-y-1 sm:col-span-2">
                             <Label htmlFor={`f-dia-${i}`} className="text-xs">Dia</Label>
                             <Select
                               value={String(s.weekday)}
@@ -1222,7 +1222,7 @@ function ContratosPage() {
                               </SelectContent>
                             </Select>
                           </div>
-                          <div className="col-span-3 space-y-1">
+                          <div className="col-span-1 space-y-1 sm:col-span-3">
                             <Label htmlFor={`f-sala-${i}`} className="text-xs">Sala</Label>
                             <Select value={s.room_id} onValueChange={(v) => updateSchedule(i, { room_id: v })}>
                               <SelectTrigger id={`f-sala-${i}`}><SelectValue placeholder="Selecione" /></SelectTrigger>
@@ -1233,7 +1233,7 @@ function ContratosPage() {
                               </SelectContent>
                             </Select>
                           </div>
-                          <div className="col-span-2 space-y-1">
+                          <div className="col-span-1 space-y-1 sm:col-span-2">
                             <Label htmlFor={`f-tipo-${i}`} className="text-xs">Tipo</Label>
                             <Select
                               value={s._mode ?? "horario"}
@@ -1247,7 +1247,7 @@ function ContratosPage() {
                             </Select>
                           </div>
                           {s._mode === "turno" ? (
-                            <div className="col-span-4 space-y-1">
+                            <div className="col-span-1 space-y-1 sm:col-span-4">
                               <Label htmlFor={`f-turno-${i}`} className="text-xs">Turno</Label>
                               <Select
                                 value={s._shift ?? "manha"}
@@ -1265,19 +1265,19 @@ function ContratosPage() {
                             </div>
                           ) : (
                             <>
-                              <div className="col-span-2 space-y-1">
+                              <div className="col-span-1 space-y-1 sm:col-span-2">
                                 <Label htmlFor={`f-inicio-${i}`} className="text-xs">Início</Label>
                                 <Input id={`f-inicio-${i}`} type="time" value={s.start_time}
                                   onChange={(e) => updateSchedule(i, { start_time: e.target.value })} />
                               </div>
-                              <div className="col-span-2 space-y-1">
+                              <div className="col-span-1 space-y-1 sm:col-span-2">
                                 <Label htmlFor={`f-fim-${i}`} className="text-xs">Fim</Label>
                                 <Input id={`f-fim-${i}`} type="time" value={s.end_time}
                                   onChange={(e) => updateSchedule(i, { end_time: e.target.value })} />
                               </div>
                             </>
                           )}
-                          <div className="col-span-1 flex justify-end">
+                          <div className="col-span-2 flex justify-end sm:col-span-1">
                             <Button type="button" variant="ghost" size="icon" onClick={() => removeSchedule(i)} title="Remover">
                               <X className="h-4 w-4" />
                             </Button>
