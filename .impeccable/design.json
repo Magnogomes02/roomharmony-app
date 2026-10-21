@@ -1,0 +1,447 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-21T01:43:40+00:00",
+  "title": "Design System: Versão Saúde",
+  "extensions": {
+    "colorMeta": {
+      "dourado-acolhida": {
+        "role": "primary",
+        "displayName": "Dourado Acolhida",
+        "canonical": "oklch(0.78 0.14 85)",
+        "tonalRamp": [
+          "oklch(0.15 0.14 85)",
+          "oklch(0.26 0.14 85)",
+          "oklch(0.37 0.14 85)",
+          "oklch(0.48 0.14 85)",
+          "oklch(0.59 0.14 85)",
+          "oklch(0.70 0.14 85)",
+          "oklch(0.83 0.14 85)",
+          "oklch(0.95 0.14 85)"
+        ]
+      },
+      "dourado-palido": {
+        "role": "primary",
+        "displayName": "Dourado Pálido",
+        "canonical": "oklch(0.95 0.015 85)",
+        "tonalRamp": [
+          "oklch(0.15 0.015 85)",
+          "oklch(0.26 0.015 85)",
+          "oklch(0.37 0.015 85)",
+          "oklch(0.48 0.015 85)",
+          "oklch(0.59 0.015 85)",
+          "oklch(0.70 0.015 85)",
+          "oklch(0.83 0.015 85)",
+          "oklch(0.95 0.015 85)"
+        ]
+      },
+      "dourado-sombra": {
+        "role": "primary",
+        "displayName": "Dourado Sombra",
+        "canonical": "oklch(0.3 0.05 85)",
+        "tonalRamp": [
+          "oklch(0.15 0.05 85)",
+          "oklch(0.26 0.05 85)",
+          "oklch(0.37 0.05 85)",
+          "oklch(0.48 0.05 85)",
+          "oklch(0.59 0.05 85)",
+          "oklch(0.70 0.05 85)",
+          "oklch(0.83 0.05 85)",
+          "oklch(0.95 0.05 85)"
+        ]
+      },
+      "linho-dourado": {
+        "role": "primary",
+        "displayName": "Linho Dourado",
+        "canonical": "oklch(0.92 0.04 85)",
+        "tonalRamp": [
+          "oklch(0.15 0.04 85)",
+          "oklch(0.26 0.04 85)",
+          "oklch(0.37 0.04 85)",
+          "oklch(0.48 0.04 85)",
+          "oklch(0.59 0.04 85)",
+          "oklch(0.70 0.04 85)",
+          "oklch(0.83 0.04 85)",
+          "oklch(0.95 0.04 85)"
+        ]
+      },
+      "nogueira-noturna": {
+        "role": "neutral",
+        "displayName": "Nogueira Noturna",
+        "canonical": "oklch(0.22 0.01 85)",
+        "tonalRamp": [
+          "oklch(0.15 0.01 85)",
+          "oklch(0.26 0.01 85)",
+          "oklch(0.37 0.01 85)",
+          "oklch(0.48 0.01 85)",
+          "oklch(0.59 0.01 85)",
+          "oklch(0.70 0.01 85)",
+          "oklch(0.83 0.01 85)",
+          "oklch(0.95 0.01 85)"
+        ]
+      },
+      "nogueira-realce": {
+        "role": "neutral",
+        "displayName": "Nogueira Realce",
+        "canonical": "oklch(0.28 0.015 85)",
+        "tonalRamp": [
+          "oklch(0.15 0.015 85)",
+          "oklch(0.26 0.015 85)",
+          "oklch(0.37 0.015 85)",
+          "oklch(0.48 0.015 85)",
+          "oklch(0.59 0.015 85)",
+          "oklch(0.70 0.015 85)",
+          "oklch(0.83 0.015 85)",
+          "oklch(0.95 0.015 85)"
+        ]
+      },
+      "nogueira-veio": {
+        "role": "neutral",
+        "displayName": "Nogueira Veio",
+        "canonical": "oklch(0.3 0.01 85)",
+        "tonalRamp": [
+          "oklch(0.15 0.01 85)",
+          "oklch(0.26 0.01 85)",
+          "oklch(0.37 0.01 85)",
+          "oklch(0.48 0.01 85)",
+          "oklch(0.59 0.01 85)",
+          "oklch(0.70 0.01 85)",
+          "oklch(0.83 0.01 85)",
+          "oklch(0.95 0.01 85)"
+        ]
+      },
+      "bege-recepcao": {
+        "role": "neutral",
+        "displayName": "Bege Recepção",
+        "canonical": "oklch(0.985 0.008 90)",
+        "tonalRamp": [
+          "oklch(0.15 0.008 90)",
+          "oklch(0.26 0.008 90)",
+          "oklch(0.37 0.008 90)",
+          "oklch(0.48 0.008 90)",
+          "oklch(0.59 0.008 90)",
+          "oklch(0.70 0.008 90)",
+          "oklch(0.83 0.008 90)",
+          "oklch(0.95 0.008 90)"
+        ]
+      },
+      "papel-branco": {
+        "role": "neutral",
+        "displayName": "Papel Branco",
+        "canonical": "oklch(1 0 0)",
+        "tonalRamp": [
+          "oklch(0.15 0 0)",
+          "oklch(0.26 0 0)",
+          "oklch(0.37 0 0)",
+          "oklch(0.48 0 0)",
+          "oklch(0.59 0 0)",
+          "oklch(0.70 0 0)",
+          "oklch(0.83 0 0)",
+          "oklch(0.95 0 0)"
+        ]
+      },
+      "areia-suave": {
+        "role": "neutral",
+        "displayName": "Areia Suave",
+        "canonical": "oklch(0.96 0.008 85)",
+        "tonalRamp": [
+          "oklch(0.15 0.008 85)",
+          "oklch(0.26 0.008 85)",
+          "oklch(0.37 0.008 85)",
+          "oklch(0.48 0.008 85)",
+          "oklch(0.59 0.008 85)",
+          "oklch(0.70 0.008 85)",
+          "oklch(0.83 0.008 85)",
+          "oklch(0.95 0.008 85)"
+        ]
+      },
+      "junta-de-areia": {
+        "role": "neutral",
+        "displayName": "Junta de Areia",
+        "canonical": "oklch(0.92 0.015 85)",
+        "tonalRamp": [
+          "oklch(0.15 0.015 85)",
+          "oklch(0.26 0.015 85)",
+          "oklch(0.37 0.015 85)",
+          "oklch(0.48 0.015 85)",
+          "oklch(0.59 0.015 85)",
+          "oklch(0.70 0.015 85)",
+          "oklch(0.83 0.015 85)",
+          "oklch(0.95 0.015 85)"
+        ]
+      },
+      "tinta-quente": {
+        "role": "neutral",
+        "displayName": "Tinta Quente",
+        "canonical": "oklch(0.18 0.005 90)",
+        "tonalRamp": [
+          "oklch(0.15 0.005 90)",
+          "oklch(0.26 0.005 90)",
+          "oklch(0.37 0.005 90)",
+          "oklch(0.48 0.005 90)",
+          "oklch(0.59 0.005 90)",
+          "oklch(0.70 0.005 90)",
+          "oklch(0.83 0.005 90)",
+          "oklch(0.95 0.005 90)"
+        ]
+      },
+      "cinza-recado": {
+        "role": "neutral",
+        "displayName": "Cinza Recado",
+        "canonical": "oklch(0.5 0.01 85)",
+        "tonalRamp": [
+          "oklch(0.15 0.01 85)",
+          "oklch(0.26 0.01 85)",
+          "oklch(0.37 0.01 85)",
+          "oklch(0.48 0.01 85)",
+          "oklch(0.59 0.01 85)",
+          "oklch(0.70 0.01 85)",
+          "oklch(0.83 0.01 85)",
+          "oklch(0.95 0.01 85)"
+        ]
+      },
+      "verde-saude": {
+        "role": "semantic",
+        "displayName": "Verde Saúde",
+        "canonical": "oklch(0.62 0.08 145)",
+        "tonalRamp": [
+          "oklch(0.15 0.08 145)",
+          "oklch(0.26 0.08 145)",
+          "oklch(0.37 0.08 145)",
+          "oklch(0.48 0.08 145)",
+          "oklch(0.59 0.08 145)",
+          "oklch(0.70 0.08 145)",
+          "oklch(0.83 0.08 145)",
+          "oklch(0.95 0.08 145)"
+        ]
+      },
+      "ambar-aviso": {
+        "role": "semantic",
+        "displayName": "Âmbar Aviso",
+        "canonical": "oklch(0.78 0.14 70)",
+        "tonalRamp": [
+          "oklch(0.15 0.14 70)",
+          "oklch(0.26 0.14 70)",
+          "oklch(0.37 0.14 70)",
+          "oklch(0.48 0.14 70)",
+          "oklch(0.59 0.14 70)",
+          "oklch(0.70 0.14 70)",
+          "oklch(0.83 0.14 70)",
+          "oklch(0.95 0.14 70)"
+        ]
+      },
+      "vermelho-alerta": {
+        "role": "semantic",
+        "displayName": "Vermelho Alerta",
+        "canonical": "oklch(0.58 0.22 27)",
+        "tonalRamp": [
+          "oklch(0.15 0.22 27)",
+          "oklch(0.26 0.22 27)",
+          "oklch(0.37 0.22 27)",
+          "oklch(0.48 0.22 27)",
+          "oklch(0.59 0.22 27)",
+          "oklch(0.70 0.22 27)",
+          "oklch(0.83 0.22 27)",
+          "oklch(0.95 0.22 27)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Login e 404 apenas."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "h1 de cada página."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Títulos de cards e seções."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Texto padrão, tabelas, descrições."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Metadados, badges, legendas."
+      }
+    },
+    "shadows": [
+      {
+        "name": "apoio",
+        "value": "0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)",
+        "purpose": "Cards e botões preenchidos em repouso."
+      },
+      {
+        "name": "apoio-leve",
+        "value": "0 1px 2px 0 rgb(0 0 0 / 0.05)",
+        "purpose": "Inputs e botões outline/secondary."
+      },
+      {
+        "name": "flutuante",
+        "value": "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)",
+        "purpose": "Popovers, dropdowns e diálogos."
+      }
+    ],
+    "motion": [
+      {
+        "name": "transicao-cor",
+        "value": "150ms cubic-bezier(0.4, 0, 0.2, 1)",
+        "purpose": "Transição padrão de cor em botões, links e itens (transition-colors)."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px"
+      },
+      {
+        "name": "xl",
+        "value": "1280px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Botão primário",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Ação principal da tela: dourado com texto Tinta Quente.",
+      "html": "<button class=\"ds-btn-primary\">Dar baixa</button>",
+      "css": ".ds-btn-primary{display:inline-flex;align-items:center;gap:8px;height:36px;padding:8px 16px;border:none;border-radius:10px;background:var(--primary,oklch(0.78 0.14 85));color:var(--primary-foreground,oklch(0.18 0.005 90));font:500 14px/1 Inter,system-ui,sans-serif;box-shadow:0 1px 3px 0 rgb(0 0 0/.1),0 1px 2px -1px rgb(0 0 0/.1);cursor:pointer;transition:background-color .15s}.ds-btn-primary:hover{background:color-mix(in oklch,var(--primary,oklch(0.78 0.14 85)) 90%,transparent)}.ds-btn-primary:focus-visible{outline:none;box-shadow:0 0 0 1px var(--ring,oklch(0.78 0.14 85))}"
+    },
+    {
+      "name": "Botão outline",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Ação secundária; hover em Linho Dourado.",
+      "html": "<button class=\"ds-btn-outline\">Cancelar</button>",
+      "css": ".ds-btn-outline{display:inline-flex;align-items:center;height:36px;padding:8px 16px;border:1px solid var(--input,oklch(0.92 0.015 85));border-radius:10px;background:var(--background,oklch(0.985 0.008 90));color:var(--foreground,oklch(0.18 0.005 90));font:500 14px/1 Inter,system-ui,sans-serif;box-shadow:0 1px 2px 0 rgb(0 0 0/.05);cursor:pointer;transition:background-color .15s,color .15s}.ds-btn-outline:hover{background:var(--accent,oklch(0.92 0.04 85));color:var(--accent-foreground,oklch(0.30 0.06 85))}.ds-btn-outline:focus-visible{outline:none;box-shadow:0 0 0 1px var(--ring,oklch(0.78 0.14 85))}"
+    },
+    {
+      "name": "Botão destrutivo",
+      "kind": "button",
+      "refersTo": "button-destructive",
+      "description": "Estornos, cancelamentos e exclusões.",
+      "html": "<button class=\"ds-btn-destructive\">Estornar</button>",
+      "css": ".ds-btn-destructive{display:inline-flex;align-items:center;height:36px;padding:8px 16px;border:none;border-radius:10px;background:var(--destructive,oklch(0.58 0.22 27));color:var(--destructive-foreground,oklch(0.98 0 0));font:500 14px/1 Inter,system-ui,sans-serif;box-shadow:0 1px 2px 0 rgb(0 0 0/.05);cursor:pointer;transition:background-color .15s}.ds-btn-destructive:hover{background:color-mix(in oklch,var(--destructive,oklch(0.58 0.22 27)) 90%,transparent)}.ds-btn-destructive:focus-visible{outline:none;box-shadow:0 0 0 1px var(--ring,oklch(0.78 0.14 85))}"
+    },
+    {
+      "name": "Campo de texto",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Borda Junta de Areia, foco com anel dourado.",
+      "html": "<input class=\"ds-input\" placeholder=\"Nome do profissional\" />",
+      "css": ".ds-input{height:36px;width:260px;padding:4px 12px;border:1px solid var(--input,oklch(0.92 0.015 85));border-radius:10px;background:transparent;color:var(--foreground,oklch(0.18 0.005 90));font:400 14px/1.4 Inter,system-ui,sans-serif;box-shadow:0 1px 2px 0 rgb(0 0 0/.05);transition:box-shadow .15s}.ds-input::placeholder{color:var(--muted-foreground,oklch(0.50 0.01 85))}.ds-input:focus-visible{outline:none;box-shadow:0 0 0 1px var(--ring,oklch(0.78 0.14 85))}"
+    },
+    {
+      "name": "Badge de status",
+      "kind": "chip",
+      "refersTo": "badge-outline",
+      "description": "Status com borda e texto na cor semântica e ícone de apoio.",
+      "html": "<span class=\"ds-badge ds-badge-conflito\"><svg width=\"12\" height=\"12\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3\"/><path d=\"M12 9v4\"/><path d=\"M12 17h.01\"/></svg>2 conflitos</span> <span class=\"ds-badge ds-badge-recebido\">Recebido</span>",
+      "css": ".ds-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border:1px solid var(--border,oklch(0.92 0.015 85));border-radius:10px;font:600 12px/1.33 Inter,system-ui,sans-serif;color:var(--foreground,oklch(0.18 0.005 90))}.ds-badge-conflito{border-color:color-mix(in oklch,var(--destructive,oklch(0.58 0.22 27)) 60%,transparent);color:var(--destructive,oklch(0.58 0.22 27))}.ds-badge-recebido{border-color:color-mix(in oklch,var(--success,oklch(0.62 0.08 145)) 40%,transparent);color:var(--success,oklch(0.62 0.08 145))}"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Papel Branco sobre Bege Recepção, título em serifa com ícone dourado.",
+      "html": "<div class=\"ds-card\"><div class=\"ds-card-title\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M8 2v4\"/><path d=\"M16 2v4\"/><rect width=\"18\" height=\"18\" x=\"3\" y=\"4\" rx=\"2\"/><path d=\"M3 10h18\"/></svg>Reservas da semana</div><p class=\"ds-card-text\">12 reservas ativas em 4 salas.</p></div>",
+      "css": ".ds-card{width:320px;padding:24px;border:1px solid var(--border,oklch(0.92 0.015 85));border-radius:16px;background:var(--card,oklch(1 0 0));color:var(--card-foreground,oklch(0.18 0.005 90));box-shadow:0 1px 3px 0 rgb(0 0 0/.1),0 1px 2px -1px rgb(0 0 0/.1)}.ds-card-title{display:flex;align-items:center;gap:8px;font:600 20px/1.3 'Cormorant Garamond', 'Inter', serif;letter-spacing:-.01em}.ds-card-title svg{color:var(--primary,oklch(0.78 0.14 85))}.ds-card-text{margin:12px 0 0;font:400 14px/1.43 Inter,system-ui,sans-serif;color:var(--muted-foreground,oklch(0.50 0.01 85))}"
+    },
+    {
+      "name": "Sidebar",
+      "kind": "nav",
+      "refersTo": "sidebar",
+      "description": "O balcão em Nogueira Noturna com item ativo em Nogueira Realce.",
+      "html": "<nav class=\"ds-nav\"><div class=\"ds-nav-brand\"><span class=\"ds-nav-mark\"></span><span><b>Versão Saúde</b><small>Gestão clínica</small></span></div><a class=\"ds-nav-item ds-active\" href=\"#\">Dashboard</a><a class=\"ds-nav-item\" href=\"#\">Contratos</a><a class=\"ds-nav-item\" href=\"#\">Financeiro</a></nav>",
+      "css": ".ds-nav{width:224px;padding:12px 8px;border-radius:12px;background:var(--sidebar,oklch(0.22 0.01 85));color:var(--sidebar-foreground,oklch(0.92 0.01 85));font:400 14px/1.4 Inter,system-ui,sans-serif;display:flex;flex-direction:column;gap:2px}.ds-nav-brand{display:flex;align-items:center;gap:8px;padding:4px 8px 12px;margin-bottom:6px;border-bottom:1px solid var(--sidebar-border,oklch(0.30 0.01 85))}.ds-nav-brand b{display:block;font:500 16px/1.2 'Cormorant Garamond', 'Inter', serif}.ds-nav-brand small{font-size:12px;opacity:.6}.ds-nav-mark{width:36px;height:36px;border-radius:12px;background:var(--sidebar-primary,oklch(0.78 0.14 85))}.ds-nav-item{padding:8px;border-radius:8px;color:inherit;text-decoration:none;transition:background-color .15s}.ds-nav-item:hover,.ds-nav-item.ds-active{background:var(--sidebar-accent,oklch(0.28 0.015 85))}.ds-nav-item.ds-active{font-weight:500}.ds-nav-item:focus-visible{outline:none;box-shadow:0 0 0 2px var(--sidebar-ring,oklch(0.78 0.14 85))}"
+    },
+    {
+      "name": "Bloco de reserva",
+      "kind": "custom",
+      "refersTo": "",
+      "description": "Reserva na grade semanal: borda esquerda na cor do profissional, fundo translúcido.",
+      "html": "<div class=\"ds-booking\" style=\"--ent:#6F8F72\"><b>Sala 3 · Turno manhã</b><span>Dra. Ana Lima</span></div>",
+      "css": ".ds-booking{width:140px;display:flex;flex-direction:column;padding:4px 6px;border-left:2px solid var(--ent);border-radius:4px;background:color-mix(in srgb,var(--ent) 13%,transparent);font:400 10px/1.25 Inter,system-ui,sans-serif;color:var(--foreground,oklch(0.18 0.005 90));transition:opacity .15s}.ds-booking b{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ds-booking span{opacity:.8}.ds-booking:hover{opacity:.9}"
+    }
+  ],
+  "narrative": {
+    "northStar": "A Recepção Dourada",
+    "overview": "O Versão Saúde se comporta como a recepção de uma clínica premium: um balcão escuro de madeira (a sidebar em Nogueira Noturna), paredes claras e quentes (o fundo Bege Recepção) e papel branco sobre a mesa (os cards). O dourado é o gesto de atenção da recepcionista. Ele aparece onde há algo a fazer ou a notar, nunca como enfeite. Os títulos em Cormorant Garamond dão o tom de cortesia. Todo o resto, em Inter, é direto e funcional, porque o gestor está trabalhando.\n\nÉ uma ferramenta de operação, então a ambição aparece como precisão: informação escaneável, estados claros, nenhum ruído. Os componentes são táteis e confiantes. Alvos de toque generosos, contraste nítido e retorno visível a cada interação importam, porque o gestor resolve conflitos e dá baixas pelo celular.\n\nRejeições confirmadas: nada de visual **hospitalar e frio** (azul e branco estéril) e nada de **SaaS genérico** (o cinza-azulado padrão de template shadcn). A temperatura quente, com croma sutil no hue 85 em todos os neutros, é o que separa este sistema das duas coisas.",
+    "keyCharacteristics": [
+      "Neutros quentes em todo lugar: até os brancos e cinzas carregam um pouco de dourado (hue 85–90).",
+      "Um único acento, o dourado, usado como preenchimento de ação e sinal de estado ativo.",
+      "Serifa editorial só nos títulos; interface e dados em sans.",
+      "Profundidade por camadas tonais (bege → branco), com sombra só de apoio.",
+      "Balcão escuro (sidebar) contra salão claro (conteúdo)."
+    ],
+    "rules": [
+      {
+        "name": "A Regra do Gesto Único",
+        "body": "O dourado é o único acento e marca o que pede ação ou o que está ativo. Se uma tela tem dourado em tudo, ele não aponta para nada.",
+        "section": "colors"
+      },
+      {
+        "name": "A Regra do Ouro como Preenchimento",
+        "body": "O Dourado Acolhida tem luminosidade alta (0.78) e não tem contraste para texto pequeno sobre o Bege Recepção ou o Papel Branco. Use-o como fundo, borda ou ícone. Quando precisar de texto dourado, use o Dourado Sombra. O código atual ainda tem links em `text-primary` que violam esta regra.",
+        "section": "colors"
+      },
+      {
+        "name": "A Regra do Neutro Quente",
+        "body": "Nenhum neutro é cinza puro. Todo cinza novo carrega croma de 0.005 a 0.015 no hue 85–90. Cinza-azulado é a assinatura do SaaS genérico que este sistema rejeita.",
+        "section": "colors"
+      },
+      {
+        "name": "A Regra da Cortesia nos Títulos",
+        "body": "A serifa aparece em `h1` a `h4` e em títulos de card, nunca em números, valores em BRL, botões ou células de tabela. Dinheiro e horários são sempre Inter.",
+        "section": "typography"
+      },
+      {
+        "name": "A Regra dos Números Alinhados",
+        "body": "Colunas de valores e horários devem usar `tabular-nums`, para que somas e turnos se alinhem verticalmente.",
+        "section": "typography"
+      },
+      {
+        "name": "A Regra do Bolso",
+        "body": "Toda ação que o gestor faz no celular (resolver conflito, dar baixa, consultar a agenda) precisa caber em uma coluna de 360px sem rolagem horizontal da página. Tabelas largas rolam dentro do próprio contêiner.",
+        "section": "layout"
+      },
+      {
+        "name": "A Regra do Papel sobre a Mesa",
+        "body": "A separação entre superfícies vem primeiro da troca de tom (bege → branco) e da borda quente. Se for preciso aumentar a sombra para um card \"aparecer\", o problema está no tom ou no espaçamento.",
+        "section": "elevation"
+      },
+      {
+        "name": "A Regra da Borda que Identifica",
+        "body": "A borda esquerda colorida é o sinal de \"a quem pertence\" (sala ou profissional). Não use esse recurso para indicar estado. Estado fica com os badges e as cores semânticas.",
+        "section": "shapes"
+      }
+    ],
+    "dos": [
+      "**Do** manter um único acento: o Dourado Acolhida marca a ação principal e o estado ativo de cada tela.",
+      "**Do** pôr texto Tinta Quente sobre o dourado, nunca branco.",
+      "**Do** separar superfícies por tom (Papel Branco sobre Bege Recepção) e borda Junta de Areia antes de recorrer à sombra.",
+      "**Do** reservar a Cormorant Garamond para `h1`–`h4` e títulos de card. Números, BRL, horários e botões são Inter.",
+      "**Do** usar as cores de entidade como borda forte com fundo translúcido (cerca de 13%) para identificar salas e profissionais.",
+      "**Do** garantir alvos de toque generosos nos fluxos que o gestor usa no celular: conflitos, baixas e agenda."
+    ],
+    "donts": [
+      "**Don't** usar texto em Dourado Acolhida sobre fundo claro. Use o Dourado Sombra.",
+      "**Don't** introduzir azul-e-branco clínico ou superfícies frias e estéreis (anti-referência confirmada: hospital frio).",
+      "**Don't** usar o cinza-azulado neutro do template shadcn padrão. Todo neutro é quente (anti-referência confirmada: SaaS genérico).",
+      "**Don't** usar a borda esquerda colorida para indicar estado. Ela identifica a entidade.",
+      "**Don't** criar um segundo acento colorido para competir com o dourado. As cores semânticas (verde, âmbar, vermelho) só comunicam estado."
+    ]
+  }
+}
